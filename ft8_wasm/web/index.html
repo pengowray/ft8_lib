@@ -124,6 +124,7 @@
         <div id="audio-controls" style="display:none;">
             <button id="play-audio">Play Audio</button>
             <button id="play-audio-timed">Play at Next 15s Slot</button>
+            <button id="stop-audio" disabled>Stop Audio</button>
             <button id="download-audio">Download Audio</button>
             <div id="countdown"></div>
         </div>
@@ -159,6 +160,7 @@
         const audioControls = document.getElementById('audio-controls');
         const playAudioButton = document.getElementById('play-audio');
         const playAudioTimedButton = document.getElementById('play-audio-timed');
+        const stopAudioButton = document.getElementById('stop-audio');
         const downloadAudioButton = document.getElementById('download-audio');
         const countdownDiv = document.getElementById('countdown');
         const themeToggle = document.getElementById('theme-toggle');
@@ -171,39 +173,50 @@
         let countdownInterval = null;
 
         function playAudio() {
-            if (audioBuffer) {
-                if (audioSource) {
-                    stopAudio();
-                } else {
-                    audioContext.resume().then(() => {
-                        audioSource = audioContext.createBufferSource();
-                        audioSource.buffer = audioBuffer;
-                        audioSource.connect(audioContext.destination);
-                        audioSource.start();
-                        audioSource.onended = stopAudio;
-                        playAudioButton.textContent = 'Stop Audio';
-                    });
-                }
+            if (audioBuffer && !audioSource) {
+                audioContext.resume().then(() => {
+                    audioSource = audioContext.createBufferSource();
+                    audioSource.buffer = audioBuffer;
+                    audioSource.connect(audioContext.destination);
+                    audioSource.start();
+                    audioSource.onended = resetAudioState;
+                    updateButtonState(true);
+                });
             }
         }
 
         function stopAudio() {
             if (audioSource) {
                 audioSource.stop();
-                audioSource = null;
-                playAudioButton.textContent = 'Play Audio';
-                playAudioTimedButton.disabled = false;
+                resetAudioState();
             }
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+                countdownDiv.style.display = 'none';
+            }
+            updateButtonState(false);
+        }
+
+        function resetAudioState() {
+            audioSource = null;
+            updateButtonState(false);
+        }
+
+        function updateButtonState(isPlaying) {
+            playAudioButton.disabled = isPlaying;
+            playAudioTimedButton.disabled = isPlaying;
+            stopAudioButton.disabled = !isPlaying;
+            downloadAudioButton.disabled = isPlaying;
         }
 
         function playAudioTimed() {
-            if (audioBuffer) {
+            if (audioBuffer && !audioSource) {
                 const now = new Date();
                 const secondsUntilNext15 = 15 - (now.getSeconds() % 15);
                 let totalSeconds = secondsUntilNext15;
 
-                playAudioButton.disabled = true;
-                playAudioTimedButton.disabled = true;
+                updateButtonState(true);
                 countdownDiv.style.display = 'block';
 
                 countdownInterval = setInterval(() => {
@@ -213,9 +226,9 @@
                     
                     if (totalSeconds <= 0) {
                         clearInterval(countdownInterval);
+                        countdownInterval = null;
                         countdownDiv.style.display = 'none';
                         playAudio();
-                        playAudioTimedButton.disabled = false;
                     }
                     totalSeconds--;
                 }, 1000);
@@ -224,6 +237,8 @@
 
         playAudioButton.addEventListener('click', playAudio);
         playAudioTimedButton.addEventListener('click', playAudioTimed);
+        stopAudioButton.addEventListener('click', stopAudio);
+
 
         function downloadAudio() {
             if (audioBuffer) {
@@ -332,10 +347,11 @@
             channelData.set(audioSamples);
 
             audioControls.style.display = 'block';
-            playAudioButton.textContent = 'Play Audio';
-            playAudioButton.disabled = false;
-            playAudioTimedButton.disabled = false;
+            updateButtonState(false);
             countdownDiv.style.display = 'none';
+
+            // Recreate the audio context to ensure it's in a clean state
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
             // Free the memory allocated in C
             freeFT8Result(resultPtr);

@@ -6,25 +6,70 @@
 #include "ft8/encode.h"
 #include "ft8/message.h"
 #include "ft8/constants.h"
+#include "genft8.h"
 //#include "ft8/pack.h"
 
-#define FT8_FREQ_BASE_DEFAULT 1000.0f
-#define FT8_TONE_SPACING 6.25f
-
 #define EMSCRIPTEN_KEEPALIVE __attribute__((used))
-
-float FT8_FREQ_BASE = FT8_FREQ_BASE_DEFAULT; 
-
-// Helper function to allocate memory for strings
 char* allocate_string(const char* str) {
     char* result = (char*)malloc(strlen(str) + 1);
     strcpy(result, str);
     return result;
 }
 
+#define FT8_FREQ_BASE_DEFAULT 1000.0f
+#define FT8_TONE_SPACING 6.25f
+#define GFSK_CONST_K 5.336446f
+#define FT8_SYMBOL_BT 2.0f
+
+#define EMSCRIPTEN_KEEPALIVE __attribute__((used))
+
+typedef struct {
+    uint8_t* packed_data;
+    int packed_size;
+    uint8_t* symbols;
+    int symbol_count;
+    float* audio;
+    int audio_samples;
+} FT8Result;  // Add semicolon here
+
 EMSCRIPTEN_KEEPALIVE
-void setBaseFrequency(float freq) {
-    FT8_FREQ_BASE = freq;
+FT8Result* encodeFT8(const char* message, float base_freq) {
+    ftx_message_t msg;
+    ftx_message_rc_t rc = ftx_message_encode(&msg, NULL, message);
+    if (rc != FTX_MESSAGE_RC_OK) {
+        return NULL;
+    }
+
+    FT8Result* result = (FT8Result*)malloc(sizeof(FT8Result));
+
+    // Pack the message
+    result->packed_data = (uint8_t*)malloc(FTX_PAYLOAD_LENGTH_BYTES);
+    memcpy(result->packed_data, msg.payload, FTX_PAYLOAD_LENGTH_BYTES);
+    result->packed_size = FTX_PAYLOAD_LENGTH_BYTES;
+
+    // Generate tones
+    result->symbols = (uint8_t*)malloc(FT8_NN);
+    ft8_encode(msg.payload, result->symbols);
+    result->symbol_count = FT8_NN;
+
+    // Generate audio
+    const int sample_rate = 12000;
+    result->audio_samples = (int)(FT8_SYMBOL_PERIOD * FT8_NN * sample_rate);
+    result->audio = (float*)malloc(result->audio_samples * sizeof(float));
+
+    synth_gfsk(result->symbols, FT8_NN, base_freq, FT8_SYMBOL_BT, FT8_SYMBOL_PERIOD, sample_rate, result->audio);
+
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE
+void freeFT8Result(FT8Result* result) {
+    if (result) {
+        free(result->packed_data);
+        free(result->symbols);
+        free(result->audio);
+        free(result);
+    }
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -56,7 +101,7 @@ char* encodeFT8_packed(const char* message) {
 }
 
 EMSCRIPTEN_KEEPALIVE
-float* encodeFT8_audio(const char* message, int* num_samples) {
+float* encodeFT8_audio(const char* message, float base_freq, int* num_samples) {
     // Encode the message
     ftx_message_t msg;
     ftx_message_rc_t rc = ftx_message_encode(&msg, NULL, message);
@@ -77,7 +122,7 @@ float* encodeFT8_audio(const char* message, int* num_samples) {
     float* audio = (float*)malloc(*num_samples * sizeof(float));
 
     for (int i = 0; i < FT8_NN; i++) {
-        float frequency = FT8_FREQ_BASE + tones[i] * FT8_TONE_SPACING;
+        float frequency = base_freq + tones[i] * FT8_TONE_SPACING;
         for (int j = 0; j < samples_per_symbol; j++) {
             int sample_index = i * samples_per_symbol + j;
             float t = (float)sample_index / sample_rate;
@@ -86,62 +131,6 @@ float* encodeFT8_audio(const char* message, int* num_samples) {
     }
 
     return audio;
-}
-
-EMSCRIPTEN_KEEPALIVE
-char* encodeFT8_full(const char* message) {
-    // Get packed bytes and tones
-    char* packed_result = encodeFT8_packed(message);
-    
-    // Get audio samples
-    int num_samples;
-    float* audio = encodeFT8_audio(message, &num_samples);
-    
-    // Combine results
-    char* full_result = (char*)malloc(strlen(packed_result) + 256);  // Adjust size as needed
-    sprintf(full_result, "%s\nNum audio samples: %d\nBase frequency: %.1f", packed_result, num_samples, FT8_FREQ_BASE);
-    
-    free(packed_result);
-    
-    // Return the pointer to the audio samples
-    *(float**)((void*)full_result + strlen(full_result) + 1) = audio;
-    
-    return full_result;
-}
-
-EMSCRIPTEN_KEEPALIVE
-char* encodeFT8_full_old(const char* message) {
-    // Get packed bytes and tones
-    char* packed_result = encodeFT8_packed(message);
-    
-    // Get audio samples
-    int num_samples;
-    float* audio = encodeFT8_audio(message, &num_samples);
-    
-    // Combine results
-    char* full_result = (char*)malloc(strlen(packed_result) + 256 + num_samples * 10);  // Adjust size as needed
-    strcpy(full_result, packed_result);
-    strcat(full_result, "\nAudio samples: ");
-    
-    for (int i = 0; i < num_samples && i < 100; i++) {  // Limit to first 100 samples
-        char sample_str[32];
-        sprintf(sample_str, "%.4f ", audio[i]);
-        strcat(full_result, sample_str);
-    }
-    
-    if (num_samples > 100) {
-        strcat(full_result, "...");
-    }
-    
-    free(packed_result);
-    free(audio);
-    
-    return full_result;
-}
-
-EMSCRIPTEN_KEEPALIVE
-char* encodeFT8(const char* message) {
-    return encodeFT8_full(message);
 }
 
 EMSCRIPTEN_KEEPALIVE

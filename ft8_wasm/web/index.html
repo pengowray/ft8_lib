@@ -154,20 +154,14 @@
         const audioInput = document.getElementById('audio-input');
         const encodeOutput = document.getElementById('encode-output');
         const decodeOutput = document.getElementById('decode-output');
-        const themeToggle = document.getElementById('theme-toggle');
-        const exampleMessagesDiv = document.getElementById('example-messages');
         const audioControls = document.getElementById('audio-controls');
         const playAudioButton = document.getElementById('play-audio');
         const downloadAudioButton = document.getElementById('download-audio');
-
-
-        const setBaseFrequency = Module.cwrap('setBaseFrequency', null, ['number']);
-        const encodeFT8_full = Module.cwrap('encodeFT8_full', 'string', ['string']);
-        const decodeFT8 = Module.cwrap('decodeFT8', 'string', ['number', 'number']);
-
-        let audioContext;
-        let audioBuffer;
-
+        const themeToggle = document.getElementById('theme-toggle');
+        const exampleMessagesDiv = document.getElementById('example-messages');
+ 
+        const encodeFT8 = Module.cwrap('encodeFT8', 'number', ['string', 'number']);
+        const freeFT8Result = Module.cwrap('freeFT8Result', null, ['number']);
 
         function playAudio() {
             if (audioBuffer) {
@@ -181,7 +175,7 @@
         }
 
         function downloadAudio() {
-            if (audioBuffer && audioBuffer.length > 0) {
+            if (audioBuffer) {
                 const wavData = audioBufferToWav(audioBuffer);
                 const blob = new Blob([new DataView(wavData)], { type: 'audio/wav' });
                 const url = URL.createObjectURL(blob);
@@ -195,8 +189,6 @@
                     document.body.removeChild(a);
                     window.URL.revokeObjectURL(url);
                 }, 100);
-            } else {
-                console.error('Audio buffer is empty or invalid');
             }
         }
 
@@ -252,32 +244,43 @@
         encodeButton.addEventListener('click', () => {
             const message = messageInput.value;
             const baseFreq = parseFloat(baseFreqInput.value) || 1000;
-            setBaseFrequency(baseFreq);
-            const result = encodeFT8_full(message);
-            console.log("Encoder result:", result);
-
-            const [textResult, audioSamplesPtr] = result.split('\0');
-            encodeOutput.textContent = textResult;
-
-            const numSamplesMatch = textResult.match(/Num audio samples: (\d+)/);
-            if (numSamplesMatch) {
-                const numSamples = parseInt(numSamplesMatch[1]);
-                const audioSamples = new Float32Array(Module.HEAPF32.buffer, parseInt(audioSamplesPtr), numSamples);
-                
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                audioBuffer = audioContext.createBuffer(1, numSamples, 12000);
-                const channelData = audioBuffer.getChannelData(0);
-                channelData.set(audioSamples);
-
-                audioControls.stylse.display = 'block';
-            } else {
-                console.error("No audio samples found in the encoder result");
-                audioControls.style.display = 'none';
+            const resultPtr = encodeFT8(message, baseFreq);
+            
+            if (resultPtr === 0) {
+                encodeOutput.textContent = "Error: Invalid message format";
+                return;
             }
 
+            const result = {
+                packed_data: Module.getValue(resultPtr, '*'),
+                packed_size: Module.getValue(resultPtr + 4, 'i32'),
+                symbols: Module.getValue(resultPtr + 8, '*'),
+                symbol_count: Module.getValue(resultPtr + 12, 'i32'),
+                audio: Module.getValue(resultPtr + 16, '*'),
+                audio_samples: Module.getValue(resultPtr + 20, 'i32')
+            };
+
+            // Display packed data and symbols
+            const packedData = new Uint8Array(Module.HEAPU8.buffer, result.packed_data, result.packed_size);
+            const symbols = new Uint8Array(Module.HEAPU8.buffer, result.symbols, result.symbol_count);
+            encodeOutput.textContent = `Packed data: ${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join(' ')}\n`;
+            encodeOutput.textContent += `Symbols: ${Array.from(symbols).join(' ')}\n`;
+
+            // Create audio buffer
+            const audioSamples = new Float32Array(Module.HEAPF32.buffer, result.audio, result.audio_samples);
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            audioBuffer = audioContext.createBuffer(1, result.audio_samples, 12000);
+            const channelData = audioBuffer.getChannelData(0);
+            channelData.set(audioSamples);
+
+            audioControls.style.display = 'block';
+
             // Free the memory allocated in C
-            Module._free(parseInt(audioSamplesPtr));
+            freeFT8Result(resultPtr);
         });
+
+        playAudioButton.addEventListener('click', playAudio);
+        downloadAudioButton.addEventListener('click', downloadAudio);
 
         decodeButton.addEventListener('click', () => {
             const file = audioInput.files[0];

@@ -92,6 +92,34 @@
             right: 10px;
         }
 
+        #piano-roll {
+            margin-top: 20px;
+            display: grid;
+            gap: 1px;
+            height: 100px;
+            position: relative;
+        }
+
+        #piano-roll div {
+            transition: background-color 0.1s;
+        }
+
+        #position-line {
+            position: absolute;
+            width: 2px;
+            height: 100%;
+            background-color: red;
+            transition: left 0.1s;
+        }
+
+        body.dark-mode #piano-roll {
+            background-color: #333;
+        }
+
+        body:not(.dark-mode) #piano-roll {
+            background-color: #ddd;
+        }
+
         @media (max-width: 600px) {
             body {
                 padding: 10px;
@@ -185,25 +213,21 @@
         function createPianoRoll(symbols) {
             const pianoRollDiv = document.getElementById('piano-roll');
             pianoRollDiv.innerHTML = '';
-            pianoRollDiv.style.display = 'grid';
             pianoRollDiv.style.gridTemplateColumns = `repeat(${symbols.length}, 1fr)`;
-            pianoRollDiv.style.gap = '1px';
-            pianoRollDiv.style.height = '100px';
-            pianoRollDiv.style.backgroundColor = '#333';
 
             symbols.forEach((symbol, index) => {
                 const symbolDiv = document.createElement('div');
-                symbolDiv.style.backgroundColor = getSymbolColor(symbol);
+                symbolDiv.style.backgroundColor = index % 2 === 0 ? 'var(--bg-color)' : 'var(--input-bg)';
                 symbolDiv.style.gridRow = `${8 - symbol} / span 1`;
                 symbolDiv.style.gridColumn = `${index + 1} / span 1`;
                 symbolDiv.dataset.index = index;
+                symbolDiv.dataset.symbol = symbol;
                 pianoRollDiv.appendChild(symbolDiv);
             });
-        }
 
-        function getSymbolColor(symbol) {
-            const colors = ['#ff0000', '#ff7f00', '#ffff00', '#00ff00', '#0000ff', '#4b0082', '#9400d3', '#ffffff'];
-            return colors[symbol];
+            const positionLine = document.createElement('div');
+            positionLine.id = 'position-line';
+            pianoRollDiv.appendChild(positionLine);
         }
 
         function highlightCurrentSymbol(currentTime) {
@@ -212,14 +236,24 @@
             
             const pianoRollDiv = document.getElementById('piano-roll');
             const symbols = pianoRollDiv.children;
+            const positionLine = document.getElementById('position-line');
             
             for (let i = 0; i < symbols.length; i++) {
                 if (i === currentSymbolIndex) {
-                    symbols[i].style.boxShadow = '0 0 10px #fff';
+                    symbols[i].style.backgroundColor = getHighlightColor(symbols[i].dataset.symbol);
                 } else {
-                    symbols[i].style.boxShadow = 'none';
+                    symbols[i].style.backgroundColor = i % 2 === 0 ? 'var(--bg-color)' : 'var(--input-bg)';
                 }
             }
+
+            // Update position line
+            const progress = currentTime / audioBuffer.duration;
+            positionLine.style.left = `${progress * 100}%`;
+        }
+
+        function getHighlightColor(symbol) {
+            const colors = ['#ff6b6b', '#feca57', '#48dbfb', '#ff9ff3', '#54a0ff', '#5f27cd', '#ff6b6b', '#ff6b6b'];
+            return colors[symbol];
         }
 
         function playAudio() {

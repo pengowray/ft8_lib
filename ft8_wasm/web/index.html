@@ -219,7 +219,7 @@
                 updateButtonState(true);
                 countdownDiv.style.display = 'block';
 
-                countdownInterval = setInterval(() => {
+                function updateCountdown() {
                     const minutes = Math.floor(totalSeconds / 60);
                     const seconds = totalSeconds % 60;
                     countdownDiv.textContent = `Playing in ${minutes}:${seconds.toString().padStart(2, '0')}`;
@@ -231,14 +231,16 @@
                         playAudio();
                     }
                     totalSeconds--;
-                }, 1000);
+                }
+
+                updateCountdown(); // Call immediately to show correct time
+                countdownInterval = setInterval(updateCountdown, 1000);
             }
         }
 
         playAudioButton.addEventListener('click', playAudio);
         playAudioTimedButton.addEventListener('click', playAudioTimed);
         stopAudioButton.addEventListener('click', stopAudio);
-
 
         function downloadAudio() {
             if (audioBuffer) {
@@ -248,7 +250,9 @@
                 const a = document.createElement('a');
                 a.style.display = 'none';
                 a.href = url;
-                a.download = 'ft8_message.wav';
+                const baseFreq = parseFloat(baseFreqInput.value) || 1000;
+                const message = messageInput.value.replace(/\s+/g, '_');
+                a.download = `FT8-${baseFreq}Hz_${message}.wav`;
                 document.body.appendChild(a);
                 a.click();
                 setTimeout(() => {
@@ -257,7 +261,6 @@
                 }, 100);
             }
         }
-
         function audioBufferToWav(buffer) {
             const numChannels = buffer.numberOfChannels;
             const sampleRate = buffer.sampleRate;
@@ -337,7 +340,13 @@
             const packedData = new Uint8Array(Module.HEAPU8.buffer, result.packed_data, result.packed_size);
             const symbols = new Uint8Array(Module.HEAPU8.buffer, result.symbols, result.symbol_count);
             encodeOutput.textContent = `Packed data: ${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join(' ')}\n`;
-            encodeOutput.textContent += `Symbols: ${Array.from(symbols).join(' ')}\n`;
+            encodeOutput.textContent += `Symbols: ${Array.from(symbols).join('')}`;
+
+            // Wrap symbols
+            const symbolsContainer = document.createElement('div');
+            symbolsContainer.style.wordBreak = 'break-all';
+            symbolsContainer.textContent = Array.from(symbols).join('');
+            encodeOutput.appendChild(symbolsContainer);
 
             // Create audio buffer
             const audioSamples = new Float32Array(Module.HEAPF32.buffer, result.audio, result.audio_samples);

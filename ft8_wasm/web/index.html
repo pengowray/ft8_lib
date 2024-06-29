@@ -123,7 +123,9 @@
 
         <div id="audio-controls" style="display:none;">
             <button id="play-audio">Play Audio</button>
+            <button id="play-audio-timed">Play at Next 15s Slot</button>
             <button id="download-audio">Download Audio</button>
+            <div id="countdown"></div>
         </div>
 
         <div id="example-messages">
@@ -156,28 +158,77 @@
         const decodeOutput = document.getElementById('decode-output');
         const audioControls = document.getElementById('audio-controls');
         const playAudioButton = document.getElementById('play-audio');
+        const playAudioTimedButton = document.getElementById('play-audio-timed');
         const downloadAudioButton = document.getElementById('download-audio');
+        const countdownDiv = document.getElementById('countdown');
         const themeToggle = document.getElementById('theme-toggle');
         const exampleMessagesDiv = document.getElementById('example-messages');
  
         const encodeFT8 = Module.cwrap('encodeFT8', 'number', ['string', 'number']);
         const freeFT8Result = Module.cwrap('freeFT8Result', null, ['number']);
 
+        let audioSource = null;
+        let countdownInterval = null;
+
         function playAudio() {
             if (audioBuffer) {
-                audioContext.resume().then(() => {
-                    const source = audioContext.createBufferSource();
-                    source.buffer = audioBuffer;
-                    source.connect(audioContext.destination);
-                    source.start();
-                });
+                if (audioSource) {
+                    stopAudio();
+                } else {
+                    audioContext.resume().then(() => {
+                        audioSource = audioContext.createBufferSource();
+                        audioSource.buffer = audioBuffer;
+                        audioSource.connect(audioContext.destination);
+                        audioSource.start();
+                        audioSource.onended = stopAudio;
+                        playAudioButton.textContent = 'Stop Audio';
+                    });
+                }
             }
         }
+
+        function stopAudio() {
+            if (audioSource) {
+                audioSource.stop();
+                audioSource = null;
+                playAudioButton.textContent = 'Play Audio';
+                playAudioTimedButton.disabled = false;
+            }
+        }
+
+        function playAudioTimed() {
+            if (audioBuffer) {
+                const now = new Date();
+                const secondsUntilNext15 = 15 - (now.getSeconds() % 15);
+                let totalSeconds = secondsUntilNext15;
+
+                playAudioButton.disabled = true;
+                playAudioTimedButton.disabled = true;
+                countdownDiv.style.display = 'block';
+
+                countdownInterval = setInterval(() => {
+                    const minutes = Math.floor(totalSeconds / 60);
+                    const seconds = totalSeconds % 60;
+                    countdownDiv.textContent = `Playing in ${minutes}:${seconds.toString().padStart(2, '0')}`;
+                    
+                    if (totalSeconds <= 0) {
+                        clearInterval(countdownInterval);
+                        countdownDiv.style.display = 'none';
+                        playAudio();
+                        playAudioTimedButton.disabled = false;
+                    }
+                    totalSeconds--;
+                }, 1000);
+            }
+        }
+
+        playAudioButton.addEventListener('click', playAudio);
+        playAudioTimedButton.addEventListener('click', playAudioTimed);
 
         function downloadAudio() {
             if (audioBuffer) {
                 const wavData = audioBufferToWav(audioBuffer);
-                const blob = new Blob([new DataView(wavData)], { type: 'audio/wav' });
+                const blob = new Blob([wavData], { type: 'audio/wav' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.style.display = 'none';
@@ -193,53 +244,60 @@
         }
 
         function audioBufferToWav(buffer) {
-            const numOfChan = buffer.numberOfChannels;
-            const length = buffer.length * numOfChan * 2 + 44;
-            const out = new ArrayBuffer(length);
-            const view = new DataView(out);
-            const channels = [];
-            let sample,
-                offset = 0;
+            const numChannels = buffer.numberOfChannels;
+            const sampleRate = buffer.sampleRate;
+            const format = 1; // PCM
+            const bitDepth = 16;
 
-            // write WAVE header
-            setUint32(0x46464952);
-            setUint32(length - 8);
-            setUint32(0x45564157);
-            setUint32(0x20746d66);
-            setUint32(16);
-            setUint16(1);
-            setUint16(numOfChan);
-            setUint32(buffer.sampleRate);
-            setUint32(buffer.sampleRate * 2 * numOfChan);
-            setUint16(numOfChan * 2);
-            setUint16(16);
-            setUint32(0x61746164);
-            setUint32(length - offset - 4);
+            let byteRate = sampleRate * numChannels * bitDepth / 8;
+            let blockAlign = numChannels * bitDepth / 8;
+            let dataSize = buffer.length * numChannels * bitDepth / 8;
+            let headerSize = 44;
+            let totalSize = headerSize + dataSize;
 
-            for (let i = 0; i < buffer.numberOfChannels; i++)
-                channels.push(buffer.getChannelData(i));
+            let arrayBuffer = new ArrayBuffer(totalSize);
+            let view = new DataView(arrayBuffer);
 
-            while (offset < length) {
-                for (let i = 0; i < numOfChan; i++) {
-                    sample = Math.max(-1, Math.min(1, channels[i][offset]));
-                    sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
-                    view.setInt16(offset * 2, sample, true);
+            // RIFF chunk descriptor
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, totalSize - 8, true);
+            writeString(view, 8, 'WAVE');
+
+            // FMT sub-chunk
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true); // subchunk1size (16 for PCM)
+            view.setUint16(20, format, true);
+            view.setUint16(22, numChannels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, byteRate, true);
+            view.setUint16(32, blockAlign, true);
+            view.setUint16(34, bitDepth, true);
+
+            // Data sub-chunk
+            writeString(view, 36, 'data');
+            view.setUint32(40, dataSize, true);
+
+            // Write the PCM samples
+            let offset = 44;
+            for (let i = 0; i < buffer.length; i++) {
+                for (let channel = 0; channel < numChannels; channel++) {
+                    let sample = Math.max(-1, Math.min(1, buffer.getChannelData(channel)[i]));
+                    sample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+                    view.setInt16(offset, sample, true);
+                    offset += 2;
                 }
-                offset++;
             }
 
-            return out;
+            return arrayBuffer;
+        }
 
-            function setUint16(data) {
-                view.setUint16(offset, data, true);
-                offset += 2;
-            }
-
-            function setUint32(data) {
-                view.setUint32(offset, data, true);
-                offset += 4;
+        function writeString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
             }
         }
+
+        downloadAudioButton.addEventListener('click', downloadAudio);
 
         encodeButton.addEventListener('click', () => {
             const message = messageInput.value;
@@ -274,6 +332,10 @@
             channelData.set(audioSamples);
 
             audioControls.style.display = 'block';
+            playAudioButton.textContent = 'Play Audio';
+            playAudioButton.disabled = false;
+            playAudioTimedButton.disabled = false;
+            countdownDiv.style.display = 'none';
 
             // Free the memory allocated in C
             freeFT8Result(resultPtr);

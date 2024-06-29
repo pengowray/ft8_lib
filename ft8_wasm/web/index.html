@@ -11,6 +11,10 @@
             --input-bg: #f0f0f0;
             --button-bg: #4CAF50;
             --button-text: #ffffff;
+
+            --costas-bg: #a9a9a9;
+            --data-bg: #737373;
+            --ramp-bg: #d0d0d0;
         }
 
         .dark-mode {
@@ -19,6 +23,14 @@
             --input-bg: #444444;
             --button-bg: #45a049;
             --button-text: #ffffff;
+
+            --costas-bg: #545454;
+            --data-bg: #1f1f1f;
+            --ramp-bg: #333333;
+
+            --link-color: #61dafb;
+            --link-hover-color: #a8e9ff;
+            --link-visited-color: #bb86fc;
         }
 
         body {
@@ -37,6 +49,21 @@
 
         h1, h2 {
             text-align: center;
+        }
+
+        .dark-mode a {
+            color: var(--link-color);
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .dark-mode a:hover {
+            color: var(--link-hover-color);
+            text-decoration: underline;
+        }
+
+        .dark-mode a:visited {
+            color: var(--link-visited-color);
         }
 
         input[type="text"], input[type="file"] {
@@ -98,6 +125,7 @@
             gap: 1px;
             height: 100px;
             position: relative;
+            background-color: var(--bg-color);
         }
 
         #piano-roll div {
@@ -149,8 +177,6 @@
         <input type="text" id="message-input" placeholder="Enter message to encode">
         <input type="number" id="base-freq-input" placeholder="Base frequency (Hz)" value="1000">
         <button id="encode-button">Encode</button>
-        <div id="encode-output"></div>
-        <div id="piano-roll" style="margin-top: 20px;"></div>
         <div id="audio-controls" style="display:none;">
             <button id="play-audio">Play Audio</button>
             <button id="play-audio-timed">Play at Next 15s Slot</button>
@@ -159,13 +185,16 @@
             <div id="countdown"></div>
         </div>
 
+        <div id="piano-roll" style="margin-top: 20px;"></div>
+        <div id="encode-output"></div>
+
         <div id="example-messages">
             <h3>Example Messages:</h3>
         </div>
 
         <h2>Who made this?</h2>
         <div>
-            By Pengo Wray VK3PGO, using <a href="https://github.com/kgoba/ft8_lib">FT8_lib</a>.
+            Pengo Wray (VK3PGO). Encoding library: <a href="https://github.com/kgoba/ft8_lib">FT8_lib</a>.
         </div>
 
         <div style="display: none;">
@@ -217,7 +246,7 @@
 
             symbols.forEach((symbol, index) => {
                 const symbolDiv = document.createElement('div');
-                symbolDiv.style.backgroundColor = index % 2 === 0 ? 'var(--bg-color)' : 'var(--input-bg)';
+                symbolDiv.style.backgroundColor = getSymbolBackgroundColor(index);
                 symbolDiv.style.gridRow = `${8 - symbol} / span 1`;
                 symbolDiv.style.gridColumn = `${index + 1} / span 1`;
                 symbolDiv.dataset.index = index;
@@ -228,6 +257,26 @@
             const positionLine = document.createElement('div');
             positionLine.id = 'position-line';
             pianoRollDiv.appendChild(positionLine);
+        }
+
+        function getSymbolBackgroundColor(index) {
+            if (isCostasSymbol(index)) {
+                return 'var(--costas-bg)';
+            //} else if (isRampSymbol(index)) {
+            //    return 'var(--ramp-bg)';
+            } else {
+                return 'var(--data-bg)';
+            }
+        }
+
+        function isCostasSymbol(index) {
+            const costasIndices = [0, 1, 2, 3, 4, 5, 6, 36, 37, 38, 39, 40, 41, 42, 72, 73, 74, 75, 76, 77, 78];
+            return costasIndices.includes(index);
+        }
+
+        function isRampSymbol(index) {
+            // FT8 doesn't have ramp symbols, but we'll keep this function in case of other modes
+            return false;
         }
 
         function highlightCurrentSymbol(currentTime) {
@@ -242,13 +291,18 @@
                 if (i === currentSymbolIndex) {
                     symbols[i].style.backgroundColor = getHighlightColor(symbols[i].dataset.symbol);
                 } else {
-                    symbols[i].style.backgroundColor = i % 2 === 0 ? 'var(--bg-color)' : 'var(--input-bg)';
+                    symbols[i].style.backgroundColor = getSymbolBackgroundColor(i);
                 }
             }
 
             // Update position line
             const progress = currentTime / audioBuffer.duration;
             positionLine.style.left = `${progress * 100}%`;
+        }
+
+        function getHighlightColor(symbol) {
+            const colors = ['#ff6b6b', '#feca57', '#48dbfb', '#ff9ff3', '#54a0ff', '#5f27cd', '#ff6b6b', '#ff6b6b'];
+            return colors[symbol];
         }
 
         function getHighlightColor(symbol) {

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FT8 Encoder/Decoder</title>
+</head>
+<body>
+    <h1>FT8 Encoder/Decoder</h1>
+    <input type="text" id="message-input" placeholder="Enter message to encode">
+    <button id="encode-button">Encode</button>
+    <div id="encode-output"></div>
+
+    <input type="file" id="audio-input" accept=".wav">
+    <button id="decode-button">Decode</button>
+    <div id="decode-output"></div>
+
+    <script src="ft8_wasm.js"></script>
+    <script>
+        Module.onRuntimeInitialized = function() {
+            const encodeButton = document.getElementById('encode-button');
+            const decodeButton = document.getElementById('decode-button');
+            const messageInput = document.getElementById('message-input');
+            const audioInput = document.getElementById('audio-input');
+            const encodeOutput = document.getElementById('encode-output');
+            const decodeOutput = document.getElementById('decode-output');
+
+            const encodeFT8 = Module.cwrap('encodeFT8', 'string', ['string']);
+            const decodeFT8 = Module.cwrap('decodeFT8', 'string', ['number', 'number']);
+
+            encodeButton.addEventListener('click', () => {
+                const message = messageInput.value;
+                const result = encodeFT8(message);
+                encodeOutput.textContent = result;
+            });
+
+            decodeButton.addEventListener('click', () => {
+                const file = audioInput.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const audioData = new Float32Array(e.target.result);
+                        const dataPtr = Module._malloc(audioData.length * 4);
+                        Module.HEAPF32.set(audioData, dataPtr / 4);
+                        const result = decodeFT8(dataPtr, audioData.length);
+                        Module._free(dataPtr);
+                        decodeOutput.textContent = result;
+                    };
+                    reader.readAsArrayBuffer(file);
+                }
+            });
+        };
+    </script>
+</body>
+</html>

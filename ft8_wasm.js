@@ -2015,6 +2015,9 @@ var ___wasm_call_ctors = Module["___wasm_call_ctors"] = createExportWrapper("__w
 var _malloc = Module["_malloc"] = createExportWrapper("malloc");
 
 /** @type {function(...*):?} */
+var _setBaseFrequency = Module["_setBaseFrequency"] = createExportWrapper("setBaseFrequency");
+
+/** @type {function(...*):?} */
 var _encodeFT8_packed = Module["_encodeFT8_packed"] = createExportWrapper("encodeFT8_packed");
 
 /** @type {function(...*):?} */
@@ -2025,6 +2028,9 @@ var _encodeFT8_full = Module["_encodeFT8_full"] = createExportWrapper("encodeFT8
 
 /** @type {function(...*):?} */
 var _free = Module["_free"] = createExportWrapper("free");
+
+/** @type {function(...*):?} */
+var _encodeFT8_full_old = Module["_encodeFT8_full_old"] = createExportWrapper("encodeFT8_full_old");
 
 /** @type {function(...*):?} */
 var _encodeFT8 = Module["_encodeFT8"] = createExportWrapper("encodeFT8");

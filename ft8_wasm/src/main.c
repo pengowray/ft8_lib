@@ -8,16 +8,23 @@
 #include "ft8/constants.h"
 //#include "ft8/pack.h"
 
-#define FT8_FREQ_BASE 1000.0f
+#define FT8_FREQ_BASE_DEFAULT 1000.0f
 #define FT8_TONE_SPACING 6.25f
 
 #define EMSCRIPTEN_KEEPALIVE __attribute__((used))
+
+float FT8_FREQ_BASE = FT8_FREQ_BASE_DEFAULT; 
 
 // Helper function to allocate memory for strings
 char* allocate_string(const char* str) {
     char* result = (char*)malloc(strlen(str) + 1);
     strcpy(result, str);
     return result;
+}
+
+EMSCRIPTEN_KEEPALIVE
+void setBaseFrequency(float freq) {
+    FT8_FREQ_BASE = freq;
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -83,6 +90,27 @@ float* encodeFT8_audio(const char* message, int* num_samples) {
 
 EMSCRIPTEN_KEEPALIVE
 char* encodeFT8_full(const char* message) {
+    // Get packed bytes and tones
+    char* packed_result = encodeFT8_packed(message);
+    
+    // Get audio samples
+    int num_samples;
+    float* audio = encodeFT8_audio(message, &num_samples);
+    
+    // Combine results
+    char* full_result = (char*)malloc(strlen(packed_result) + 256);  // Adjust size as needed
+    sprintf(full_result, "%s\nNum audio samples: %d\nBase frequency: %.1f", packed_result, num_samples, FT8_FREQ_BASE);
+    
+    free(packed_result);
+    
+    // Return the pointer to the audio samples
+    *(float**)((void*)full_result + strlen(full_result) + 1) = audio;
+    
+    return full_result;
+}
+
+EMSCRIPTEN_KEEPALIVE
+char* encodeFT8_full_old(const char* message) {
     // Get packed bytes and tones
     char* packed_result = encodeFT8_packed(message);
     

@@ -4,52 +4,320 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FT8 Encoder/Decoder</title>
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #333333;
+            --input-bg: #f0f0f0;
+            --button-bg: #4CAF50;
+            --button-text: #ffffff;
+        }
+
+        .dark-mode {
+            --bg-color: #222222;
+            --text-color: #f0f0f0;
+            --input-bg: #444444;
+            --button-bg: #45a049;
+            --button-text: #ffffff;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--bg-color);
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        h1, h2 {
+            text-align: center;
+        }
+
+        input[type="text"], input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: var(--input-bg);
+            border: 1px solid var(--text-color);
+            color: var(--text-color);
+        }
+
+        button {
+            background-color: var(--button-bg);
+            color: var(--button-text);
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        #encode-output, #decode-output {
+            background-color: var(--input-bg);
+            padding: 10px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        #example-messages {
+            margin-top: 20px;
+        }
+
+        #example-messages button {
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        #audio-controls {
+            margin-top: 20px;
+        }
+
+        #audio-controls button {
+            margin-right: 10px;
+        }
+
+        #theme-toggle {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+
+            button {
+                width: 100%;
+                margin-bottom: 10px;
+            }
+
+            #theme-toggle {
+                position: static;
+                display: block;
+                margin-bottom: 20px;
+            }
+        }
+    </style>
 </head>
-<body>
-    <h1>FT8 Encoder/Decoder</h1>
-    <input type="text" id="message-input" placeholder="Enter message to encode">
-    <button id="encode-button">Encode</button>
-    <div id="encode-output"></div>
+<body class="dark-mode">
+    <div class="container">
+        <button id="theme-toggle">Toggle Dark Mode</button>
+        <h1>FT8 Encoder/Decoder</h1>
 
-    <input type="file" id="audio-input" accept=".wav">
-    <button id="decode-button">Decode</button>
-    <div id="decode-output"></div>
+        <h2>Encoder</h2>
+        <input type="text" id="message-input" placeholder="Enter message to encode">
+        <input type="number" id="base-freq-input" placeholder="Base frequency (Hz)" value="1000">
+        <button id="encode-button">Encode</button>
+        <div id="encode-output"></div>
 
-    <script src="ft8_wasm.js"></script>
-    <script>
-        Module.onRuntimeInitialized = function() {
-            const encodeButton = document.getElementById('encode-button');
-            const decodeButton = document.getElementById('decode-button');
-            const messageInput = document.getElementById('message-input');
-            const audioInput = document.getElementById('audio-input');
-            const encodeOutput = document.getElementById('encode-output');
-            const decodeOutput = document.getElementById('decode-output');
+        <div id="audio-controls" style="display:none;">
+            <button id="play-audio">Play Audio</button>
+            <button id="download-audio">Download Audio</button>
+        </div>
 
-            const encodeFT8 = Module.cwrap('encodeFT8', 'string', ['string']);
-            const decodeFT8 = Module.cwrap('decodeFT8', 'string', ['number', 'number']);
+        <div id="example-messages">
+            <h3>Example Messages:</h3>
+        </div>
 
-            encodeButton.addEventListener('click', () => {
-                const message = messageInput.value;
-                const result = encodeFT8(message);
-                encodeOutput.textContent = result;
-            });
+        <h2>Decoder</h2>
+        <input type="file" id="audio-input" accept=".wav">
+        <button id="decode-button">Decode</button>
+        <div id="decode-output"></div>
+    </div>
 
-            decodeButton.addEventListener('click', () => {
-                const file = audioInput.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = function(e) {
-                        const audioData = new Float32Array(e.target.result);
-                        const dataPtr = Module._malloc(audioData.length * 4);
-                        Module.HEAPF32.set(audioData, dataPtr / 4);
-                        const result = decodeFT8(dataPtr, audioData.length);
-                        Module._free(dataPtr);
-                        decodeOutput.textContent = result;
-                    };
-                    reader.readAsArrayBuffer(file);
+<script src="ft8_wasm.js"></script>
+<script>
+    const exampleMessages = [
+        "CQ K1ABC FN42",
+        "K1ABC W9XYZ -15",
+        "W9XYZ K1ABC R-17",
+        "K1ABC W9XYZ RRR",
+        "W9XYZ K1ABC 73"
+    ];
+
+    function initializeUI() {
+        const encodeButton = document.getElementById('encode-button');
+        const decodeButton = document.getElementById('decode-button');
+        const messageInput = document.getElementById('message-input');
+        const baseFreqInput = document.getElementById('base-freq-input');
+        const audioInput = document.getElementById('audio-input');
+        const encodeOutput = document.getElementById('encode-output');
+        const decodeOutput = document.getElementById('decode-output');
+        const themeToggle = document.getElementById('theme-toggle');
+        const exampleMessagesDiv = document.getElementById('example-messages');
+        const audioControls = document.getElementById('audio-controls');
+        const playAudioButton = document.getElementById('play-audio');
+        const downloadAudioButton = document.getElementById('download-audio');
+
+
+        const setBaseFrequency = Module.cwrap('setBaseFrequency', null, ['number']);
+        const encodeFT8_full = Module.cwrap('encodeFT8_full', 'string', ['string']);
+        const decodeFT8 = Module.cwrap('decodeFT8', 'string', ['number', 'number']);
+
+        let audioContext;
+        let audioBuffer;
+
+
+        function playAudio() {
+            if (audioBuffer) {
+                audioContext.resume().then(() => {
+                    const source = audioContext.createBufferSource();
+                    source.buffer = audioBuffer;
+                    source.connect(audioContext.destination);
+                    source.start();
+                });
+            }
+        }
+
+        function downloadAudio() {
+            if (audioBuffer && audioBuffer.length > 0) {
+                const wavData = audioBufferToWav(audioBuffer);
+                const blob = new Blob([new DataView(wavData)], { type: 'audio/wav' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = 'ft8_message.wav';
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                }, 100);
+            } else {
+                console.error('Audio buffer is empty or invalid');
+            }
+        }
+
+        function audioBufferToWav(buffer) {
+            const numOfChan = buffer.numberOfChannels;
+            const length = buffer.length * numOfChan * 2 + 44;
+            const out = new ArrayBuffer(length);
+            const view = new DataView(out);
+            const channels = [];
+            let sample,
+                offset = 0;
+
+            // write WAVE header
+            setUint32(0x46464952);
+            setUint32(length - 8);
+            setUint32(0x45564157);
+            setUint32(0x20746d66);
+            setUint32(16);
+            setUint16(1);
+            setUint16(numOfChan);
+            setUint32(buffer.sampleRate);
+            setUint32(buffer.sampleRate * 2 * numOfChan);
+            setUint16(numOfChan * 2);
+            setUint16(16);
+            setUint32(0x61746164);
+            setUint32(length - offset - 4);
+
+            for (let i = 0; i < buffer.numberOfChannels; i++)
+                channels.push(buffer.getChannelData(i));
+
+            while (offset < length) {
+                for (let i = 0; i < numOfChan; i++) {
+                    sample = Math.max(-1, Math.min(1, channels[i][offset]));
+                    sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
+                    view.setInt16(offset * 2, sample, true);
                 }
+                offset++;
+            }
+
+            return out;
+
+            function setUint16(data) {
+                view.setUint16(offset, data, true);
+                offset += 2;
+            }
+
+            function setUint32(data) {
+                view.setUint32(offset, data, true);
+                offset += 4;
+            }
+        }
+
+        encodeButton.addEventListener('click', () => {
+            const message = messageInput.value;
+            const baseFreq = parseFloat(baseFreqInput.value) || 1000;
+            setBaseFrequency(baseFreq);
+            const result = encodeFT8_full(message);
+            console.log("Encoder result:", result);
+
+            const [textResult, audioSamplesPtr] = result.split('\0');
+            encodeOutput.textContent = textResult;
+
+            const numSamplesMatch = textResult.match(/Num audio samples: (\d+)/);
+            if (numSamplesMatch) {
+                const numSamples = parseInt(numSamplesMatch[1]);
+                const audioSamples = new Float32Array(Module.HEAPF32.buffer, parseInt(audioSamplesPtr), numSamples);
+                
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                audioBuffer = audioContext.createBuffer(1, numSamples, 12000);
+                const channelData = audioBuffer.getChannelData(0);
+                channelData.set(audioSamples);
+
+                audioControls.stylse.display = 'block';
+            } else {
+                console.error("No audio samples found in the encoder result");
+                audioControls.style.display = 'none';
+            }
+
+            // Free the memory allocated in C
+            Module._free(parseInt(audioSamplesPtr));
+        });
+
+        decodeButton.addEventListener('click', () => {
+            const file = audioInput.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const audioData = new Float32Array(e.target.result);
+                    const dataPtr = Module._malloc(audioData.length * 4);
+                    Module.HEAPF32.set(audioData, dataPtr / 4);
+                    const result = decodeFT8(dataPtr, audioData.length);
+                    Module._free(dataPtr);
+                    decodeOutput.textContent = result;
+                };
+                reader.readAsArrayBuffer(file);
+            }
+        });
+
+        themeToggle.addEventListener('click', () => {
+            document.body.classList.toggle('dark-mode');
+        });
+
+        playAudioButton.addEventListener('click', playAudio);
+        downloadAudioButton.addEventListener('click', downloadAudio);
+
+        exampleMessages.forEach(message => {
+            const button = document.createElement('button');
+            button.textContent = message;
+            button.addEventListener('click', () => {
+                messageInput.value = message;
+                encodeButton.click();
             });
-        };
-    </script>
+            exampleMessagesDiv.appendChild(button);
+        });
+    }
+
+    if (typeof Module !== 'undefined') {
+        Module.onRuntimeInitialized = initializeUI;
+    } else {
+        document.addEventListener('DOMContentLoaded', initializeUI);
+    }
+</script>
 </body>
 </html>

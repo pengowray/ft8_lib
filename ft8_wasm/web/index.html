@@ -113,9 +113,11 @@
 <body class="dark-mode">
     <div class="container">
         <button id="theme-toggle">Toggle Dark Mode</button>
-        <h1>FT8 Encoder/Decoder</h1>
+<!-- 
+        <h1>FT8 Encoder/Decoder</h1> 
+-->
 
-        <h2>Encoder</h2>
+        <h2>FT8 Encoder</h2>
         <input type="text" id="message-input" placeholder="Enter message to encode">
         <input type="number" id="base-freq-input" placeholder="Base frequency (Hz)" value="1000">
         <button id="encode-button">Encode</button>
@@ -133,10 +135,17 @@
             <h3>Example Messages:</h3>
         </div>
 
-        <h2>Decoder</h2>
-        <input type="file" id="audio-input" accept=".wav">
-        <button id="decode-button">Decode</button>
-        <div id="decode-output"></div>
+        <h2>Who made this?</h2>
+        <div>
+            By Pengo Wray VK3PGO, using <a href="https://github.com/kgoba/ft8_lib">FT8_lib</a>.
+        </div>
+
+        <div style="display: none;">
+            <h2>Decoder</h2>
+            <input type="file" id="audio-input" accept=".wav">
+            <button id="decode-button">Decode</button>
+            <div id="decode-output"></div>
+        </div>
     </div>
 
 <script src="ft8_wasm.js"></script>

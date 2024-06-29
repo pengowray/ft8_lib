@@ -122,7 +122,7 @@
         <input type="number" id="base-freq-input" placeholder="Base frequency (Hz)" value="1000">
         <button id="encode-button">Encode</button>
         <div id="encode-output"></div>
-
+        <div id="piano-roll" style="margin-top: 20px;"></div>
         <div id="audio-controls" style="display:none;">
             <button id="play-audio">Play Audio</button>
             <button id="play-audio-timed">Play at Next 15s Slot</button>
@@ -180,6 +180,47 @@
 
         let audioSource = null;
         let countdownInterval = null;
+        let pianoRollInterval;
+
+        function createPianoRoll(symbols) {
+            const pianoRollDiv = document.getElementById('piano-roll');
+            pianoRollDiv.innerHTML = '';
+            pianoRollDiv.style.display = 'grid';
+            pianoRollDiv.style.gridTemplateColumns = `repeat(${symbols.length}, 1fr)`;
+            pianoRollDiv.style.gap = '1px';
+            pianoRollDiv.style.height = '100px';
+            pianoRollDiv.style.backgroundColor = '#333';
+
+            symbols.forEach((symbol, index) => {
+                const symbolDiv = document.createElement('div');
+                symbolDiv.style.backgroundColor = getSymbolColor(symbol);
+                symbolDiv.style.gridRow = `${8 - symbol} / span 1`;
+                symbolDiv.style.gridColumn = `${index + 1} / span 1`;
+                symbolDiv.dataset.index = index;
+                pianoRollDiv.appendChild(symbolDiv);
+            });
+        }
+
+        function getSymbolColor(symbol) {
+            const colors = ['#ff0000', '#ff7f00', '#ffff00', '#00ff00', '#0000ff', '#4b0082', '#9400d3', '#ffffff'];
+            return colors[symbol];
+        }
+
+        function highlightCurrentSymbol(currentTime) {
+            const symbolDuration = audioBuffer.duration / 79; // 79 symbols in FT8
+            const currentSymbolIndex = Math.floor(currentTime / symbolDuration);
+            
+            const pianoRollDiv = document.getElementById('piano-roll');
+            const symbols = pianoRollDiv.children;
+            
+            for (let i = 0; i < symbols.length; i++) {
+                if (i === currentSymbolIndex) {
+                    symbols[i].style.boxShadow = '0 0 10px #fff';
+                } else {
+                    symbols[i].style.boxShadow = 'none';
+                }
+            }
+        }
 
         function playAudio() {
             if (audioBuffer && !audioSource) {
@@ -190,6 +231,15 @@
                     audioSource.start();
                     audioSource.onended = resetAudioState;
                     updateButtonState(true);
+
+                    const startTime = audioContext.currentTime;
+                    pianoRollInterval = setInterval(() => {
+                        const currentTime = audioContext.currentTime - startTime;
+                        highlightCurrentSymbol(currentTime);
+                        if (currentTime >= audioBuffer.duration) {
+                            clearInterval(pianoRollInterval);
+                        }
+                    }, 50); // Update every 50ms
                 });
             }
         }
@@ -204,12 +254,26 @@
                 countdownInterval = null;
                 countdownDiv.style.display = 'none';
             }
+            if (pianoRollInterval) {
+                clearInterval(pianoRollInterval);
+                pianoRollInterval = null;
+            }
             updateButtonState(false);
         }
 
         function resetAudioState() {
             audioSource = null;
             updateButtonState(false);
+            if (pianoRollInterval) {
+                clearInterval(pianoRollInterval);
+                pianoRollInterval = null;
+            }
+            // Clear all highlights
+            const pianoRollDiv = document.getElementById('piano-roll');
+            const symbols = pianoRollDiv.children;
+            for (let i = 0; i < symbols.length; i++) {
+                symbols[i].style.boxShadow = 'none';
+            }
         }
 
         function updateButtonState(isPlaying) {
@@ -356,6 +420,8 @@
             symbolsContainer.style.wordBreak = 'break-all';
             symbolsContainer.textContent = Array.from(symbols).join('');
             encodeOutput.appendChild(symbolsContainer);
+
+            createPianoRoll(Array.from(symbols));
 
             // Create audio buffer
             const audioSamples = new Float32Array(Module.HEAPF32.buffer, result.audio, result.audio_samples);

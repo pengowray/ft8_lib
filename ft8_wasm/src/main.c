@@ -34,6 +34,56 @@ typedef struct {
     char* decoded_text;
 } FT8Result;
 
+void symbols_to_packed(const uint8_t* symbols, uint8_t* packed) {
+    int packed_bit = 0;
+    for (int i = 0; i < FT8_NN; i++) {
+        if (i < 7 || (i >= 36 && i < 43) || (i >= 72 && i < 79)) {
+            continue; // Skip Costas symbols
+        }
+        for (int j = 2; j >= 0; j--) {
+            if (packed_bit < FTX_LDPC_K) {
+                if (symbols[i] & (1 << j)) {
+                    packed[packed_bit / 8] |= (0x80 >> (packed_bit % 8));
+                }
+                packed_bit++;
+            }
+        }
+    }
+}
+
+EMSCRIPTEN_KEEPALIVE
+FT8Result* processSymbols(const char* symbolString, float base_freq) {
+    FT8Result* result = (FT8Result*)malloc(sizeof(FT8Result));
+
+    // Convert symbol string to uint8_t array
+    result->symbols = (uint8_t*)malloc(FT8_NN);
+    result->symbol_count = FT8_NN;
+    for (int i = 0; i < FT8_NN; i++) {
+        result->symbols[i] = symbolString[i] - '0';
+    }
+
+    // Generate audio
+    const int sample_rate = 12000;
+    result->audio_samples = (int)(FT8_SYMBOL_PERIOD * FT8_NN * sample_rate);
+    result->audio = (float*)malloc(result->audio_samples * sizeof(float));
+
+    synth_gfsk(result->symbols, FT8_NN, base_freq, FT8_SYMBOL_BT, FT8_SYMBOL_PERIOD, sample_rate, result->audio);
+
+    // Decode symbols to packed data
+    result->packed_data = (uint8_t*)malloc(FTX_PAYLOAD_LENGTH_BYTES);
+    result->packed_size = FTX_PAYLOAD_LENGTH_BYTES;
+    // You need to implement this function to convert symbols to packed data
+    symbols_to_packed(result->symbols, result->packed_data);
+
+    // Decode packed data to text
+    result->decoded_text = (char*)malloc(FTX_MAX_MESSAGE_LENGTH);
+    ftx_message_t msg;
+    memcpy(msg.payload, result->packed_data, FTX_PAYLOAD_LENGTH_BYTES);
+    ftx_message_decode(&msg, NULL, result->decoded_text);
+
+    return result;
+}
+
 EMSCRIPTEN_KEEPALIVE
 char* decodeFT8Symbols(const uint8_t* symbols, int symbol_count) {
     char* decoded_text = (char*)malloc(FTX_MAX_MESSAGE_LENGTH);

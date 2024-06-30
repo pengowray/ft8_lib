@@ -2015,6 +2015,9 @@ var ___wasm_call_ctors = Module["___wasm_call_ctors"] = createExportWrapper("__w
 var _malloc = Module["_malloc"] = createExportWrapper("malloc");
 
 /** @type {function(...*):?} */
+var _processSymbols = Module["_processSymbols"] = createExportWrapper("processSymbols");
+
+/** @type {function(...*):?} */
 var _decodeFT8Symbols = Module["_decodeFT8Symbols"] = createExportWrapper("decodeFT8Symbols");
 
 /** @type {function(...*):?} */

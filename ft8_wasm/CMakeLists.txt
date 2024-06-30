@@ -29,7 +29,7 @@ add_executable(ft8_wasm
 # Set Emscripten link flags
 set_target_properties(ft8_wasm PROPERTIES LINK_FLAGS "\
     -s WASM=1 \
-    -s EXPORTED_FUNCTIONS=['_malloc','_free','_encodeFT8','_freeFT8Result','_decodeFT8Symbols','_decodeFT8PackedData'] \
+    -s EXPORTED_FUNCTIONS=['_malloc','_free','_encodeFT8','_freeFT8Result','_decodeFT8Symbols','_decodeFT8PackedData','_processSymbols'] \
     -s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','getValue','UTF8ToString'] \
     -s ALLOW_MEMORY_GROWTH=1 \
 ")

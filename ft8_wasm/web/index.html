@@ -261,7 +261,9 @@
 
         function detectInputType(input) {
             // Check if input is 79 numbers (symbols); numbers are always 1 digit
-            if (/^(\d\s*){79}$/.test(input)) {
+            if (/^[0-7]{79}$/.test(input)) { 
+                // allow spaces?
+                // if (/^(\d\s*){79}$/.test(input)) {
                 return 'symbols';
             }
             // Check if input is hex string (packed data)
@@ -518,11 +520,7 @@
             
             let resultPtr;
             if (inputType === 'symbols') {
-                const symbols = input.split(/\s+/).map(Number);
-                const symbolsPtr = Module._malloc(symbols.length);
-                Module.HEAPU8.set(symbols, symbolsPtr);
-                resultPtr = Module.ccall('decodeFT8Symbols', 'number', ['number', 'number'], [symbolsPtr, symbols.length]);
-                Module._free(symbolsPtr);
+                resultPtr = Module.ccall('processSymbols', 'number', ['string', 'number'], [input, baseFreq]);
             } else if (inputType === 'packed') {
                 const packed = input.split(/\s+/).map(hex => parseInt(hex, 16));
                 const packedPtr = Module._malloc(packed.length);

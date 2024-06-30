@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FT8 Encoder/Decoder</title>
+    <title>VK3PGO FT8 Encoder/Decoder</title>
     <style>
         :root {
             --bg-color: #ffffff;
@@ -173,7 +173,7 @@
         <h1>FT8 Encoder/Decoder</h1> 
 -->
 
-        <h2>FT8 Encoder</h2>
+        <h2>VK3PGO FT8 Encoder / Audio Generator</h2>
         <input type="text" id="message-input" placeholder="Enter message to encode">
         <input type="number" id="base-freq-input" placeholder="Base frequency (Hz)" value="500"> Hz
         <button id="encode-button">Encode</button>
@@ -263,17 +263,29 @@
             return message.trim().toUpperCase().replace(/\s+/g, ' ');
         }
 
+        function normalizeSymbols(input) {
+            // numbers only
+            return input.replace(/[-\s]/g, '');
+        }
+
+        function normalizePackedData(input) {
+            return input.replace(/[-\s]/g, '').toUpperCase();
+        }
+
         function detectInputType(input) {
+            input = input.trim();
+
             if (/^[0-7]{79}$/.test(input)) {
                 return 'symbols';
             }
             // Check if input is hex string (packed data)
-            if (/^([0-9A-Fa-f]{2}\s*){10}$/.test(input)) {
+            if (/^([0-9A-Fa-f]{2}[-\s]?){10}$/.test(input)) {
                 return 'packed';
             }
             // Otherwise, assume it's a message
             return 'message';
         }
+
 
         function updateOutput(result, inputType, originalInput) {
             const packedData = new Uint8Array(Module.HEAPU8.buffer, result.packed_data, result.packed_size);
@@ -284,14 +296,16 @@
                 output.innerHTML += `Input type: ${inputType}<br>`;
             }
             output.innerHTML += `Symbols: ${Array.from(symbols).join('')}<br>`;
-            output.innerHTML += `Packed data: ${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join(' ')}<br>`;
+            output.innerHTML += `Packed: ${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join(' ')}<br>`;
 
             const decodedSpan = document.createElement('span');
             decodedSpan.textContent = `Decoded: ${result.decoded_text}`;
             if (inputType === 'message' && normalizeMessage(result.decoded_text) !== normalizeMessage(originalInput)) {
                 decodedSpan.style.color = 'red';
             }
+
             output.appendChild(decodedSpan);
+            output.innerHTML += `<br>Explanation: ${explainFT8Message(result.decoded_text)}<br>`;
 
             createPianoRoll(Array.from(symbols));
         }
@@ -570,16 +584,19 @@
         downloadAudioButton.addEventListener('click', downloadAudio);
 
         encodeButton.addEventListener('click', () => {
-            const input = normalizeMessage(messageInput.value);
+            let input = messageInput.value;
             const inputType = detectInputType(input);
             const baseFreq = parseFloat(baseFreqInput.value) || 1000;
-            
+                    
             let resultPtr;
             if (inputType === 'symbols') {
+                input = normalizeSymbols(input);
                 resultPtr = Module.ccall('processSymbols', 'number', ['string', 'number'], [input, baseFreq]);
             } else if (inputType === 'packed') {
-                //todo
+                input = normalizePackedData(input);
+                resultPtr = Module.ccall('processPackedData', 'number', ['string', 'number'], [input, baseFreq]);
             } else {
+                input = normalizeMessage(input);
                 resultPtr = encodeFT8(input, baseFreq);
             }
 
@@ -635,6 +652,8 @@
                 Module._free(symbolsPtr);
 
                 output.textContent += `Decoded: ${decodedText}\n`;
+                output.textContent += `Explanation: ${explainFT8Message(decodedText)}\n`;
+
                 createPianoRoll(symbols);
             } else if (inputType === 'packed') {
                 output.textContent = `Input type: ${inputType}\n`;
@@ -645,6 +664,8 @@
                 Module._free(packedPtr);
 
                 output.textContent += `Decoded: ${decodedText}\n`;
+                output.textContent += `Explanation: ${explainFT8Message(decodedText)}\n`;
+
                 // Generate symbols from packed data for piano roll
                 const symbolsPtr = Module._malloc(79);
                 Module.ccall('ft8_encode', null, ['number', 'number'], [packedPtr, symbolsPtr]);
@@ -673,8 +694,12 @@
                 const symbols = new Uint8Array(Module.HEAPU8.buffer, result.symbols, result.symbol_count);
 
                 output.textContent += `Symbols: ${Array.from(symbols).join(' ')}\n`;
-                output.textContent += `Packed data: ${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join(' ')}\n`;
+                output.textContent += `Packed: ${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join(' ')}\n`;
 
+                //???
+                const decodedText = Module.UTF8ToString(Module.getValue(resultPtr + 24, '*'));
+                output.textContent += `Decoded: ${decodedText}\n`;
+                output.textContent += `Explanation: ${explainFT8Message(decodedText)}\n`;
                 createPianoRoll(Array.from(symbols));
 
                 // Create audio buffer
@@ -704,6 +729,69 @@
             });
             exampleMessagesDiv.appendChild(button);
         });
+
+        function explainFT8Message(message) {
+            const parts = message.trim().split(/\s+/);
+            let explanation = '';
+
+            function isValidCallsign(call) {
+                return /^[A-Z0-9]{1,6}$/.test(call);
+            }
+
+            function isGridLocator(grid) {
+                return /^[A-R]{2}[0-9]{2}([a-x]{2})?$/.test(grid);
+            }
+
+            function isReport(report) {
+                return /^[+-]?\d{2}$/.test(report);
+            }
+
+            if (parts.length === 2 && parts[0] === 'CQ') {
+                if (isValidCallsign(parts[1])) {
+                    explanation = `This is a general call (CQ) message. Station ${parts[1]} is calling CQ, looking for any station to respond.`;
+                } else {
+                    explanation = `This appears to be an incomplete or non-standard CQ message.`;
+                }
+            } else if (parts.length === 3 && parts[0] === 'CQ') {
+                if (isValidCallsign(parts[1]) && isGridLocator(parts[2])) {
+                    explanation = `This is a general call (CQ) message with location. Station ${parts[1]} is calling CQ from grid square ${parts[2]}.`;
+                } else if (/^[A-Z]{2}$/.test(parts[1]) && isValidCallsign(parts[2])) {
+                    explanation = `This is a directed CQ message. Station ${parts[2]} is calling CQ, specifically looking for stations in the ${parts[1]} region.`;
+                } else {
+                    explanation = `This appears to be a non-standard CQ message format.`;
+                }
+            } else if (parts.length === 3 && isValidCallsign(parts[0]) && isValidCallsign(parts[1])) {
+                if (isReport(parts[2])) {
+                    explanation = `This is a signal report message. Station ${parts[0]} is sending a signal report of ${parts[2]} dB to station ${parts[1]}.`;
+                } else if (parts[2] === 'RRR') {
+                    explanation = `This is an acknowledgment message. Station ${parts[0]} is confirming receipt of information from station ${parts[1]}.`;
+                } else if (parts[2] === 'RR73') {
+                    explanation = `This is a combined acknowledgment and goodbye message. Station ${parts[0]} is confirming receipt and saying goodbye to station ${parts[1]}.`;
+                } else if (parts[2] === '73') {
+                    explanation = `This is a goodbye message. Station ${parts[0]} is saying goodbye to station ${parts[1]} with "73" (best regards).`;
+                } else if (isGridLocator(parts[2])) {
+                    explanation = `Station ${parts[0]} is sending its grid locator ${parts[2]} to station ${parts[1]}.`;
+                } else if (parts[2].startsWith('R')) {
+                    explanation = `Station ${parts[0]} is acknowledging receipt of a message from ${parts[1]} and sending a signal report of ${parts[2].slice(1)} dB.`;
+                } else {
+                    explanation = `This is a message from ${parts[0]} to ${parts[1]}, but the content "${parts[2]}" is non-standard.`;
+                }
+            } else if (parts.length === 4 && isValidCallsign(parts[0]) && isValidCallsign(parts[1])) {
+                if (parts[2] === 'R' && isReport(parts[3])) {
+                    explanation = `This is a signal report acknowledgment. Station ${parts[0]} is confirming receipt of a previous message and sending a signal report of ${parts[3]} dB to station ${parts[1]}.`;
+                } else {
+                    explanation = `This is a message from ${parts[0]} to ${parts[1]}, but the content "${parts[2]} ${parts[3]}" is non-standard.`;
+                }
+            } else if (message.startsWith('<') && message.endsWith('>')) {
+                explanation = `This is a free-text message: "${message}". Free-text messages in FT8 are limited to 13 characters.`;
+            } else if (/^[0-9A-F]{12}$/.test(message)) {
+                explanation = `This appears to be a telemetry message containing 12 hexadecimal digits: ${message}. The specific meaning depends on the implementation.`;
+            } else {
+                explanation = `This appears to be a custom or non-standard message: "${message}". It doesn't match common FT8 message formats.`;
+            }
+
+            return explanation;
+        }
 
         themeToggle.addEventListener('click', () => {
             document.body.classList.toggle('dark-mode');

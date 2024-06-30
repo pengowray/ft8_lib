@@ -2024,6 +2024,9 @@ var _decodeFT8Symbols = Module["_decodeFT8Symbols"] = createExportWrapper("decod
 var _free = Module["_free"] = createExportWrapper("free");
 
 /** @type {function(...*):?} */
+var _processPackedData = Module["_processPackedData"] = createExportWrapper("processPackedData");
+
+/** @type {function(...*):?} */
 var _decodeFT8PackedData = Module["_decodeFT8PackedData"] = createExportWrapper("decodeFT8PackedData");
 
 /** @type {function(...*):?} */

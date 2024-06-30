@@ -83,7 +83,7 @@ FT8Result* processSymbols(const char* symbolString, float base_freq) {
 
     synth_gfsk(result->symbols, FT8_NN, base_freq, FT8_SYMBOL_BT, FT8_SYMBOL_PERIOD, sample_rate, result->audio);
 
-    // Decode symbols to packed data
+    // Decode symbols to packed data / Generate packed data from symbols
     result->packed_data = (uint8_t*)malloc(FTX_PAYLOAD_LENGTH_BYTES);
     result->packed_size = FTX_PAYLOAD_LENGTH_BYTES;
     symbols_to_packed(result->symbols, result->packed_data);
@@ -108,6 +108,41 @@ char* decodeFT8Symbols(const uint8_t* symbols, int symbol_count) {
     }
     free(decoded_text);
     return strdup("Decoding failed");
+}
+
+EMSCRIPTEN_KEEPALIVE
+FT8Result* processPackedData(const char* packedDataHex, float base_freq) {
+    FT8Result* result = (FT8Result*)malloc(sizeof(FT8Result));
+
+    // Convert hex string to bytes
+    result->packed_data = (uint8_t*)malloc(FTX_PAYLOAD_LENGTH_BYTES);
+    result->packed_size = FTX_PAYLOAD_LENGTH_BYTES;
+    for (int i = 0; i < FTX_PAYLOAD_LENGTH_BYTES; i++) {
+        sscanf(&packedDataHex[i*2], "%2hhx", &result->packed_data[i]);
+    }
+
+    // Generate symbols from packed data
+    result->symbols = (uint8_t*)malloc(FT8_NN);
+    result->symbol_count = FT8_NN;
+    ft8_encode(result->packed_data, result->symbols);
+
+    // Generate audio
+    const int sample_rate = 12000;
+    result->audio_samples = (int)(FT8_SYMBOL_PERIOD * FT8_NN * sample_rate);
+    result->audio = (float*)malloc(result->audio_samples * sizeof(float));
+
+    synth_gfsk(result->symbols, FT8_NN, base_freq, FT8_SYMBOL_BT, FT8_SYMBOL_PERIOD, sample_rate, result->audio);
+
+    // Decode packed data to text
+    result->decoded_text = (char*)malloc(FTX_MAX_MESSAGE_LENGTH);
+    ftx_message_t msg;
+    memcpy(msg.payload, result->packed_data, FTX_PAYLOAD_LENGTH_BYTES);
+    ftx_message_rc_t rc = ftx_message_decode(&msg, NULL, result->decoded_text);
+    if (rc != FTX_MESSAGE_RC_OK) {
+        strcpy(result->decoded_text, "Decoding failed");
+    }
+
+    return result;
 }
 
 EMSCRIPTEN_KEEPALIVE

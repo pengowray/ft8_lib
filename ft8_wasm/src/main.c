@@ -7,6 +7,7 @@
 #include "ft8/message.h"
 #include "ft8/constants.h"
 #include "genft8.h"
+#include "decft8.h"
 //#include "ft8/pack.h"
 
 #define EMSCRIPTEN_KEEPALIVE __attribute__((used))
@@ -30,7 +31,28 @@ typedef struct {
     int symbol_count;
     float* audio;
     int audio_samples;
-} FT8Result;  // Add semicolon here
+    char* decoded_text;
+} FT8Result;
+
+EMSCRIPTEN_KEEPALIVE
+char* decodeFT8Symbols(const uint8_t* symbols, int symbol_count) {
+    char* decoded_text = (char*)malloc(FTX_MAX_MESSAGE_LENGTH);
+    if (decoded_text && decft8_decode_symbols(symbols, symbol_count, decoded_text, FTX_MAX_MESSAGE_LENGTH)) {
+        return decoded_text;
+    }
+    free(decoded_text);
+    return NULL;
+}
+
+EMSCRIPTEN_KEEPALIVE
+char* decodeFT8PackedData(const uint8_t* packed_data, int packed_size) {
+    char* decoded_text = (char*)malloc(FTX_MAX_MESSAGE_LENGTH);
+    if (decoded_text && decft8_decode_packed(packed_data, packed_size, decoded_text, FTX_MAX_MESSAGE_LENGTH)) {
+        return decoded_text;
+    }
+    free(decoded_text);
+    return NULL;
+}
 
 EMSCRIPTEN_KEEPALIVE
 FT8Result* encodeFT8(const char* message, float base_freq) {
@@ -59,6 +81,14 @@ FT8Result* encodeFT8(const char* message, float base_freq) {
 
     synth_gfsk(result->symbols, FT8_NN, base_freq, FT8_SYMBOL_BT, FT8_SYMBOL_PERIOD, sample_rate, result->audio);
 
+    // Decode the symbols back to text
+    char* decoded_text = decodeFT8Symbols(result->symbols, result->symbol_count);
+    if (decoded_text) {
+        result->decoded_text = decoded_text;
+    } else {
+        result->decoded_text = strdup("Decoding failed");  // Allocate new memory with a message
+    }
+
     return result;
 }
 
@@ -68,6 +98,7 @@ void freeFT8Result(FT8Result* result) {
         free(result->packed_data);
         free(result->symbols);
         free(result->audio);
+        free(result->decoded_text);
         free(result);
     }
 }
@@ -138,3 +169,5 @@ char* decodeFT8(const float* audio, int num_samples) {
     // This is a stub implementation
     return allocate_string("Decoding not implemented yet");
 }
+
+

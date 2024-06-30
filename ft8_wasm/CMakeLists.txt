@@ -13,6 +13,7 @@ include_directories(
 add_executable(ft8_wasm
     src/main.c
     src/genft8.c
+    src/decft8.c
     ../ft8/constants.c
     ../ft8/crc.c
     ../ft8/decode.c
@@ -26,8 +27,12 @@ add_executable(ft8_wasm
 )
 
 # Set Emscripten link flags
-# set_target_properties(ft8_wasm PROPERTIES LINK_FLAGS "-s WASM=1 -s EXPORTED_FUNCTIONS='[\"_malloc\", \"_free\", \"_encodeFT8\", \"_freeFT8Result\", \"_decodeFT8\"]' -s EXPORTED_RUNTIME_METHODS='[\"ccall\", \"cwrap\"]' -s ALLOW_MEMORY_GROWTH=1")
-set_target_properties(ft8_wasm PROPERTIES LINK_FLAGS "-s WASM=1 -s EXPORTED_FUNCTIONS='[\"_malloc\", \"_free\", \"_encodeFT8\", \"_freeFT8Result\", \"_decodeFT8\"]' -s EXPORTED_RUNTIME_METHODS='[\"ccall\", \"cwrap\", \"getValue\"]' -s ALLOW_MEMORY_GROWTH=1")
+set_target_properties(ft8_wasm PROPERTIES LINK_FLAGS "\
+    -s WASM=1 \
+    -s EXPORTED_FUNCTIONS=['_malloc','_free','_encodeFT8','_freeFT8Result','_decodeFT8Symbols','_decodeFT8PackedData'] \
+    -s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','getValue','UTF8ToString'] \
+    -s ALLOW_MEMORY_GROWTH=1 \
+")
 
 # Add a custom command to copy the resulting .js and .wasm files
 add_custom_command(TARGET ft8_wasm POST_BUILD

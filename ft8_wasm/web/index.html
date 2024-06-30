@@ -550,23 +550,10 @@
             const packedData = new Uint8Array(Module.HEAPU8.buffer, result.packed_data, result.packed_size);
             const symbols = new Uint8Array(Module.HEAPU8.buffer, result.symbols, result.symbol_count);
 
-            encodeOutput.textContent = `Symbols: ${Array.from(symbols).join('')}`;
-            encodeOutput.textContent += `\nPacked data: ${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join(' ')}`;
-            encodeOutput.textContent += `\nDecoded: ${result.decoded_text}`;
-            encodeOutput.textContent += `\nInput type: ${inputType}`;
-            
-/*
             output.textContent = `Input type: ${inputType}\n`;
-            output.textContent += `Symbols: ${Array.from(symbols).join(' ')}\n`;
+            output.textContent += `Symbols: ${Array.from(symbols).join('')}\n`;
             output.textContent += `Packed data: ${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join(' ')}\n`;
             output.textContent += `Decoded: ${result.decoded_text}\n`;
-*/
-
-            // Wrap symbols
-            //const symbolsContainer = document.createElement('div');
-            //symbolsContainer.style.wordBreak = 'break-all';
-            //symbolsContainer.textContent = Array.from(symbols).join('');
-            //encodeOutput.appendChild(symbolsContainer);
 
             createPianoRoll(Array.from(symbols));
 

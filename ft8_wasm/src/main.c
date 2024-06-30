@@ -34,18 +34,32 @@ typedef struct {
     char* decoded_text;
 } FT8Result;
 
+#include "ft8/constants.h"
+
 void symbols_to_packed(const uint8_t* symbols, uint8_t* packed) {
-    int packed_bit = 0;
+    memset(packed, 0, FTX_PAYLOAD_LENGTH_BYTES);
+    int bit_idx = 0;
+
     for (int i = 0; i < FT8_NN; i++) {
         if (i < 7 || (i >= 36 && i < 43) || (i >= 72 && i < 79)) {
             continue; // Skip Costas symbols
         }
+
+        uint8_t symbol = symbols[i];
+        uint8_t gray_mapped = 0;
+        for (int j = 0; j < 8; j++) {
+            if (kFT8_Gray_map[j] == symbol) {
+                gray_mapped = j;
+                break;
+            }
+        }
+
         for (int j = 2; j >= 0; j--) {
-            if (packed_bit < FTX_LDPC_K) {
-                if (symbols[i] & (1 << j)) {
-                    packed[packed_bit / 8] |= (0x80 >> (packed_bit % 8));
+            if (bit_idx < FTX_LDPC_K) {
+                if (gray_mapped & (1 << j)) {
+                    packed[bit_idx / 8] |= (1 << (7 - (bit_idx % 8)));
                 }
-                packed_bit++;
+                bit_idx++;
             }
         }
     }
@@ -72,14 +86,16 @@ FT8Result* processSymbols(const char* symbolString, float base_freq) {
     // Decode symbols to packed data
     result->packed_data = (uint8_t*)malloc(FTX_PAYLOAD_LENGTH_BYTES);
     result->packed_size = FTX_PAYLOAD_LENGTH_BYTES;
-    // You need to implement this function to convert symbols to packed data
     symbols_to_packed(result->symbols, result->packed_data);
 
     // Decode packed data to text
     result->decoded_text = (char*)malloc(FTX_MAX_MESSAGE_LENGTH);
     ftx_message_t msg;
     memcpy(msg.payload, result->packed_data, FTX_PAYLOAD_LENGTH_BYTES);
-    ftx_message_decode(&msg, NULL, result->decoded_text);
+    ftx_message_rc_t rc = ftx_message_decode(&msg, NULL, result->decoded_text);
+    if (rc != FTX_MESSAGE_RC_OK) {
+        strcpy(result->decoded_text, "Decoding failed");
+    }
 
     return result;
 }

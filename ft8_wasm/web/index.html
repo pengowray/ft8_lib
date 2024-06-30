@@ -259,11 +259,12 @@
         let audioSource = null;
         let countdownInterval = null;
 
+        function normalizeMessage(message) {
+            return message.trim().toUpperCase().replace(/\s+/g, ' ');
+        }
+
         function detectInputType(input) {
-            // Check if input is 79 numbers (symbols); numbers are always 1 digit
-            if (/^[0-7]{79}$/.test(input)) { 
-                // allow spaces?
-                // if (/^(\d\s*){79}$/.test(input)) {
+            if (/^[0-7]{79}$/.test(input)) {
                 return 'symbols';
             }
             // Check if input is hex string (packed data)
@@ -272,6 +273,27 @@
             }
             // Otherwise, assume it's a message
             return 'message';
+        }
+
+        function updateOutput(result, inputType, originalInput) {
+            const packedData = new Uint8Array(Module.HEAPU8.buffer, result.packed_data, result.packed_size);
+            const symbols = new Uint8Array(Module.HEAPU8.buffer, result.symbols, result.symbol_count);
+
+            output.innerHTML = '';
+            if (inputType !== 'message') {
+                output.innerHTML += `Input type: ${inputType}<br>`;
+            }
+            output.innerHTML += `Symbols: ${Array.from(symbols).join('')}<br>`;
+            output.innerHTML += `Packed data: ${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join(' ')}<br>`;
+
+            const decodedSpan = document.createElement('span');
+            decodedSpan.textContent = `Decoded: ${result.decoded_text}`;
+            if (inputType === 'message' && normalizeMessage(result.decoded_text) !== normalizeMessage(originalInput)) {
+                decodedSpan.style.color = 'red';
+            }
+            output.appendChild(decodedSpan);
+
+            createPianoRoll(Array.from(symbols));
         }
 
         function createPianoRoll(symbols) {
@@ -291,6 +313,7 @@
 
             const positionLine = document.createElement('div');
             positionLine.id = 'position-line';
+            positionLine.style.display = 'none'; // Initially hidden
             pianoRollDiv.appendChild(positionLine);
         }
 
@@ -391,11 +414,44 @@
                 clearInterval(pianoRollInterval);
                 pianoRollInterval = null;
             }
+            // Hide position line
+            const positionLine = document.getElementById('position-line');
+            if (positionLine) {
+                positionLine.style.display = 'none';
+            }
             // Clear all highlights
             const pianoRollDiv = document.getElementById('piano-roll');
             const symbols = pianoRollDiv.children;
             for (let i = 0; i < symbols.length; i++) {
-                symbols[i].style.boxShadow = 'none';
+                symbols[i].style.backgroundColor = getSymbolBackgroundColor(i);
+            }
+        }
+
+        function playAudio() {
+            if (audioBuffer && !audioSource) {
+                audioContext.resume().then(() => {
+                    audioSource = audioContext.createBufferSource();
+                    audioSource.buffer = audioBuffer;
+                    audioSource.connect(audioContext.destination);
+                    audioSource.start();
+                    audioSource.onended = resetAudioState;
+                    updateButtonState(true);
+
+                    // Show position line
+                    const positionLine = document.getElementById('position-line');
+                    positionLine.style.display = 'block';
+                    positionLine.style.backgroundColor = document.body.classList.contains('dark-mode') ? 'white' : 'red';
+
+                    const startTime = audioContext.currentTime;
+                    pianoRollInterval = setInterval(() => {
+                        const currentTime = audioContext.currentTime - startTime;
+                        highlightCurrentSymbol(currentTime);
+                        if (currentTime >= audioBuffer.duration) {
+                            clearInterval(pianoRollInterval);
+                            resetAudioState();
+                        }
+                    }, 50); // Update every 50ms
+                });
             }
         }
 
@@ -514,7 +570,7 @@
         downloadAudioButton.addEventListener('click', downloadAudio);
 
         encodeButton.addEventListener('click', () => {
-            const input = messageInput.value;
+            const input = normalizeMessage(messageInput.value);
             const inputType = detectInputType(input);
             const baseFreq = parseFloat(baseFreqInput.value) || 1000;
             
@@ -522,11 +578,7 @@
             if (inputType === 'symbols') {
                 resultPtr = Module.ccall('processSymbols', 'number', ['string', 'number'], [input, baseFreq]);
             } else if (inputType === 'packed') {
-                const packed = input.split(/\s+/).map(hex => parseInt(hex, 16));
-                const packedPtr = Module._malloc(packed.length);
-                Module.HEAPU8.set(packed, packedPtr);
-                resultPtr = Module.ccall('decodeFT8PackedData', 'number', ['number', 'number'], [packedPtr, packed.length]);
-                Module._free(packedPtr);
+                //todo
             } else {
                 resultPtr = encodeFT8(input, baseFreq);
             }
@@ -546,16 +598,7 @@
                 decoded_text: Module.UTF8ToString(Module.getValue(resultPtr + 24, '*'))
             };
 
-            // Display packed data and symbols
-            const packedData = new Uint8Array(Module.HEAPU8.buffer, result.packed_data, result.packed_size);
-            const symbols = new Uint8Array(Module.HEAPU8.buffer, result.symbols, result.symbol_count);
-
-            output.textContent = `Input type: ${inputType}\n`;
-            output.textContent += `Symbols: ${Array.from(symbols).join('')}\n`;
-            output.textContent += `Packed data: ${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join(' ')}\n`;
-            output.textContent += `Decoded: ${result.decoded_text}\n`;
-
-            createPianoRoll(Array.from(symbols));
+            updateOutput(result, inputType, input);
 
             // Create audio buffer
             const audioSamples = new Float32Array(Module.HEAPF32.buffer, result.audio, result.audio_samples);
@@ -583,9 +626,8 @@
             const inputType = detectInputType(input);
             const baseFreq = parseFloat(baseFreqInput.value) || 1000;
 
-            output.textContent = `Input type: ${inputType}\n`;
-
             if (inputType === 'symbols') {
+                output.textContent = `Input type: ${inputType}\n`;
                 const symbols = input.split(/\s+/).map(Number);
                 const symbolsPtr = Module._malloc(symbols.length);
                 Module.HEAPU8.set(symbols, symbolsPtr);
@@ -595,6 +637,7 @@
                 output.textContent += `Decoded: ${decodedText}\n`;
                 createPianoRoll(symbols);
             } else if (inputType === 'packed') {
+                output.textContent = `Input type: ${inputType}\n`;
                 const packed = input.split(/\s+/).map(hex => parseInt(hex, 16));
                 const packedPtr = Module._malloc(packed.length);
                 Module.HEAPU8.set(packed, packedPtr);
@@ -609,6 +652,7 @@
                 createPianoRoll(Array.from(symbols));
                 Module._free(symbolsPtr);
             } else {
+                output.textContent = '';
                 const resultPtr = encodeFT8(input, baseFreq);
 
                 if (resultPtr === 0) {
@@ -663,8 +707,11 @@
 
         themeToggle.addEventListener('click', () => {
             document.body.classList.toggle('dark-mode');
+            const positionLine = document.getElementById('position-line');
+            if (positionLine) {
+                positionLine.style.backgroundColor = document.body.classList.contains('dark-mode') ? 'white' : 'red';
+            }
         });
-
     }
 
     if (typeof Module !== 'undefined') {

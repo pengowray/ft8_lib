@@ -41,7 +41,7 @@ char* decodeFT8Symbols(const uint8_t* symbols, int symbol_count) {
         return decoded_text;
     }
     free(decoded_text);
-    return NULL;
+    return strdup("Decoding failed");
 }
 
 EMSCRIPTEN_KEEPALIVE

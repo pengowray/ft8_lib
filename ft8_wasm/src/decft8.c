@@ -22,12 +22,40 @@ bool decft8_decode_symbols(const uint8_t* symbols, int symbol_count, char* decod
     message.hash = 0;  // Don't need the hash for decoding
 
     // Convert symbols to payload
-    uint8_t payload[FTX_PAYLOAD_LENGTH_BYTES] = {0};
-    for (int i = 0; i < FT8_ND; i++) {
-        int symbol_idx = i + ((i < 29) ? 7 : 14);
-        int bit_idx = 3 * i;
+    uint8_t codeword[FTX_LDPC_N_BYTES] = {0};
+    int codeword_bit_idx = 0;
+
+    for (int i = 0; i < FT8_NN; ++i) {
+        if ((i >= 0 && i < 7) || (i >= 36 && i < 43) || (i >= 72 && i < 79)) {
+            // Skip Costas symbols
+            continue;
+        }
         
-        payload[bit_idx / 8] |= (symbols[symbol_idx] & 0x07) << (bit_idx % 8);
+        uint8_t bits3 = 0;
+        for (int j = 0; j < 8; ++j) {
+            if (kFT8_Gray_map[j] == symbols[i]) {
+                bits3 = j;
+                break;
+            }
+        }
+        
+        for (int j = 2; j >= 0; --j) {
+            if (codeword_bit_idx < FTX_LDPC_N) {
+                if (bits3 & (1 << j)) {
+                    codeword[codeword_bit_idx / 8] |= (0x80 >> (codeword_bit_idx % 8));
+                }
+                codeword_bit_idx++;
+            }
+        }
+    }
+
+    // Extract payload from codeword (first 91 bits)
+    uint8_t payload[FTX_PAYLOAD_LENGTH_BYTES];
+    for (int i = 0; i < FTX_PAYLOAD_LENGTH_BYTES; ++i) {
+        payload[i] = codeword[i];
+    }
+    if (FTX_PAYLOAD_LENGTH_BYTES * 8 > FTX_LDPC_K) {
+        payload[FTX_PAYLOAD_LENGTH_BYTES - 1] &= (0xFF << (FTX_PAYLOAD_LENGTH_BYTES * 8 - FTX_LDPC_K));
     }
 
     // Print the payload for debugging

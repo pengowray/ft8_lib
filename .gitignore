@@ -7,3 +7,8 @@ wsjtx2/
 .DS_Store
 .vscode/
 __pycache__/
+
+# WebAssembly output in root
+/*.wasm
+/*.js
+

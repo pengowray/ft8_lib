@@ -205,6 +205,7 @@
             <div id="visualization-controls">
                 <button id="zoom-in">Zoom In</button>
                 <button id="zoom-out">Zoom Out</button>
+                <button id="toggle-visualization">Show Audio</button>
                 <span id="time-display">0.00 / 0.00</span>
             </div>
         </div>
@@ -229,6 +230,18 @@
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script src="ft8_wasm.js"></script>
 <script>
+    let waveformCanvas, waveformCtx, audioData, zoomLevel = 1, currentTime = 0;
+    let audioContext = null;
+    let audioBuffer = null;
+    let audioSource = null;
+    let countdownInterval = null;
+    let audioSamples;
+    let dphiSamples;
+    let metadata;
+    let channelData;
+    let baseFreq = 500;
+    let sampleRate = 12000;
+
     const exampleMessages = [
         "CQ K1ABC FN42",
         "K1ABC W9XYZ -15",
@@ -239,7 +252,7 @@
 
     function initializeUI() {
         const encodeButton = document.getElementById('encode-button');
-        const decodeButton = document.getElementById('decode-button');
+        const decodeButton = document.getElementById('decode-button'); // not used (yet)
         const messageInput = document.getElementById('message-input');
         const baseFreqInput = document.getElementById('base-freq-input');
         const audioInput = document.getElementById('audio-input');
@@ -276,11 +289,6 @@
             Module._free(resultPtr);
             return result;
         };
-
-        let audioContext = null;
-        let audioBuffer = null;
-        let audioSource = null;
-        let countdownInterval = null;
 
         function normalizeMessage(message) {
             return message.trim().toUpperCase().replace(/\s+/g, ' ');
@@ -376,7 +384,7 @@
 
         function highlightCurrentSymbol(currentTime) {
             const symbolDuration = audioBuffer.duration / 79; // 79 symbols in FT8
-            const currentSymbolIndex = Math.floor(currentTime / symbolDuration);
+            currentSymbolIndex = Math.floor(currentTime / symbolDuration);
             
             const pianoRollDiv = document.getElementById('piano-roll');
             const symbols = pianoRollDiv.children;
@@ -416,19 +424,17 @@
                     updateButtonState(true);
 
                     const startTime = audioContext.currentTime;
-                    const updateInterval = 1000 / 30; // 30 fps
-
                     function updateVisualization() {
                         currentTime = audioContext.currentTime - startTime;
-                        drawWaveform();
+                        drawWaveform(currentTime);
+                        highlightCurrentSymbol(currentTime);
 
                         if (currentTime < audioBuffer.duration) {
-                            setTimeout(updateVisualization, updateInterval);
+                            requestAnimationFrame(updateVisualization);
                         } else {
                             resetAudioState();
                         }
                     }
-
                     updateVisualization();
                 });
             }
@@ -537,6 +543,7 @@
         playAudioButton.addEventListener('click', playAudio);
         playAudioTimedButton.addEventListener('click', playAudioTimed);
         stopAudioButton.addEventListener('click', stopAudio);
+        downloadAudioButton.addEventListener('click', downloadAudio);
 
         function downloadAudio() {
             if (audioBuffer) {
@@ -611,23 +618,38 @@
             }
         }
 
-        downloadAudioButton.addEventListener('click', downloadAudio);
+        function findMinAndMax(numbers) {
+            let min = Infinity;
+            let max = -Infinity;
+            
+            for (const num of numbers) {
+                if (num < min) min = num;
+                if (num > max) max = num;
+            }
+            
+            return { min, max };
+        }
+
+        function scaleToRange(numbers, newMin, newMax) {
+            const { min: originalMin, max: originalMax } = findMinAndMax(numbers);
+            const scale = (newMax - newMin) / (originalMax - originalMin);
+            
+            return numbers.map(num => (num - originalMin) * scale + newMin);
+        }
 
         encodeButton.addEventListener('click', () => {
-            let input = messageInput.value;
+            const input = normalizeMessage(messageInput.value);
             const inputType = detectInputType(input);
-            const baseFreq = parseFloat(baseFreqInput.value) || 1000;
+            baseFreq = parseFloat(baseFreqInput.value) || 1000;
+            sampleRate = parseInt(sampleRateSelect.value);
                     
             let resultPtr;
             if (inputType === 'symbols') {
-                input = normalizeSymbols(input);
-                resultPtr = Module.ccall('processSymbols', 'number', ['string', 'number'], [input, baseFreq]);
+                resultPtr = Module.ccall('processSymbols', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
             } else if (inputType === 'packed') {
-                input = normalizePackedData(input);
-                resultPtr = Module.ccall('processPackedData', 'number', ['string', 'number'], [input, baseFreq]);
+                resultPtr = Module.ccall('processPackedData', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
             } else {
-                input = normalizeMessage(input);
-                resultPtr = encodeFT8(input, baseFreq);
+                resultPtr = Module.ccall('encodeFT8', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
             }
 
             if (resultPtr === 0) {
@@ -642,116 +664,48 @@
                 symbol_count: Module.getValue(resultPtr + 12, 'i32'),
                 audio: Module.getValue(resultPtr + 16, '*'),
                 audio_samples: Module.getValue(resultPtr + 20, 'i32'),
-                decoded_text: Module.UTF8ToString(Module.getValue(resultPtr + 24, '*'))
+                dphi: Module.getValue(resultPtr + 24, '*'),
+                decoded_text: Module.UTF8ToString(Module.getValue(resultPtr + 28, '*')),
+                metadata: Module.UTF8ToString(Module.getValue(resultPtr + 32, '*')),
+                metadata_length: Module.getValue(resultPtr + 36, 'i32')
             };
-
             updateOutput(result, inputType, input);
 
-            // Create audio buffer
-            const audioSamples = new Float32Array(Module.HEAPF32.buffer, result.audio, result.audio_samples);
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            audioBuffer = audioContext.createBuffer(1, result.audio_samples, 12000);
-            const channelData = audioBuffer.getChannelData(0);
-            channelData.set(audioSamples);
+            if (result.audio_samples > 0) {
+                audioSamples = new Float32Array(Module.HEAPF32.buffer, result.audio, result.audio_samples);
+                dphiSamples = new Float32Array(Module.HEAPF32.buffer, result.dphi, result.audio_samples);
+                
+                audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: sampleRate });
+                audioBuffer = audioContext.createBuffer(1, result.audio_samples, sampleRate);
+                channelData = audioBuffer.getChannelData(0);
+                channelData.set(audioSamples);
+                
+                let range = findMinAndMax(dphiSamples);
+                dphiSamples = scaleToRange(dphiSamples, 10, 190) // fit in 0 to 200
 
-            audioControls.style.display = 'block';
-            updateButtonState(false);
-            countdownDiv.style.display = 'none';
+                try {
+                    metadata = JSON.parse(result.metadata);
+                    console.log(metadata);
 
-            // Recreate the audio context to ensure it's in a clean state
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-
-            // Create waveform visualization
-            createWaveformVisualization(audioSamples, metadata);
-
-            // Free the memory allocated in C
-            freeFT8Result(resultPtr);
-        });
-
-        playAudioButton.addEventListener('click', playAudio);
-        downloadAudioButton.addEventListener('click', downloadAudio);
-
-        decodeButton.addEventListener('click', () => {
-            const input = messageInput.value;
-            const inputType = detectInputType(input);
-            const baseFreq = parseFloat(baseFreqInput.value) || 1000;
-
-            if (inputType === 'symbols') {
-                output.textContent = `Input type: ${inputType}\n`;
-                const symbols = input.split(/\s+/).map(Number);
-                const symbolsPtr = Module._malloc(symbols.length);
-                Module.HEAPU8.set(symbols, symbolsPtr);
-                const decodedText = decodeFT8Symbols(symbolsPtr, symbols.length);
-                Module._free(symbolsPtr);
-
-                output.textContent += `Decoded: ${decodedText}\n`;
-                output.textContent += `Explanation: ${explainFT8Message(decodedText)}\n`;
-
-                createPianoRoll(symbols);
-            } else if (inputType === 'packed') {
-                output.textContent = `Input type: ${inputType}\n`;
-                const packed = input.split(/\s+/).map(hex => parseInt(hex, 16));
-                const packedPtr = Module._malloc(packed.length);
-                Module.HEAPU8.set(packed, packedPtr);
-                const decodedText = decodeFT8PackedData(packedPtr, packed.length);
-                Module._free(packedPtr);
-
-                output.textContent += `Decoded: ${decodedText}\n`;
-                output.textContent += `Explanation: ${explainFT8Message(decodedText)}\n`;
-
-                // Generate symbols from packed data for piano roll
-                const symbolsPtr = Module._malloc(79);
-                Module.ccall('ft8_encode', null, ['number', 'number'], [packedPtr, symbolsPtr]);
-                const symbols = new Uint8Array(Module.HEAPU8.buffer, symbolsPtr, 79);
-                createPianoRoll(Array.from(symbols));
-                Module._free(symbolsPtr);
-            } else {
-                output.textContent = '';
-                const resultPtr = encodeFT8(input, baseFreq);
-
-                if (resultPtr === 0) {
-                    output.textContent += "Error: Invalid message format\n";
-                    return;
+                } catch (e) {
+                    console.error("Error parsing metadata:", e);
+                    metadata = {};
                 }
 
-                const result = {
-                    packed_data: Module.getValue(resultPtr, '*'),
-                    packed_size: Module.getValue(resultPtr + 4, 'i32'),
-                    symbols: Module.getValue(resultPtr + 8, '*'),
-                    symbol_count: Module.getValue(resultPtr + 12, 'i32'),
-                    audio: Module.getValue(resultPtr + 16, '*'),
-                    audio_samples: Module.getValue(resultPtr + 20, 'i32')
-                };
-
-                const packedData = new Uint8Array(Module.HEAPU8.buffer, result.packed_data, result.packed_size);
-                const symbols = new Uint8Array(Module.HEAPU8.buffer, result.symbols, result.symbol_count);
-
-                output.textContent += `Symbols: ${Array.from(symbols).join(' ')}\n`;
-                output.textContent += `Packed: ${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join(' ')}\n`;
-
-                //???
-                const decodedText = Module.UTF8ToString(Module.getValue(resultPtr + 24, '*'));
-                output.textContent += `Decoded: ${decodedText}\n`;
-                output.textContent += `Explanation: ${explainFT8Message(decodedText)}\n`;
-                createPianoRoll(Array.from(symbols));
-
-                // Create audio buffer
-                const audioSamples = new Float32Array(Module.HEAPF32.buffer, result.audio, result.audio_samples);
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                audioBuffer = audioContext.createBuffer(1, result.audio_samples, 12000);
-                const channelData = audioBuffer.getChannelData(0);
-                channelData.set(audioSamples);
+                createWaveformVisualization(audioSamples, dphiSamples, metadata);
 
                 audioControls.style.display = 'block';
                 updateButtonState(false);
                 countdownDiv.style.display = 'none';
-
-                freeFT8Result(resultPtr);
+            } else {
+                console.error("No audio data generated");
+                output.textContent += "\nError: No audio data generated";
+                audioControls.style.display = 'none';
             }
-        });
 
-        playAudioButton.addEventListener('click', playAudio);
-        downloadAudioButton.addEventListener('click', downloadAudio);
+            // Free the memory allocated in C
+            Module.ccall('freeFT8Result', null, ['number'], [resultPtr]);
+        });
 
         exampleMessages.forEach(message => {
             const button = document.createElement('button');
@@ -764,6 +718,9 @@
         });
 
         function explainFT8Message(message) {
+            if (message === "Decoding failed") {
+                return '';
+            }
             const parts = message.trim().split(/\s+/);
             let explanation = '';
 
@@ -845,67 +802,10 @@
         });
         baseFreqInput.parentNode.insertBefore(sampleRateSelect, baseFreqInput.nextSibling);
 
-        encodeButton.addEventListener('click', () => {
-            const input = normalizeMessage(messageInput.value);
-            const inputType = detectInputType(input);
-            const baseFreq = parseFloat(baseFreqInput.value) || 1000;
-            const sampleRate = parseInt(sampleRateSelect.value);
-            
-            let resultPtr;
-            if (inputType === 'symbols') {
-                resultPtr = Module.ccall('processSymbols', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
-            } else if (inputType === 'packed') {
-                //todo
-            } else {
-                resultPtr = encodeFT8(input, baseFreq, sampleRate);
-            }
-
-            if (resultPtr === 0) {
-                output.textContent = "Error: Invalid input";
-                return;
-            }
-
-            const result = {
-                packed_data: Module.getValue(resultPtr, '*'),
-                packed_size: Module.getValue(resultPtr + 4, 'i32'),
-                symbols: Module.getValue(resultPtr + 8, '*'),
-                symbol_count: Module.getValue(resultPtr + 12, 'i32'),
-                audio: Module.getValue(resultPtr + 16, '*'),
-                audio_samples: Module.getValue(resultPtr + 20, 'i32'),
-                dphi: Module.getValue(resultPtr + 24, '*'),
-                decoded_text: Module.UTF8ToString(Module.getValue(resultPtr + 28, '*')),
-                metadata: Module.UTF8ToString(Module.getValue(resultPtr + 32, '*')),
-                metadata_length: Module.getValue(resultPtr + 36, 'i32')
-            };
-
-            updateOutput(result, inputType, input);
-
-            // Create audio buffer
-            const audioSamples = new Float32Array(Module.HEAPF32.buffer, result.audio, result.audio_samples);
-            audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: sampleRate });
-            audioBuffer = audioContext.createBuffer(1, result.audio_samples, sampleRate);
-            const channelData = audioBuffer.getChannelData(0);
-            channelData.set(audioSamples);
-
-            // Create dphi data
-            const dphiData = new Float32Array(Module.HEAPF32.buffer, result.dphi, result.audio_samples);
-
-            // Parse metadata
-            const metadata = JSON.parse(result.metadata);
-
-            audioControls.style.display = 'block';
-            updateButtonState(false);
-            countdownDiv.style.display = 'none';
-
-            // Free the memory allocated in C
-            freeFT8Result(resultPtr);
-        });
-
-        let waveformCanvas, waveformCtx, audioData, sampleRate, zoomLevel = 1, currentTime = 0;
-
-        function createWaveformVisualization(audioSamples, metadata) {
+        function createWaveformVisualization(audioSamples, dphiSamples, metadata) {
             audioData = audioSamples;
-            sampleRate = metadata.sample_rate;
+            dphiData = dphiSamples;
+            sampleRate = metadata?.sample_rate ?? 12000;
             
             waveformCanvas = document.getElementById('waveform-canvas');
             waveformCtx = waveformCanvas.getContext('2d');
@@ -919,7 +819,7 @@
 
             // Setup zoom controls
             document.getElementById('zoom-in').addEventListener('click', () => {
-                zoomLevel = Math.min(zoomLevel * 2, 16);
+                zoomLevel = Math.min(zoomLevel * 2, 1024);
                 drawWaveform();
             });
             document.getElementById('zoom-out').addEventListener('click', () => {
@@ -928,7 +828,40 @@
             });
         }
 
-        function drawWaveform() {
+        function handleResize() {
+            if (waveformCanvas) {
+                waveformCanvas.width = waveformCanvas.clientWidth;
+                drawWaveform();
+            }
+        }
+
+        window.addEventListener('resize', handleResize);
+
+        let showDphi = true;
+        const toggleVisualizationButton = document.getElementById('toggle-visualization');
+
+        function toggleVisualization() {
+            showDphi = !showDphi;
+            toggleVisualizationButton.textContent = showDphi ? 'Show Audio' : 'Show Unmodulated';
+            drawWaveform();
+        }
+
+        toggleVisualizationButton.addEventListener('click', toggleVisualization);
+
+
+        function drawWaveform(currentTime = 0) {
+            if (showDphi && (!dphiData || dphiData.length === 0)) { 
+                console.error("No dphiData to draw");
+                return;
+            }
+
+            if (!showDphi && (!audioData || audioData.length === 0)) { 
+                console.error("No data to draw");
+                return;
+            }
+
+            const data = showDphi ? dphiData : audioData;
+
             const width = waveformCanvas.width;
             const height = waveformCanvas.height;
             const middle = height / 2;
@@ -937,24 +870,38 @@
             waveformCtx.beginPath();
             waveformCtx.moveTo(0, middle);
 
-            const totalDuration = audioData.length / sampleRate;
+            const totalDuration = data.length / sampleRate;
+            console.log("data.length / sampleRate: ", data.length, sampleRate, totalDuration, dphiData.length);
+
             const visibleDuration = totalDuration / zoomLevel;
-            const startSample = Math.floor((currentTime - visibleDuration / 2) * sampleRate);
-            const endSample = Math.floor((currentTime + visibleDuration / 2) * sampleRate);
+
+            const currentTimePercent = currentTime / audioBuffer.duration;
+
+            let startSample = Math.max(0, Math.floor((currentTimePercent - visibleDuration / 2) * sampleRate));
+            let endSample = Math.min(data.length, Math.floor((currentTimePercent + visibleDuration / 2) * sampleRate));
+
+            const step = Math.max(1, Math.floor((endSample - startSample) / width));
 
             for (let x = 0; x < width; x++) {
-                const sampleIndex = Math.floor(startSample + (x / width) * (endSample - startSample));
-                if (sampleIndex >= 0 && sampleIndex < audioData.length) {
-                    const y = middle + (audioData[sampleIndex] * middle);
-                    waveformCtx.lineTo(x, y);
+                const sampleIndex = startSample + x * step;
+                if (sampleIndex >= 0 && sampleIndex < data.length) {
+                    if (showDphi) {
+                        let y = data[sampleIndex]; // pre-scaled
+                        waveformCtx.lineTo(x, y);
+
+                    } else {
+                        let y = middle + (data[sampleIndex] * middle);
+                        waveformCtx.lineTo(x, y);
+                    }
                 }
             }
 
-            waveformCtx.strokeStyle = 'steelblue';
+            waveformCtx.strokeStyle = showDphi ? 'green' : 'steelblue';
+            //waveformCtx.strokeStyle = 'steelblue';
             waveformCtx.stroke();
 
             // Draw playback position line
-            const playbackX = width / 2;
+            const playbackX = ((currentTime - (startSample / sampleRate)) / visibleDuration) * width;
             waveformCtx.beginPath();
             waveformCtx.moveTo(playbackX, 0);
             waveformCtx.lineTo(playbackX, height);
@@ -965,8 +912,8 @@
             const timeDisplay = document.getElementById('time-display');
             timeDisplay.textContent = `${currentTime.toFixed(2)} / ${totalDuration.toFixed(2)}`;
         }
-    }
 
+    }
     if (typeof Module !== 'undefined') {
         Module.onRuntimeInitialized = initializeUI;
     } else {

@@ -69,7 +69,7 @@ void symbols_to_packed(const uint8_t* symbols, uint8_t* packed) {
 }
 
 EMSCRIPTEN_KEEPALIVE
-FT8Result* processSymbols(const char* symbolString, float base_freq) {
+FT8Result* processSymbols(const char* symbolString, float base_freq, int sample_rate) {
     FT8Result* result = (FT8Result*)malloc(sizeof(FT8Result));
 
     // Convert symbol string to uint8_t array
@@ -80,9 +80,9 @@ FT8Result* processSymbols(const char* symbolString, float base_freq) {
     }
 
     // Generate audio
-    const int sample_rate = 12000;
-    result->audio_samples = (int)(FT8_SYMBOL_PERIOD * FT8_NN * sample_rate);
+    result->audio_samples = calculate_num_samples(FT8_NN, FT8_SYMBOL_PERIOD, sample_rate);
     result->audio = (float*)malloc(result->audio_samples * sizeof(float));
+    result->dphi = (float*)malloc(result->audio_samples * sizeof(float));
 
     synth_gfsk(result->symbols, FT8_NN, base_freq, FT8_SYMBOL_BT, FT8_SYMBOL_PERIOD, sample_rate, result->audio, result->dphi, &result->metadata_length, &result->metadata);
 
@@ -114,7 +114,7 @@ char* decodeFT8Symbols(const uint8_t* symbols, int symbol_count) {
 }
 
 EMSCRIPTEN_KEEPALIVE
-FT8Result* processPackedData(const char* packedDataHex, float base_freq) {
+FT8Result* processPackedData(const char* packedDataHex, float base_freq, int sample_rate) {
     FT8Result* result = (FT8Result*)malloc(sizeof(FT8Result));
 
     // Convert hex string to bytes
@@ -130,18 +130,22 @@ FT8Result* processPackedData(const char* packedDataHex, float base_freq) {
     ft8_encode(result->packed_data, result->symbols);
 
     // Generate audio
-    const int sample_rate = 12000;
-    result->audio_samples = (int)(FT8_SYMBOL_PERIOD * FT8_NN * sample_rate);
+    result->audio_samples = calculate_num_samples(FT8_NN, FT8_SYMBOL_PERIOD, sample_rate);
     result->audio = (float*)malloc(result->audio_samples * sizeof(float));
+    result->dphi = (float*)malloc(result->audio_samples * sizeof(float));
+    
+    // Generate metadata
+    char* metadata_json;
+    int metadata_length;
 
-    synth_gfsk(result->symbols, FT8_NN, base_freq, FT8_SYMBOL_BT, FT8_SYMBOL_PERIOD, sample_rate, result->audio, result->dphi, &result->metadata_length, &result->metadata);
+    synth_gfsk(result->symbols, FT8_NN, base_freq, FT8_SYMBOL_BT, FT8_SYMBOL_PERIOD, sample_rate, result->audio, result->dphi, &metadata_length, &metadata_json);
+
+    result->metadata = metadata_json;
+    result->metadata_length = metadata_length;
 
     // Decode packed data to text
     result->decoded_text = (char*)malloc(FTX_MAX_MESSAGE_LENGTH);
-    ftx_message_t msg;
-    memcpy(msg.payload, result->packed_data, FTX_PAYLOAD_LENGTH_BYTES);
-    ftx_message_rc_t rc = ftx_message_decode(&msg, NULL, result->decoded_text);
-    if (rc != FTX_MESSAGE_RC_OK) {
+    if (!decft8_decode_packed(result->packed_data, result->packed_size, result->decoded_text, FTX_MAX_MESSAGE_LENGTH)) {
         strcpy(result->decoded_text, "Decoding failed");
     }
 
@@ -179,11 +183,12 @@ FT8Result* encodeFT8(const char* message, float base_freq, int sample_rate)
     ft8_encode(msg.payload, result->symbols);
     result->symbol_count = FT8_NN;
 
-    // Generate audio
-    result->audio_samples = (int)(FT8_SYMBOL_PERIOD * FT8_NN * sample_rate);
-    result->audio = (float*)malloc(result->audio_samples * sizeof(float));
+    // Calculate total samples including ramp up/down
+    int n_spsym = (int)(0.5f + sample_rate * FT8_SYMBOL_PERIOD);
+    int n_ramp = n_spsym / 8;
 
-    // Allocate memory for dphi
+    result->audio_samples = calculate_num_samples(FT8_NN, FT8_SYMBOL_PERIOD, sample_rate);
+    result->audio = (float*)malloc(result->audio_samples * sizeof(float));
     result->dphi = (float*)malloc(result->audio_samples * sizeof(float));
 
     // Generate metadata
@@ -247,7 +252,7 @@ char* encodeFT8_packed(const char* message) {
 }
 
 EMSCRIPTEN_KEEPALIVE
-float* encodeFT8_audio(const char* message, float base_freq, int* num_samples) {
+float* encodeFT8_audio(const char* message, float base_freq, int* num_samples, int sample_rate) {
     // Encode the message
     ftx_message_t msg;
     ftx_message_rc_t rc = ftx_message_encode(&msg, NULL, message);
@@ -261,10 +266,10 @@ float* encodeFT8_audio(const char* message, float base_freq, int* num_samples) {
     ft8_encode(msg.payload, tones);
 
     // Generate audio samples
-    const int sample_rate = 12000;
     const float symbol_rate = 6.25f;
     const int samples_per_symbol = (int)(sample_rate / symbol_rate);
-    *num_samples = FT8_NN * samples_per_symbol;
+
+    *num_samples = calculate_num_samples(FT8_NN, FT8_SYMBOL_PERIOD, sample_rate);
     float* audio = (float*)malloc(*num_samples * sizeof(float));
 
     for (int i = 0; i < FT8_NN; i++) {

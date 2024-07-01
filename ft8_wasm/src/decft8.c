@@ -92,5 +92,11 @@ bool decft8_decode_packed(const uint8_t* packed_data, int packed_size, char* dec
     // Decode the message
     ftx_message_rc_t rc = ftx_message_decode(&message, &hash_if, decoded_text);
 
-    return (rc == FTX_MESSAGE_RC_OK);
+    if (rc != FTX_MESSAGE_RC_OK) {
+        snprintf(decoded_text, max_text_length, "Decoding failed (error code: %d)", rc);
+        return false;
+    }
+
+    return true;
 }
+

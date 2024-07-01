@@ -139,6 +139,7 @@ FT8Result* processPackedData(const char* packedDataHex, float base_freq, int sam
     int metadata_length;
 
     synth_gfsk(result->symbols, FT8_NN, base_freq, FT8_SYMBOL_BT, FT8_SYMBOL_PERIOD, sample_rate, result->audio, result->dphi, &metadata_length, &metadata_json);
+    //synth_gfsk(result->symbols, FT8_NN, base_freq, FT8_SYMBOL_BT, FT8_SYMBOL_PERIOD, sample_rate, result->audio, result->dphi, &result->metadata_length, &result->metadata);
 
     result->metadata = metadata_json;
     result->metadata_length = metadata_length;

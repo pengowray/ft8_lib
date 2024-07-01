@@ -638,17 +638,21 @@
         }
 
         encodeButton.addEventListener('click', () => {
-            const input = normalizeMessage(messageInput.value);
+            let input = messageInput.value;
             const inputType = detectInputType(input);
+
             baseFreq = parseFloat(baseFreqInput.value) || 1000;
             sampleRate = parseInt(sampleRateSelect.value);
                     
             let resultPtr;
             if (inputType === 'symbols') {
+                input = normalizeSymbols(input);
                 resultPtr = Module.ccall('processSymbols', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
             } else if (inputType === 'packed') {
+                input = normalizePackedData(input);
                 resultPtr = Module.ccall('processPackedData', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
             } else {
+                input = normalizeMessage(input);
                 resultPtr = Module.ccall('encodeFT8', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
             }
 

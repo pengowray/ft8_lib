@@ -842,8 +842,6 @@
             const height = waveformCanvas.height;
             const middle = height / 2;
             waveformCtx.clearRect(0, 0, width, height);
-            waveformCtx.beginPath();
-            waveformCtx.moveTo(0, middle);
 
             const totalDuration = data.length / sampleRate;
             const visibleDuration = totalDuration / zoomLevel;
@@ -864,16 +862,30 @@
             const startSample = Math.floor(startTime * sampleRate);
             const endSample = Math.floor(endTime * sampleRate);
 
+            waveformCtx.beginPath();
+            waveformCtx.moveTo(0, middle);
+
             for (let x = 0; x < width; x++) {
-                const sampleIndex = Math.floor(startSample + x * samplesPerPixel);
-                if (sampleIndex >= 0 && sampleIndex < data.length) {
-                    let y;
-                    if (showDphi) {
-                        y = data[sampleIndex]; // pre-scaled
-                    } else {
-                        y = middle + (data[sampleIndex] * middle);
-                    }
-                    waveformCtx.lineTo(x, y);
+                const sampleStart = Math.floor(startSample + x * samplesPerPixel);
+                const sampleEnd = Math.floor(sampleStart + samplesPerPixel);
+
+                let minSample = Infinity;
+                let maxSample = -Infinity;
+
+                for (let s = sampleStart; s < sampleEnd && s < data.length; s++) {
+                    const sample = data[s];
+                    if (sample < minSample) minSample = sample;
+                    if (sample > maxSample) maxSample = sample;
+                }
+
+                if (showDphi) {
+                    waveformCtx.moveTo(x, minSample);
+                    waveformCtx.lineTo(x, maxSample);
+                } else {
+                    const minY = middle + (minSample * middle);
+                    const maxY = middle + (maxSample * middle);
+                    waveformCtx.moveTo(x, minY);
+                    waveformCtx.lineTo(x, maxY);
                 }
             }
 

@@ -828,53 +828,52 @@
 
 
         function drawWaveform(currentTime = 0) {
-            if (showDphi && (!dphiData || dphiData.length === 0)) { 
-                console.error("No dphiData to draw", currentTime);
+            if (showDphi && (!dphiData || dphiData.length === 0)) {
+                console.error("No dphiData to draw");
                 return;
             }
-
-            if (!showDphi && (!audioData || audioData.length === 0)) { 
-                console.error("No data to draw", currentTime);
+            if (!showDphi && (!audioData || audioData.length === 0)) {
+                console.error("No data to draw");
                 return;
             }
 
             const data = showDphi ? dphiData : audioData;
-
             const width = waveformCanvas.width;
             const height = waveformCanvas.height;
             const middle = height / 2;
-
             waveformCtx.clearRect(0, 0, width, height);
             waveformCtx.beginPath();
             waveformCtx.moveTo(0, middle);
 
             const totalDuration = data.length / sampleRate;
-            console.log("data.length / sampleRate: ", data.length, sampleRate, totalDuration, dphiData.length);
-
             const visibleDuration = totalDuration / zoomLevel;
+            const samplesPerPixel = (sampleRate * visibleDuration) / width;
 
-            const currentTimePercent = currentTime / audioBuffer.duration;
+            let startTime = currentTime - visibleDuration / 2;
+            let endTime = currentTime + visibleDuration / 2;
 
-            let startSample = 0;
-            let endSample = data.length;
-            if (zoomLevel > 1.1) {
-                startSample = Math.max(0, Math.floor((currentTimePercent - visibleDuration / 2) * sampleRate));
-                endSample = Math.min(data.length, Math.floor((currentTimePercent + visibleDuration / 2) * sampleRate));
-            } 
+            // Adjust start and end times to prevent showing blank areas
+            if (startTime < 0) {
+                startTime = 0;
+                endTime = visibleDuration;
+            } else if (endTime > totalDuration) {
+                endTime = totalDuration;
+                startTime = endTime - visibleDuration;
+            }
 
-            const step = Math.max(1, Math.floor((endSample - startSample) / width));
+            const startSample = Math.floor(startTime * sampleRate);
+            const endSample = Math.floor(endTime * sampleRate);
 
             for (let x = 0; x < width; x++) {
-                const sampleIndex = startSample + x * step;
+                const sampleIndex = Math.floor(startSample + x * samplesPerPixel);
                 if (sampleIndex >= 0 && sampleIndex < data.length) {
+                    let y;
                     if (showDphi) {
-                        let y = data[sampleIndex]; // pre-scaled
-                        waveformCtx.lineTo(x, y);
-
+                        y = data[sampleIndex]; // pre-scaled
                     } else {
-                        let y = middle + (data[sampleIndex] * middle);
-                        waveformCtx.lineTo(x, y);
+                        y = middle + (data[sampleIndex] * middle);
                     }
+                    waveformCtx.lineTo(x, y);
                 }
             }
 
@@ -882,7 +881,7 @@
             waveformCtx.stroke();
 
             // Draw playback position line
-            const playbackX = ((currentTime - (startSample / sampleRate)) / visibleDuration) * width;
+            const playbackX = ((currentTime - startTime) / visibleDuration) * width;
             waveformCtx.beginPath();
             waveformCtx.moveTo(playbackX, 0);
             waveformCtx.lineTo(playbackX, height);

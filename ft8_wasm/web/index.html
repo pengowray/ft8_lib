@@ -148,6 +148,20 @@
             background-color: #ddd;
         }
 
+        #audio-visualization {
+            margin-top: 20px;
+        }
+        #waveform-canvas {
+            width: 100%;
+            border: 1px solid #ccc;
+        }
+        #visualization-controls {
+            margin-top: 10px;
+        }
+        #time-display {
+            margin-left: 10px;
+        }
+
         @media (max-width: 600px) {
             body {
                 padding: 10px;
@@ -186,7 +200,14 @@
         </div>
 
         <div id="piano-roll" style="margin-top: 20px;"></div>
-        <div id="frequency-graph" style="margin-top: 20px;"></div>
+        <div id="audio-visualization">
+            <canvas id="waveform-canvas"></canvas>
+            <div id="visualization-controls">
+                <button id="zoom-in">Zoom In</button>
+                <button id="zoom-out">Zoom Out</button>
+                <span id="time-display">0.00 / 0.00</span>
+            </div>
+        </div>
         <div id="output"></div>
 
         <div id="example-messages">
@@ -395,13 +416,20 @@
                     updateButtonState(true);
 
                     const startTime = audioContext.currentTime;
-                    pianoRollInterval = setInterval(() => {
-                        const currentTime = audioContext.currentTime - startTime;
-                        highlightCurrentSymbol(currentTime);
-                        if (currentTime >= audioBuffer.duration) {
-                            clearInterval(pianoRollInterval);
+                    const updateInterval = 1000 / 30; // 30 fps
+
+                    function updateVisualization() {
+                        currentTime = audioContext.currentTime - startTime;
+                        drawWaveform();
+
+                        if (currentTime < audioBuffer.duration) {
+                            setTimeout(updateVisualization, updateInterval);
+                        } else {
+                            resetAudioState();
                         }
-                    }, 50); // Update every 50ms
+                    }
+
+                    updateVisualization();
                 });
             }
         }
@@ -633,6 +661,9 @@
             // Recreate the audio context to ensure it's in a clean state
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
+            // Create waveform visualization
+            createWaveformVisualization(audioSamples, metadata);
+
             // Free the memory allocated in C
             freeFT8Result(resultPtr);
         });
@@ -862,9 +893,6 @@
             // Parse metadata
             const metadata = JSON.parse(result.metadata);
 
-            // Create frequency graph
-            createFrequencyGraph(dphiData, metadata);
-
             audioControls.style.display = 'block';
             updateButtonState(false);
             countdownDiv.style.display = 'none';
@@ -873,53 +901,69 @@
             freeFT8Result(resultPtr);
         });
 
-        function createFrequencyGraph(dphiData, metadata) {
-            const graphDiv = document.getElementById('frequency-graph');
-            graphDiv.innerHTML = '';
+        let waveformCanvas, waveformCtx, audioData, sampleRate, zoomLevel = 1, currentTime = 0;
 
-            const margin = { top: 20, right: 20, bottom: 30, left: 50 };
-            const width = graphDiv.clientWidth - margin.left - margin.right;
-            const height = 200 - margin.top - margin.bottom;
+        function createWaveformVisualization(audioSamples, metadata) {
+            audioData = audioSamples;
+            sampleRate = metadata.sample_rate;
+            
+            waveformCanvas = document.getElementById('waveform-canvas');
+            waveformCtx = waveformCanvas.getContext('2d');
 
-            const svg = d3.select(graphDiv).append("svg")
-                .attr("width", width + margin.left + margin.right)
-                .attr("height", height + margin.top + margin.bottom)
-                .append("g")
-                .attr("transform", `translate(${margin.left},${margin.top})`);
+            // Set canvas size
+            waveformCanvas.width = waveformCanvas.clientWidth;
+            waveformCanvas.height = 200;
 
-            const x = d3.scaleLinear()
-                .domain([0, dphiData.length])
-                .range([0, width]);
+            // Initial draw
+            drawWaveform();
 
-            const y = d3.scaleLinear()
-                .domain([metadata.base_frequency - 5, metadata.base_frequency + 55])
-                .range([height, 0]);
+            // Setup zoom controls
+            document.getElementById('zoom-in').addEventListener('click', () => {
+                zoomLevel = Math.min(zoomLevel * 2, 16);
+                drawWaveform();
+            });
+            document.getElementById('zoom-out').addEventListener('click', () => {
+                zoomLevel = Math.max(zoomLevel / 2, 1);
+                drawWaveform();
+            });
+        }
 
-            const line = d3.line()
-                .x((d, i) => x(i))
-                .y(d => y(d / (2 * Math.PI) * metadata.sample_rate));
+        function drawWaveform() {
+            const width = waveformCanvas.width;
+            const height = waveformCanvas.height;
+            const middle = height / 2;
 
-            svg.append("path")
-                .datum(dphiData)
-                .attr("fill", "none")
-                .attr("stroke", "steelblue")
-                .attr("stroke-width", 1.5)
-                .attr("d", line);
+            waveformCtx.clearRect(0, 0, width, height);
+            waveformCtx.beginPath();
+            waveformCtx.moveTo(0, middle);
 
-            svg.append("g")
-                .attr("transform", `translate(0,${height})`)
-                .call(d3.axisBottom(x));
+            const totalDuration = audioData.length / sampleRate;
+            const visibleDuration = totalDuration / zoomLevel;
+            const startSample = Math.floor((currentTime - visibleDuration / 2) * sampleRate);
+            const endSample = Math.floor((currentTime + visibleDuration / 2) * sampleRate);
 
-            svg.append("g")
-                .call(d3.axisLeft(y));
+            for (let x = 0; x < width; x++) {
+                const sampleIndex = Math.floor(startSample + (x / width) * (endSample - startSample));
+                if (sampleIndex >= 0 && sampleIndex < audioData.length) {
+                    const y = middle + (audioData[sampleIndex] * middle);
+                    waveformCtx.lineTo(x, y);
+                }
+            }
 
-            svg.append("text")
-                .attr("transform", "rotate(-90)")
-                .attr("y", 0 - margin.left)
-                .attr("x", 0 - (height / 2))
-                .attr("dy", "1em")
-                .style("text-anchor", "middle")
-                .text("Frequency (Hz)");
+            waveformCtx.strokeStyle = 'steelblue';
+            waveformCtx.stroke();
+
+            // Draw playback position line
+            const playbackX = width / 2;
+            waveformCtx.beginPath();
+            waveformCtx.moveTo(playbackX, 0);
+            waveformCtx.lineTo(playbackX, height);
+            waveformCtx.strokeStyle = 'red';
+            waveformCtx.stroke();
+
+            // Update time display
+            const timeDisplay = document.getElementById('time-display');
+            timeDisplay.textContent = `${currentTime.toFixed(2)} / ${totalDuration.toFixed(2)}`;
         }
     }
 

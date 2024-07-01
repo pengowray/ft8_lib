@@ -413,33 +413,6 @@
             return colors[symbol];
         }
 
-        function playAudio() {
-            if (audioBuffer && !audioSource) {
-                audioContext.resume().then(() => {
-                    audioSource = audioContext.createBufferSource();
-                    audioSource.buffer = audioBuffer;
-                    audioSource.connect(audioContext.destination);
-                    audioSource.start();
-                    audioSource.onended = resetAudioState;
-                    updateButtonState(true);
-
-                    const startTime = audioContext.currentTime;
-                    function updateVisualization() {
-                        currentTime = audioContext.currentTime - startTime;
-                        drawWaveform(currentTime);
-                        highlightCurrentSymbol(currentTime);
-
-                        if (currentTime < audioBuffer.duration) {
-                            requestAnimationFrame(updateVisualization);
-                        } else {
-                            resetAudioState();
-                        }
-                    }
-                    updateVisualization();
-                });
-            }
-        }
-
         function stopAudio() {
             if (audioSource) {
                 audioSource.stop();
@@ -495,6 +468,7 @@
                     const startTime = audioContext.currentTime;
                     pianoRollInterval = setInterval(() => {
                         const currentTime = audioContext.currentTime - startTime;
+                        drawWaveform(currentTime);
                         highlightCurrentSymbol(currentTime);
                         if (currentTime >= audioBuffer.duration) {
                             clearInterval(pianoRollInterval);
@@ -685,7 +659,7 @@
                 channelData.set(audioSamples);
                 
                 let range = findMinAndMax(dphiSamples);
-                dphiSamples = scaleToRange(dphiSamples, 10, 190) // fit in 0 to 200
+                dphiSamples = scaleToRange(dphiSamples, 190, 10) // fit in 0 to 200 (and flip?)
 
                 try {
                     metadata = JSON.parse(result.metadata);
@@ -855,12 +829,12 @@
 
         function drawWaveform(currentTime = 0) {
             if (showDphi && (!dphiData || dphiData.length === 0)) { 
-                console.error("No dphiData to draw");
+                console.error("No dphiData to draw", currentTime);
                 return;
             }
 
             if (!showDphi && (!audioData || audioData.length === 0)) { 
-                console.error("No data to draw");
+                console.error("No data to draw", currentTime);
                 return;
             }
 
@@ -881,8 +855,12 @@
 
             const currentTimePercent = currentTime / audioBuffer.duration;
 
-            let startSample = Math.max(0, Math.floor((currentTimePercent - visibleDuration / 2) * sampleRate));
-            let endSample = Math.min(data.length, Math.floor((currentTimePercent + visibleDuration / 2) * sampleRate));
+            let startSample = 0;
+            let endSample = data.length;
+            if (zoomLevel > 1.1) {
+                startSample = Math.max(0, Math.floor((currentTimePercent - visibleDuration / 2) * sampleRate));
+                endSample = Math.min(data.length, Math.floor((currentTimePercent + visibleDuration / 2) * sampleRate));
+            } 
 
             const step = Math.max(1, Math.floor((endSample - startSample) / width));
 
@@ -901,7 +879,6 @@
             }
 
             waveformCtx.strokeStyle = showDphi ? 'green' : 'steelblue';
-            //waveformCtx.strokeStyle = 'steelblue';
             waveformCtx.stroke();
 
             // Draw playback position line

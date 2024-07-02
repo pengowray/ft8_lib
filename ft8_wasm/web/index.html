@@ -309,26 +309,38 @@
             return input.replace(/[-\s]/g, '');
         }
 
+        function normalizeBinary(input) {
+            // 0 and 1 only
+            return input.replace(/[-\s]/g, '');
+        }
+
         function normalizePackedData(input) {
-            return input.replace(/[-\s]/g, '').toUpperCase();
+            //return input.replace(/[-\s]/g, '').toUpperCase();
+            return input.replace(/[-\s]/g, '').toLowerCase();
         }
 
         function detectInputType(input) {
             input = input.trim();
 
-            if (/^[0-7]{79}$/.test(input)) {
+            if (/^[0-7]{79}$/.test(normalizeSymbols(input))) {
                 return 'symbols';
             }
-            // Check if input is hex string (packed data)
-            if (/^([0-9A-Fa-f]{2}[-\s]?){10}$/.test(input)) {
+            // Check if input is hex string (packed data); pairs of hex must be together.
+            if (/^\s*([0-9A-Fa-f]{2}[-\s]?){10}\s*$/.test(input)) {
                 return 'packed';
             }
+
+            if (/^[0-1]{77}$/.test(normalizeBinary(input))) {
+                return '77 bits'; // Source-encoded message, 77 bits
+            }
+
             // Otherwise, assume it's a message
             return 'message';
         }
 
 
         function updateOutput(result, inputType, originalInput) {
+            
             const packedData = new Uint8Array(Module.HEAPU8.buffer, result.packed_data, result.packed_size);
             const symbols = new Uint8Array(Module.HEAPU8.buffer, result.symbols, result.symbol_count);
 
@@ -624,6 +636,20 @@
             return numbers.map(num => (num - originalMin) * scale + newMin);
         }
 
+        function binaryToHex(binaryStr) {
+            // Pad the binary string to ensure its length is a multiple of 4
+            let paddedBinaryStr = binaryStr.padStart(Math.ceil(binaryStr.length / 4) * 4, '0');
+            
+            let hexString = '';
+            for (let i = 0; i < paddedBinaryStr.length; i += 4) {
+                let fourBits = paddedBinaryStr.slice(i, i + 4);
+                let hexDigit = parseInt(fourBits, 2).toString(16);
+                hexString += hexDigit;
+            }
+            
+            return hexString;
+        }
+
         encodeButton.addEventListener('click', () => {
             let input = messageInput.value;
             const inputType = detectInputType(input);
@@ -636,8 +662,21 @@
                 input = normalizeSymbols(input);
                 resultPtr = Module.ccall('processSymbols', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
             } else if (inputType === 'packed') {
+                if (typeof Module['_processPackedHexStr'] !== 'function') {
+                    console.error('processPackedHexStr function not found in Module');
+                    return;
+                }
+
                 input = normalizePackedData(input);
-                resultPtr = Module.ccall('processPackedData', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
+                console.log(input, baseFreq, sampleRate)
+                console.log(typeof input, typeof baseFreq, typeof sampleRate)
+                resultPtr = Module.ccall('processPackedHexStr', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
+
+            } else if (inputType === '77 bits') {
+                binaryStr = normalizeBinary(input);
+                input = binaryToHex(binaryStr);
+                console.log(binaryStr, input, baseFreq, sampleRate)
+                resultPtr = Module.ccall('processPackedHexStr', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
             } else {
                 input = normalizeMessage(input);
                 resultPtr = Module.ccall('encodeFT8', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
@@ -660,6 +699,7 @@
                 metadata: Module.UTF8ToString(Module.getValue(resultPtr + 32, '*')),
                 metadata_length: Module.getValue(resultPtr + 36, 'i32')
             };
+
             updateOutput(result, inputType, input);
 
             if (result.audio_samples > 0) {
@@ -748,6 +788,7 @@
                     case 5: return { type: "5", messageType: "EU VHF contest with 6-digit grid locator" };
                     case 6: return { type: "6", messageType: "Unknown / Reserved" };
                     case 7: return { type: "7", messageType: "Unknown / Reserved" };
+                    default: return { type: `${i3}`, messageType: "Unknown" };
                 }
             }
 

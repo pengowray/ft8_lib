@@ -235,6 +235,7 @@
 
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script src="ft8_wasm.js"></script>
+<script src="ft8_extra.js"></script>
 <script>
     let audioData, dphiData, dphiSamples, currentTime = 0;
     let audioContext = null;
@@ -334,7 +335,7 @@
                 return '77 bits'; // Source-encoded message, 77 bits
             }
 
-            // Otherwise, assume it's a message
+            // Otherwise, assume it's a message (or 'free text' if ft8_lib fails to encode it)
             return 'message';
         }
 
@@ -349,7 +350,7 @@
                 output.innerHTML += `Input type: ${inputType}<br>`;
             }
             output.innerHTML += `Symbols: ${Array.from(symbols).join('')}<br>`;
-            output.innerHTML += `Packed: ${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join(' ')}<br>`;
+            output.innerHTML += `Packed: ${packedToHexStrSp(packedData)}<br>`;
 
             const decodedSpan = document.createElement('span');
             decodedSpan.textContent = `Decoded: ${result.decoded_text}`;
@@ -358,7 +359,6 @@
             }
             output.appendChild(decodedSpan);
 
-            //const packedHexStr = `${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join('')}`;
             const messageInfo = FT8MessageTypeInfo(packedData);
             output.innerHTML += `<br>Message Type: ${messageInfo.messageType} (${messageInfo.type})`;
             output.innerHTML += `<br>Explanation: ${explainFT8Message(result.decoded_text, messageInfo)}<br>`;
@@ -636,20 +636,6 @@
             return numbers.map(num => (num - originalMin) * scale + newMin);
         }
 
-        function binaryToHex(binaryStr) {
-            // Pad the binary string to ensure its length is a multiple of 4
-            let paddedBinaryStr = binaryStr.padEnd(Math.ceil(binaryStr.length / 4) * 4, '0');
-            
-            let hexString = '';
-            for (let i = 0; i < paddedBinaryStr.length; i += 4) {
-                let fourBits = paddedBinaryStr.slice(i, i + 4);
-                let hexDigit = parseInt(fourBits, 2).toString(16);
-                hexString += hexDigit;
-            }
-            
-            return hexString;
-        }
-
         encodeButton.addEventListener('click', () => {
             let input = messageInput.value;
             const inputType = detectInputType(input);
@@ -666,20 +652,30 @@
                     console.error('processPackedHexStr function not found in Module');
                     return;
                 }
-
                 input = normalizePackedData(input);
-                console.log(input, baseFreq, sampleRate)
-                console.log(typeof input, typeof baseFreq, typeof sampleRate)
                 resultPtr = Module.ccall('processPackedHexStr', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
 
             } else if (inputType === '77 bits') {
                 binaryStr = normalizeBinary(input);
                 input = binaryToHex(binaryStr);
-                console.log(binaryStr, input, baseFreq, sampleRate)
                 resultPtr = Module.ccall('processPackedHexStr', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
             } else {
                 input = normalizeMessage(input);
                 resultPtr = Module.ccall('encodeFT8', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
+            }
+
+            if (!resultPtr || resultPtr === 0) {
+                // attempt free text fallback
+                let textInput = input.trim();
+                if (textInput.length <= 13 && textInput.length > 0) {
+                    try {
+                        const packedData = encodeFT8FreeText(textInput);
+                        const hexStr = packedToHexStr(packedData);
+                        console.log("packedData", packedData);
+                        resultPtr = Module.ccall('processPackedHexStr', 'number', ['string', 'number', 'number'], [hexStr, baseFreq, sampleRate]);
+                        inputType = 'free text';
+                    } catch (e) {}
+                }
             }
 
             if (resultPtr === 0) {

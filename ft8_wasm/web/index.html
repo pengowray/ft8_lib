@@ -203,8 +203,6 @@
         <div id="audio-visualization">
             <canvas id="waveform-canvas"></canvas>
             <div id="visualization-controls">
-                <button id="zoom-in">Zoom In</button>
-                <button id="zoom-out">Zoom Out</button>
                 <button id="toggle-visualization">Show Audio</button>
                 <span id="time-display">0.00 / 0.00</span>
             </div>
@@ -794,16 +792,6 @@
 
             // Initial draw
             drawWaveform();
-
-            // Setup zoom controls
-            document.getElementById('zoom-in').addEventListener('click', () => {
-                zoomLevel = Math.min(zoomLevel * 2, 1024);
-                drawWaveform();
-            });
-            document.getElementById('zoom-out').addEventListener('click', () => {
-                zoomLevel = Math.max(zoomLevel / 2, 1);
-                drawWaveform();
-            });
         }
 
         function handleResize() {
@@ -815,19 +803,44 @@
 
         window.addEventListener('resize', handleResize);
 
-        let showDphi = true;
+        const showModes = [ 
+            {name: "Viz: Off", "mode": "off", "zoom": 1}, 
+            {name: "Viz: Frequency Deviation", "mode": "dphi", "zoom": 1},  // aka "Unmodulated", or "frequency deviation waveform generated using the Gaussian smoothed frequency deviation pulse"
+            {name: "Viz: Frequency Deviation (x16)", "mode": "dphi", "zoom": 16}, 
+            {name: "Viz: Audio Waveform (x16)", "mode": "wave", "zoom": 16}, 
+            {name: "Viz: Audio Waveform (x256)", "mode": "wave", "zoom": 256},
+        ];
+        let showMode = 0; // showDphi
         const toggleVisualizationButton = document.getElementById('toggle-visualization');
-
-        function toggleVisualization() {
-            showDphi = !showDphi;
-            toggleVisualizationButton.textContent = showDphi ? 'Show Audio' : 'Show Unmodulated';
+        function toggleVisualization() { // todo: rename cycleVisualization
+            showMode = (showMode + 1) % showModes.length;
+            //showDphi = !showDphi;
+            toggleVisualizationButton.textContent = showModes[showMode]['name'];
+//            toggleVisualizationButton.textContent = showDphi ? 'Show Audio' : 'Show Unmodulated';
             drawWaveform();
         }
+        toggleVisualization(); // set name on button (and turn on viz)
 
         toggleVisualizationButton.addEventListener('click', toggleVisualization);
 
-
         function drawWaveform(currentTime = 0) {
+            const mode = showModes[showMode];
+            const showDphi = (mode['mode'] === 'dphi');
+            const off = (mode['mode'] === 'off');
+
+            if (!waveformCanvas) return; // not ready yet
+
+            const width = waveformCanvas.width;
+            const height = waveformCanvas.height;
+            const middle = height / 2;
+            waveformCtx.clearRect(0, 0, width, height);
+            waveformCtx.beginPath();
+            waveformCtx.moveTo(0, middle);
+
+            if (off) return;
+
+            const zoomLevel = mode['zoom'];
+
             if (showDphi && (!dphiData || dphiData.length === 0)) {
                 console.error("No dphiData to draw");
                 return;
@@ -838,12 +851,6 @@
             }
 
             const data = showDphi ? dphiData : audioData;
-            const width = waveformCanvas.width;
-            const height = waveformCanvas.height;
-            const middle = height / 2;
-            waveformCtx.clearRect(0, 0, width, height);
-            waveformCtx.beginPath();
-            waveformCtx.moveTo(0, middle);
 
             const totalDuration = data.length / sampleRate;
             const visibleDuration = totalDuration / zoomLevel;
@@ -871,7 +878,7 @@
                     if (showDphi) {
                         y = data[sampleIndex]; // pre-scaled
                     } else {
-                        y = middle + (data[sampleIndex] * middle);
+                        y = middle + (data[sampleIndex] * middle * 0.9);
                     }
                     waveformCtx.lineTo(x, y);
                 }

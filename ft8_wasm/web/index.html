@@ -807,8 +807,8 @@
             {name: "Viz: Off", "mode": "off", "zoom": 1}, 
             {name: "Viz: Frequency Deviation", "mode": "dphi", "zoom": 1},  // aka "Unmodulated", or "frequency deviation waveform generated using the Gaussian smoothed frequency deviation pulse"
             {name: "Viz: Frequency Deviation (x16)", "mode": "dphi", "zoom": 16}, 
-            {name: "Viz: Audio Waveform (x16)", "mode": "wave", "zoom": 16}, 
             {name: "Viz: Audio Waveform (x256)", "mode": "wave", "zoom": 256},
+            {name: "Viz: Audio Waveform (x2048)", "mode": "wave", "zoom": 2048},
         ];
         let showMode = 0; // showDphi
         const toggleVisualizationButton = document.getElementById('toggle-visualization');
@@ -828,29 +828,25 @@
             const showDphi = (mode['mode'] === 'dphi');
             const off = (mode['mode'] === 'off');
 
-            if (!waveformCanvas) return; // not ready yet
+            if (!waveformCanvas) return;
 
             const width = waveformCanvas.width;
             const height = waveformCanvas.height;
             const middle = height / 2;
             waveformCtx.clearRect(0, 0, width, height);
-            waveformCtx.beginPath();
-            waveformCtx.moveTo(0, middle);
 
             if (off) return;
 
+            waveformCtx.beginPath();
+            waveformCtx.moveTo(0, middle);
+
             const zoomLevel = mode['zoom'];
 
-            if (showDphi && (!dphiData || dphiData.length === 0)) {
-                console.error("No dphiData to draw");
-                return;
-            }
-            if (!showDphi && (!audioData || audioData.length === 0)) {
-                console.error("No data to draw");
-                return;
-            }
-
             const data = showDphi ? dphiData : audioData;
+            if (!data || data.length === 0) {
+                console.error(`No ${showDphi ? 'dphiData' : 'audioData'} to draw`);
+                return;
+            }
 
             const totalDuration = data.length / sampleRate;
             const visibleDuration = totalDuration / zoomLevel;
@@ -871,16 +867,20 @@
             const startSample = Math.floor(startTime * sampleRate);
             const endSample = Math.floor(endTime * sampleRate);
 
-            for (let x = 0; x < width; x++) {
-                const sampleIndex = Math.floor(startSample + x * samplesPerPixel);
-                if (sampleIndex >= 0 && sampleIndex < data.length) {
-                    let y;
-                    if (showDphi) {
-                        y = data[sampleIndex]; // pre-scaled
-                    } else {
-                        y = middle + (data[sampleIndex] * middle * 0.9);
+            let lastX = -1;
+            for (let sample = startSample; sample <= endSample; sample++) {
+                if (sample >= 0 && sample < data.length) {
+                    const x = Math.floor((sample - startSample) / samplesPerPixel);
+                    if (x !== lastX) {  // Only draw if we've moved to a new x position
+                        let y;
+                        if (showDphi) {
+                            y = data[sample]; // pre-scaled
+                        } else {
+                            y = middle + (data[sample] * middle * 0.9);
+                        }
+                        waveformCtx.lineTo(x, y);
+                        lastX = x;
                     }
-                    waveformCtx.lineTo(x, y);
                 }
             }
 
@@ -899,8 +899,8 @@
             const timeDisplay = document.getElementById('time-display');
             timeDisplay.textContent = `${currentTime.toFixed(2)} / ${totalDuration.toFixed(2)}`;
         }
-
     }
+
     if (typeof Module !== 'undefined') {
         Module.onRuntimeInitialized = initializeUI;
     } else {

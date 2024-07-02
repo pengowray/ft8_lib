@@ -810,13 +810,12 @@
             {name: "Viz: Audio Waveform (x256)", "mode": "wave", "zoom": 256},
             {name: "Viz: Audio Waveform (x2048)", "mode": "wave", "zoom": 2048},
         ];
-        let showMode = 0; // showDphi
+        let showMode = 0;
         const toggleVisualizationButton = document.getElementById('toggle-visualization');
         function toggleVisualization() { // todo: rename cycleVisualization
             showMode = (showMode + 1) % showModes.length;
             //showDphi = !showDphi;
             toggleVisualizationButton.textContent = showModes[showMode]['name'];
-//            toggleVisualizationButton.textContent = showDphi ? 'Show Audio' : 'Show Unmodulated';
             drawWaveform();
         }
         toggleVisualization(); // set name on button (and turn on viz)
@@ -864,14 +863,45 @@
                 startTime = endTime - visibleDuration;
             }
 
-            const startSample = Math.floor(startTime * sampleRate);
-            const endSample = Math.floor(endTime * sampleRate);
+            let startSample = Math.floor(startTime * sampleRate);
+            let endSample = Math.floor(endTime * sampleRate);
+
+            // Implement trigger-like behavior for high zoom levels
+            if (!showDphi && zoomLevel > 2000) {
+                const triggerWindowSamples = Math.floor(sampleRate * 0.01); // 0.001 = 1ms window (todo: consider actual data)
+                //const triggerThreshold = 0.1;
+                
+                for (let i = startSample; i < startSample + triggerWindowSamples; i++) {
+                    if (i + 1 < data.length) {
+                        if (data[i] <= 0 && data[i + 1] > 0) {
+                            // || (Math.abs(data[i]) < triggerThreshold && Math.abs(data[i + 1]) >= triggerThreshold)) {
+
+                            //todo: should probably do some of these calcs in samples instead of time, but matching earlier calcs
+                            let newStartSample = i;
+                            let newEndTime = (i / sampleRate) + visibleDuration;
+                            if (endTime > totalDuration) {
+                                break; // trigger is too late, ignore
+                                //endTime = totalDuration;
+                                //startTime = endTime - (visibleDuration / sampleRate);
+                                //startSample = Math.floor(startTime * sampleRate); 
+                            }
+
+                            startSample = newStartSample;
+                            endSample = Math.floor(newEndTime * sampleRate);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            waveformCtx.beginPath();
+            waveformCtx.moveTo(0, middle);
 
             let lastX = -1;
             for (let sample = startSample; sample <= endSample; sample++) {
                 if (sample >= 0 && sample < data.length) {
                     const x = Math.floor((sample - startSample) / samplesPerPixel);
-                    if (x !== lastX) {  // Only draw if we've moved to a new x position
+                    if (x !== lastX) {
                         let y;
                         if (showDphi) {
                             y = data[sample]; // pre-scaled

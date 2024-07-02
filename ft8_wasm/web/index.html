@@ -826,7 +826,6 @@
 
         toggleVisualizationButton.addEventListener('click', toggleVisualization);
 
-
         function drawWaveform(currentTime = 0) {
             if (showDphi && (!dphiData || dphiData.length === 0)) {
                 console.error("No dphiData to draw");
@@ -850,7 +849,6 @@
             let startTime = currentTime - visibleDuration / 2;
             let endTime = currentTime + visibleDuration / 2;
 
-            // Adjust start and end times to prevent showing blank areas
             if (startTime < 0) {
                 startTime = 0;
                 endTime = visibleDuration;
@@ -863,34 +861,58 @@
             const endSample = Math.floor(endTime * sampleRate);
 
             waveformCtx.beginPath();
-            waveformCtx.moveTo(0, middle);
 
-            for (let x = 0; x < width; x++) {
-                const sampleStart = Math.floor(startSample + x * samplesPerPixel);
-                const sampleEnd = Math.floor(sampleStart + samplesPerPixel);
-
-                let minSample = Infinity;
-                let maxSample = -Infinity;
-
-                for (let s = sampleStart; s < sampleEnd && s < data.length; s++) {
-                    const sample = data[s];
-                    if (sample < minSample) minSample = sample;
-                    if (sample > maxSample) maxSample = sample;
+            if (showDphi) {
+                // For dphi mode, use simple line drawing without oversampling
+                for (let x = 0; x < width; x++) {
+                    const sampleIndex = Math.floor(startSample + x * samplesPerPixel);
+                    if (sampleIndex >= 0 && sampleIndex < data.length) {
+                        const y = data[sampleIndex];
+                        if (x === 0) {
+                            waveformCtx.moveTo(x, y);
+                        } else {
+                            waveformCtx.lineTo(x, y);
+                        }
+                    }
                 }
+            } else {
+                // For audio mode, use optimized drawing
+                const maxSamplesPerPixel = 4;
+                const step = Math.max(1, Math.floor(samplesPerPixel / maxSamplesPerPixel));
 
-                if (showDphi) {
-                    waveformCtx.moveTo(x, minSample);
-                    waveformCtx.lineTo(x, maxSample);
-                } else {
+                for (let x = 0; x < width; x++) {
+                    const sampleStart = Math.floor(startSample + x * samplesPerPixel);
+                    const sampleEnd = Math.min(sampleStart + step, data.length);
+
+                    if (sampleStart >= data.length) break;
+
+                    let minSample = data[sampleStart];
+                    let maxSample = minSample;
+
+                    for (let s = sampleStart + 1; s < sampleEnd; s++) {
+                        const sample = data[s];
+                        if (sample < minSample) minSample = sample;
+                        if (sample > maxSample) maxSample = sample;
+                    }
+
                     const minY = middle + (minSample * middle);
                     const maxY = middle + (maxSample * middle);
-                    waveformCtx.moveTo(x, minY);
-                    waveformCtx.lineTo(x, maxY);
+
+                    if (minY === maxY) {
+                        waveformCtx.rect(x, minY, 1, 1);
+                    } else {
+                        waveformCtx.fillRect(x, Math.min(minY, maxY), 1, Math.abs(maxY - minY));
+                    }
                 }
             }
 
             waveformCtx.strokeStyle = showDphi ? 'green' : 'steelblue';
             waveformCtx.stroke();
+
+            if (!showDphi) {
+                waveformCtx.fillStyle = 'steelblue';
+                waveformCtx.fill();
+            }
 
             // Draw playback position line
             const playbackX = ((currentTime - startTime) / visibleDuration) * width;
@@ -906,6 +928,7 @@
         }
 
     }
+
     if (typeof Module !== 'undefined') {
         Module.onRuntimeInitialized = initializeUI;
     } else {

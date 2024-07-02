@@ -84,6 +84,11 @@
             transition: background-color 0.3s ease;
         }
 
+        #visualization-caption {
+            color: gray;
+            font-size: 0.7em;
+        }
+
         button:hover {
             opacity: 0.9;
         }
@@ -153,6 +158,7 @@
         }
         #waveform-canvas {
             width: 100%;
+            height: 200px;
             border: 1px solid #ccc;
         }
         #visualization-controls {
@@ -202,8 +208,9 @@
         <div id="piano-roll" style="margin-top: 20px;"></div>
         <div id="audio-visualization">
             <canvas id="waveform-canvas"></canvas>
+            <div id="visualization-caption"></div>
             <div id="visualization-controls">
-                <button id="toggle-visualization">Show Audio</button>
+                <button id="toggle-visualization">Change Vizualization</button>
                 <span id="time-display">0.00 / 0.00</span>
             </div>
         </div>
@@ -228,7 +235,7 @@
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script src="ft8_wasm.js"></script>
 <script>
-    let waveformCanvas, waveformCtx, audioData, zoomLevel = 1, currentTime = 0;
+    let audioData, dphiData, currentTime = 0;
     let audioContext = null;
     let audioBuffer = null;
     let audioSource = null;
@@ -265,6 +272,11 @@
         const countdownDiv = document.getElementById('countdown');
         const themeToggle = document.getElementById('theme-toggle');
         const exampleMessagesDiv = document.getElementById('example-messages');
+
+        const waveformCanvas = document.getElementById('waveform-canvas');
+        waveformCanvas.width = waveformCanvas.clientWidth;
+        waveformCanvas.height = 200;
+        let waveformCtx = waveformCanvas.getContext('2d');
 
         const encodeFT8 = Module.cwrap('encodeFT8', 'number', ['string', 'number', 'number']);
         const freeFT8Result = Module.cwrap('freeFT8Result', null, ['number']);
@@ -782,9 +794,6 @@
             audioData = audioSamples;
             dphiData = dphiSamples;
             sampleRate = metadata?.sample_rate ?? 12000;
-            
-            waveformCanvas = document.getElementById('waveform-canvas');
-            waveformCtx = waveformCanvas.getContext('2d');
 
             // Set canvas size
             waveformCanvas.width = waveformCanvas.clientWidth;
@@ -804,18 +813,19 @@
         window.addEventListener('resize', handleResize);
 
         const showModes = [ 
-            {name: "Viz: Off", "mode": "off", "zoom": 1}, 
-            {name: "Viz: Frequency Deviation", "mode": "dphi", "zoom": 1},  // aka "Unmodulated", or "frequency deviation waveform generated using the Gaussian smoothed frequency deviation pulse"
-            {name: "Viz: Frequency Deviation (x16)", "mode": "dphi", "zoom": 16}, 
-            {name: "Viz: Audio Waveform (x256)", "mode": "wave", "zoom": 256},
-            {name: "Viz: Audio Waveform (x2048)", "mode": "wave", "zoom": 2048},
+            {name: "Off", "mode": "off", "zoom": 1}, 
+            {name: "Frequency Deviation", "mode": "dphi", "zoom": 1},  // aka "Unmodulated", or "frequency deviation waveform generated using the Gaussian smoothed frequency deviation pulse"
+            {name: "Frequency Deviation (zoom)", "mode": "dphi", "zoom": 16}, 
+            {name: "Waveform", "mode": "wave", "zoom": 256},
+            {name: "Oscilloscope", "mode": "wave", "zoom": 2048},
         ];
         let showMode = 0;
         const toggleVisualizationButton = document.getElementById('toggle-visualization');
+        const VisualizationCaption = document.getElementById('visualization-caption');
         function toggleVisualization() { // todo: rename cycleVisualization
             showMode = (showMode + 1) % showModes.length;
             //showDphi = !showDphi;
-            toggleVisualizationButton.textContent = showModes[showMode]['name'];
+            VisualizationCaption.innerHTML = showModes[showMode]['name'];
             drawWaveform();
         }
         toggleVisualization(); // set name on button (and turn on viz)

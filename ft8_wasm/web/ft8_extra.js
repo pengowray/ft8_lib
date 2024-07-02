@@ -31,51 +31,41 @@ function decodeFT8FreeText(payload) {
 //const payload = new Uint8Array([0x17, 0x6C, 0x5D, 0xB8, 0x73, 0x7F, 0x8A, 0x49, 0x30, 0x00]);
 //console.log(decodeFT8FreeText(payload));
 
-
 function encodeFT8FreeText(message) {
-    // Uppercase the message and trim it to 13 characters max
-    message = message.toUpperCase().trim().slice(0, 13);
-    
-    // Pad the message with spaces to 13 characters
-    message = message.padEnd(13, ' ');
+  const MAX_LEN = 13;
+  // Ensure the message is no longer than 13 characters
+  message = message.slice(0, MAX_LEN).toUpperCase();
+  
+  // Pad the message to 13 characters with spaces
+  message = message.padStart(MAX_LEN, ' ');
+  
+  // Define the character set
+  const chars = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+-./?";
+  
+  // Initialize the result as a BigInt
+  let result = 0n;
+  
+  // Encode each character
+  for (let i = 0; i < MAX_LEN; i++) {
+    const charIndex = chars.indexOf(message[i]);
+    result = result * 42n + BigInt(charIndex);
+  }
+  
+  // Convert to 71-bit binary string
+  let binaryString = result.toString(2).padStart(71, '0');
 
-    // Encode the message
-    let n71 = BigInt(0);
-    for (let i = 0; i < 13; i++) {
-        let charIndex = FT8_CHAR_TABLE_FULL.indexOf(message[i]);
-        if (charIndex === -1) {
-            throw new Error(`Invalid character in message: ${message[i]}`);
-        }
-        n71 = n71 * BigInt(42) + BigInt(charIndex);
-    }
+  // message type 0.0 (6 bits) + 3 bits padding to get to 80
+  binaryString = binaryString + '000000000';
 
-    // Convert to 10-byte Uint8Array
-    let payload = new Uint8Array(10);
-    for (let i = 8; i >= 0; i--) {
-        payload[i] = Number(n71 & BigInt(0xFF));
-        n71 = n71 >> BigInt(8);
-    }
-    
-    // Set the last 6 bits to 0 (message type for free text)
-    payload[9] = 0;
-
-    return payload;
+  // Convert binary string to Uint8Array
+  const output = new Uint8Array(10);
+  for (let i = 0; i < 10; i++) {
+    output[i] = parseInt(binaryString.slice(i * 8, (i + 1) * 8), 2);
+  }
+  
+  return output;
 }
 
-// Example usage
-/*
-try {
-    const message = "Hello World!";
-    const encodedPayload = encodeFT8FreeText(message);
-    console.log("Encoded payload:", encodedPayload);
-
-    // Decode it back to verify
-    const decodedMessage = decodeFT8FreeText(encodedPayload);
-    console.log("Decoded message:", decodedMessage);
-} catch (error) {
-    console.error("Error:", error.message);
-}
-*/
 
 function packedToHexStr(packedData) {
     return `${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join('')}`;

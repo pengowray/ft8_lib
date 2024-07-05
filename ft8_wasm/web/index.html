@@ -398,7 +398,7 @@
             syncSpan.textContent = `Sync check: ${syncCheckResult.result}`;
             if (syncCheckResult.result !== 'OK' ) {
                 syncSpan.style.color = 'red';
-                syncSpan.textContent += '. Unexpected symbols: ' + syncCheckResult.errors.join(', ');
+                syncSpan.textContent += '. Unexpected symbol position(s): ' + syncCheckResult.errors.join(', ');
                 console.log('Sync', syncCheckResult);
             }
             output.appendChild(syncSpan);

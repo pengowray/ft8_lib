@@ -155,29 +155,53 @@ function printMessageDetails(symbols) {
      + `${symbols.slice(0, 7)} ${symbols.slice(7, 36)} ${symbols.slice(36, 43)} ${symbols.slice(43, 72)} ${symbols.slice(72)}\n`);
 }
 
+const FT8_CRC_WIDTH = 14;
+const FT8_CRC_POLYNOMIAL = 0x2757;  // 14-bit CRC polynomial without the leading 1
+const TOPBIT = 1 << (FT8_CRC_WIDTH - 1);
+
+function ftx_compute_crc(message, num_bits) {
+    let remainder = 0;
+    let idx_byte = 0;
+
+    // Perform modulo-2 division, a bit at a time.
+    for (let idx_bit = 0; idx_bit < num_bits; ++idx_bit) {
+        if (idx_bit % 8 === 0) {
+            // Bring the next byte into the remainder.
+            remainder ^= (message[idx_byte] << (FT8_CRC_WIDTH - 8));
+            ++idx_byte;
+        }
+
+        // Try to divide the current data bit.
+        if (remainder & TOPBIT) {
+            remainder = (remainder << 1) ^ FT8_CRC_POLYNOMIAL;
+        } else {
+            remainder = (remainder << 1);
+        }
+    }
+
+    return remainder & ((TOPBIT << 1) - 1);
+}
+
 function checkCRC(symbols) {
     let bitString = symbolsToBitsStrNoCosta(symbols);
     let message = bitString.slice(0, 77).padEnd(82, '0').split('').map(Number);
-    let receivedCRC = parseInt(bitString.slice(77, 91), 2);  // CRC is right after the 77-bit message
     
-    let crc = 0;
-    for (let i = 0; i < 82; i++) {
-        crc ^= (message[i] << 13);
-        for (let j = 0; j < 14; j++) {
-            let topBit = (crc & 0x2000) !== 0;
-            crc = (crc << 1) & 0x3FFF;
-            if (topBit) {
-                crc ^= CRC_POLYNOMIAL;
-            }
-        }
+    // Convert bit array to byte array
+    let messageBytes = [];
+    for (let i = 0; i < 82; i += 8) {
+        messageBytes.push(parseInt(message.slice(i, i + 8).join(''), 2));
     }
     
+    let calculatedCRC = ftx_compute_crc(messageBytes, 82);
+    let receivedCRC = parseInt(bitString.slice(77, 91), 2);
+    
     return {
-        crc: crc.toString(2).padStart(14, '0'),
+        crc: calculatedCRC.toString(2).padStart(14, '0'),
         received: receivedCRC.toString(2).padStart(14, '0'),
-        result: crc === receivedCRC ? 'OK' : 'FAILED'
+        result: calculatedCRC === receivedCRC ? 'OK' : 'FAILED'
     };
 }
+
 
 function checkParity(symbols) {
     let bits = symbolsToBitsStrNoCosta(symbols).slice(0, 174).split('').map(Number);  // We need all 174 bits

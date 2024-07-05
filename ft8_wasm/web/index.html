@@ -315,6 +315,7 @@
         function normalizeBracketedFreeText(input) {
             return input.trim().replace(/^<|>$/g, '');
         }
+
         function normalizeSymbols(input) {
             // numbers only
             return input.replace(/[-\s]/g, '');
@@ -368,9 +369,18 @@
                 return 'telemetry';
             }
 
-            if (/^[0-1]{77}$/.test(normalizeBinary(input))) {
-                return '77 bits'; // Source-encoded message, 77 bits
-            }
+            const normBinary = normalizeBinary(input);
+            if (/^[0-1]+$/.test(normBinary)) {
+                if (normBinary.length === 77) {
+                   return '77 bits'; // Source-encoded message, 77 bits
+                } else if (normBinary.length === 91) { // 77 + 14 bits
+                   return '77 bits + CRC';
+                } else if (normBinary.length === 174) { // 77 + 14 + 83 bits
+                   return '77 bits + CRC + LDPC'
+                } else if (normBinary.length === 77 + 14 + 83 + 21) { // costas as binary
+                   return 'symbols (as binary)'
+                }
+            } 
 
             // Otherwise, assume it's a message (or 'free text' if ft8_lib fails to encode it)
             return 'message';
@@ -382,6 +392,8 @@
             const packedData = new Uint8Array(Module.HEAPU8.buffer, result.packed_data, result.packed_size);
             const symbols = new Uint8Array(Module.HEAPU8.buffer, result.symbols, result.symbol_count);
             const symbolsText = Array.from(symbols).join('');
+            console.log('symbolsText', symbolsText);
+
             printMessageDetails(symbolsText);
             const syncCheckResult = checkSync(symbolsText);
             const crcCheckResult = checkCRC(symbolsText);
@@ -757,6 +769,19 @@
                     binaryStr = normalizeBinary(input);
                     input = binaryToHex(binaryStr);
                     resultPtr = Module.ccall('processPackedHexStr', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
+                } else if (inputType === '77 bits + CRC') {
+                    binaryStr = normalizeBinary(input);
+                    input = binary91ToSymbols(binaryStr);
+                    console.log("input91: ", input);
+                    resultPtr = Module.ccall('processSymbols', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
+                } else if (inputType === '77 bits + CRC + LDPC') {
+                    binaryStr = normalizeBinary(input);
+                    input = binary174ToSymbols(binaryStr);
+                    resultPtr = Module.ccall('processSymbols', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
+                } else if (inputType === 'symbols (as binary)') {
+                    binaryStr = normalizeBinary(input);
+                    input = binary195ToSymbols(binaryStr);
+                    resultPtr = Module.ccall('processSymbols', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
                 } else {
                     input = normalizeMessage(input);
                     resultPtr = Module.ccall('encodeFT8', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
@@ -831,7 +856,8 @@
                     audioControls.style.display = 'none';
                 }
             } catch (error) {
-                    output.innerHTML = "Error: " + error.message;
+                output.innerHTML = "Error: " + error.message;
+                throw (error);
             } finally {
                 // Free the memory allocated in C
                 if (resultPtr && resultPtr !== 0) {

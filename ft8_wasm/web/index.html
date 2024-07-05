@@ -196,8 +196,9 @@
 
         <h2>VK3PGO FT8 Player</h2>
         <input type="text" id="message-input" placeholder="Enter message to encode">
-        <input type="number" id="base-freq-input" placeholder="Base frequency (Hz)" value="500">
         <button id="encode-button">Encode</button>
+
+        <input type="number" id="base-freq-input" placeholder="Base frequency (Hz)" value="500">
         <div id="audio-controls" style="display:none;">
             <button id="play-audio">Play Audio</button>
             <button id="play-audio-timed">Play at Next 15s Slot</button>
@@ -395,6 +396,49 @@
             return 'message';
         }
 
+        const parseFreq = (note) => {
+            return parseNote(note) || parseFloat(note) || 500;
+        }
+
+        const parseNote = (note) => {
+          const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+          const flatToSharp = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
+          
+          // Validate input
+          if (typeof note !== 'string') return NaN;
+          
+          // Convert flat notation to sharp notation if necessary
+          let normalizedNote = note.replace(/([A-G])b(\d?)$/, (_, noteLetter, octave) => 
+            (flatToSharp[noteLetter + 'b'] || noteLetter + 'b') + octave
+          );
+          
+          const octave = parseInt(normalizedNote.slice(-1)) || 4;
+          const noteWithoutOctave = normalizedNote.replace(/\d+$/, '');
+          const keyNumber = notes.indexOf(noteWithoutOctave);
+          
+          if (keyNumber === -1) return NaN;
+          
+          const a4 = 440;
+          return a4 * Math.pow(2, (octave - 4) + (keyNumber - 9) / 12);
+        };
+
+        function detectNoteNotation(input) {
+          // Regular expression to match note notation
+          const notePattern = /^([A-G](#|b)?)(\d)?$/;
+          const match = input.match(notePattern);
+          
+          if (match) {
+            const [, note, accidental, octave] = match;
+            return {
+              isValid: true,
+              note: note,
+              accidental: accidental || null,
+              octave: octave ? parseInt(octave) : null
+            };
+          } else {
+            return { isValid: false };
+          }
+        }
 
         function updateOutput(result, inputType, originalInput) {
             
@@ -648,7 +692,7 @@
                 const a = document.createElement('a');
                 a.style.display = 'none';
                 a.href = url;
-                const baseFreq = parseFloat(baseFreqInput.value) || 1000;
+                const baseFreq = parseFreq(baseFreqInput.value) || 1000;
                 const message = messageInput.value.replace(/\s+/g, '_');
                 a.download = `FT8-${baseFreq}Hz_${message}.wav`;
                 document.body.appendChild(a);
@@ -744,7 +788,7 @@
                 let input = messageInput.value;
                 let inputType = detectInputType(input);
 
-                baseFreq = parseFloat(baseFreqInput.value) || 1000;
+                baseFreq = parseFreq(baseFreqInput.value);
                 sampleRate = parseInt(sampleRateSelect.value);
 
                 if (inputType === 'free text') {

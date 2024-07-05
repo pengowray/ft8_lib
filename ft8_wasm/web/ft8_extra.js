@@ -1,6 +1,27 @@
 // Constants
 const FT8_CHAR_TABLE_FULL = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+-./?";
 
+// Costas array for sync
+const COSTAS_ARRAY = [3, 1, 4, 0, 6, 5, 2];
+
+function checkSync(symbols) {
+    const syncPositions = [0, 36, 72];
+    let errors = [];
+    
+    for (let i = 0; i < syncPositions.length; i++) {
+        for (let j = 0; j < COSTAS_ARRAY.length; j++) {
+            if (parseInt(symbols[syncPositions[i] + j]) !== COSTAS_ARRAY[j]) {
+                errors.push(syncPositions[i] + j);
+            }
+        }
+    }
+    
+    return {
+        result: errors.length === 0 ? 'OK' : 'failed',
+        errors: errors
+    };
+}
+
 // not used / tested
 function decodeFT8FreeText(payload) {
     if (!(payload instanceof Uint8Array) || payload.length !== 10) {
@@ -38,16 +59,13 @@ function encodeFT8FreeText(message) {
   
   // Pad the message to 13 characters with spaces
   message = message.padStart(MAX_LEN, ' ');
-  
-  // Define the character set
-  const chars = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+-./?";
-  
+
   // Initialize the result as a BigInt
   let result = 0n;
   
   // Encode each character
   for (let i = 0; i < MAX_LEN; i++) {
-    const charIndex = chars.indexOf(message[i]);
+    const charIndex = FT8_CHAR_TABLE_FULL.indexOf(message[i]);
     result = result * 42n + BigInt(charIndex);
   }
   
@@ -147,4 +165,6 @@ function binaryToHex_V2(binary) {
     parseInt(byte, 2).toString(16).padStart(2, '0')
   ).join('');
 }
+
+
 

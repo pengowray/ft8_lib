@@ -381,13 +381,24 @@
             
             const packedData = new Uint8Array(Module.HEAPU8.buffer, result.packed_data, result.packed_size);
             const symbols = new Uint8Array(Module.HEAPU8.buffer, result.symbols, result.symbol_count);
+            const symbolsText = Array.from(symbols).join('');
+            const syncCheckResult = checkSync(symbolsText);
 
             output.innerHTML = '';
             if (inputType !== 'message') {
                 output.innerHTML += `Input type: ${inputType}<br>`;
             }
-            output.innerHTML += `Symbols: ${Array.from(symbols).join('')}<br>`;
-            output.innerHTML += `Packed: ${packedToHexStrSp(packedData)}<br>`;
+            output.innerHTML += `Symbols: ${symbolsText}<br>`;
+
+            const syncSpan = document.createElement('span');
+            syncSpan.textContent = `Sync check: ${syncCheckResult.result}`;
+            if (syncCheckResult.result !== 'OK' ) {
+                syncSpan.style.color = 'red';
+                syncSpan.textContent += '. Unexpected symbols: ' + syncCheckResult.errors.join(', ');
+            }
+            output.appendChild(syncSpan);
+
+            output.innerHTML += `<br>Packed: ${packedToHexStrSp(packedData)}<br>`;
 
             const decodedSpan = document.createElement('span');
             decodedSpan.textContent = `Decoded: ${result.decoded_text}`;
@@ -680,14 +691,14 @@
         });
 
         encodeButton.addEventListener('click', () => {
+            let resultPtr;
             try {
                 let input = messageInput.value;
                 let inputType = detectInputType(input);
 
                 baseFreq = parseFloat(baseFreqInput.value) || 1000;
                 sampleRate = parseInt(sampleRateSelect.value);
-                        
-                let resultPtr;
+
                 if (inputType === 'free text') {
                     input = normalizeBracketedFreeText(input);
                     const packedData = encodeFT8FreeText(input);
@@ -796,7 +807,9 @@
                     output.innerHTML = "Error: " + error.message;
             } finally {
                 // Free the memory allocated in C
-                Module.ccall('freeFT8Result', null, ['number'], [resultPtr]);
+                if (resultPtr && resultPtr !== 0) {
+                    Module.ccall('freeFT8Result', null, ['number'], [resultPtr]);
+                }
             }
         });
 

@@ -334,15 +334,24 @@
         function normalizeTelemetry(str) {
             //exactly 18 hex digits, or start with T:
             //note: first digit must be 0-8 if 18 digits. (not checked here)
+            
             let trimmed = str.trim();
-            trimmed = trimmed.toUpperCase().replace(/^[Tt]:\s*/g, '');
+            trimmed = trimmed.toUpperCase()
+                .replace(/^[Tt](ELEMETRY)?:\s*/g, '') // remove initial "T:" or telemetry:
+                .replace(/\#T(ELEMETRY)?\s*$/g, '') // remove "#TELEMETRY "
+                .replace(/[ \-\:]/g, '') // remove any space - :
+                .replace(/^[0]*/g, ''); // initial 0's hopefully
             return trimmed;
         }
+
         function detectTelemetry(str) {
             //exactly 18 hex digits, or start with T:
             //note: first digit must be 0-8 if 18 digits. (not checked here)
-            const trimmed = str.trim();
-            return (/^[0-9A-Fa-f]{18}$/.test(trimmed)) || (/[Tt]:\s*[0-9A-Fa-f]{1,18}$/.test(trimmed))
+            const trimmed = str.trim().toUpperCase();
+            return (/^([0-9A-Fa-f][\s\-\:]?){18}$/.test(trimmed)) 
+//                || (/^[Tt](ELEMETRY)?:\s0*([0-9A-Fa-f][\s\-\:]?){1,18}$/.test(trimmed))
+                  || (/^[Tt](ELEMETRY)?\s*:/.test(trimmed))
+                  || (/\#T(ELEMETRY)?$/.test(trimmed))
         }
 
         function detectFreeTextBrackets(str) {

@@ -382,7 +382,10 @@
             const packedData = new Uint8Array(Module.HEAPU8.buffer, result.packed_data, result.packed_size);
             const symbols = new Uint8Array(Module.HEAPU8.buffer, result.symbols, result.symbol_count);
             const symbolsText = Array.from(symbols).join('');
+            printMessageDetails(symbolsText);
             const syncCheckResult = checkSync(symbolsText);
+            const crcCheckResult = checkCRC(symbolsText);
+            const parityCheckResult = checkParity(symbolsText); // LDPC
 
             output.innerHTML = '';
             if (inputType !== 'message') {
@@ -390,16 +393,40 @@
             }
             output.innerHTML += `Symbols: ${symbolsText}<br>`;
 
+            // sync check (costas)
             const syncSpan = document.createElement('span');
             syncSpan.textContent = `Sync check: ${syncCheckResult.result}`;
             if (syncCheckResult.result !== 'OK' ) {
                 syncSpan.style.color = 'red';
                 syncSpan.textContent += '. Unexpected symbols: ' + syncCheckResult.errors.join(', ');
+                console.log('Sync', syncCheckResult);
             }
             output.appendChild(syncSpan);
+            output.innerHTML += "<br>";
+
+            // CRC (14-bits)
+            const crcSpan = document.createElement('span');
+            crcSpan.textContent = `CRC check: ${crcCheckResult.result}`;
+            if (crcCheckResult.result !== 'OK' ) {
+                crcSpan.style.color = 'red';
+                console.log('CRC', crcCheckResult);
+            }
+            output.appendChild(crcSpan);
+            output.innerHTML += "<br>";
+
+            // Parity (LDPC)
+            const paritySpan = document.createElement('span');
+            paritySpan.textContent = `Parity check: ${parityCheckResult.result}`;
+            if (parityCheckResult.result !== 'OK' ) {
+                paritySpan.style.color = 'red';
+                console.log('Parity', parityCheckResult);
+
+            }
+            output.appendChild(paritySpan);
 
             output.innerHTML += `<br>Packed: ${packedToHexStrSp(packedData)}<br>`;
 
+            // re-decoded
             const decodedSpan = document.createElement('span');
             decodedSpan.textContent = `Decoded: ${result.decoded_text}`;
             if (inputType === 'message' && normalizeMessage(result.decoded_text) !== normalizeMessage(originalInput)) {

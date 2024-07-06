@@ -67,6 +67,16 @@
             color: var(--link-visited-color);
         }
 
+        .btn {
+          height: 40px;
+          padding: 0 15px;
+          border-radius: 4px;
+          font-size: 14px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+
         input[type="text"], input[type="file"] {
             width: 100%;
             padding: 10px;
@@ -91,6 +101,113 @@
         }
 
         button:hover {
+            opacity: 0.9;
+        }
+
+        .input-group {
+          display: flex;
+          align-items: stretch;
+        }
+
+        #message-input {
+          flex-grow: 1;
+          height: 40px;
+          padding: 0 10px;
+          border-radius: 4px 0 0 4px;
+        }
+
+        #encode-button {
+          border-radius: 0 4px 4px 0;
+        }
+/*
+        .input-group input[type="text"] {
+            flex-grow: 1;
+            margin-right: 10px;
+        }
+*/
+
+        #theme-toggle {
+          position: fixed;
+          top: 10px;
+          right: 10px;
+          background: none;
+          border: none;
+          font-size: 24px;
+          cursor: pointer;
+          opacity: 0.7;
+        }
+
+        #theme-toggle:hover {
+          opacity: 1;
+        }
+
+        #toggle-settings {
+          background: none;
+          border: none;
+          color: var(--text-color);
+          opacity: 0.7;
+          font-size: 14px;
+          padding: 5px 0;
+          cursor: pointer;
+          text-decoration: underline;
+        }
+
+        #audio-controls {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 10px;
+          margin-top: 15px;
+        }
+
+        @media (max-width: 600px) {
+          #audio-controls {
+            flex-direction: column;
+          }
+          
+          #audio-controls .btn {
+            width: 100%;
+          }
+        }
+        .settings-toggle {
+            margin-bottom: 10px;
+        }
+
+        #audio-settings {
+            background-color: var(--input-bg);
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+
+        #audio-settings.hidden {
+            display: none;
+        }
+
+        .setting-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .setting-group label {
+            min-width: 150px;
+            margin-right: 10px;
+        }
+
+        #base-freq-input, #sample-rate-select {
+            flex-grow: 1;
+        }
+
+        #toggle-settings {
+            background-color: var(--button-bg);
+            color: var(--button-text);
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        #toggle-settings:hover {
             opacity: 0.9;
         }
 
@@ -188,39 +305,53 @@
     </style>
 </head>
 <body class="dark-mode">
-    <div class="container">
-        <button id="theme-toggle">Toggle Dark Mode</button>
-<!-- 
-        <h1>FT8 Encoder/Decoder</h1> 
--->
+<div class="container">
+    <button id="theme-toggle" aria-label="Toggle Dark Mode">🌓</button>
 
-        <h2>VK3PGO FT8 Player</h2>
-        <input type="text" id="message-input" placeholder="Enter message to encode">
-        <button id="encode-button">Encode</button>
+    <h2>VK3PGO FT8 Player</h2>
+    
+    <div class="input-group">
+      <input type="text" id="message-input" placeholder="Enter message to encode">
+      <button id="encode-button" class="btn">Encode</button>
+    </div>
 
-        <input type="number" id="base-freq-input" placeholder="Base frequency (Hz)" value="500">
-        <div id="audio-controls" style="display:none;">
-            <button id="play-audio">Play Audio</button>
-            <button id="play-audio-timed">Play at Next 15s Slot</button>
-            <button id="stop-audio" disabled>Stop Audio</button>
-            <button id="download-audio">Download Audio</button>
-            <div id="countdown"></div>
+    <div class="settings-toggle">
+        <button id="toggle-settings">Audio Settings ▼</button>
+    </div>
+
+    <div id="audio-settings" class="hidden">
+        <div class="setting-group">
+            <label for="base-freq-input">Base Frequency (Hz):</label>
+            <input type="text" id="base-freq-input" placeholder="e.g., 500 or A4" value="500">
         </div>
-
-        <div id="piano-roll" style="margin-top: 20px;"></div>
-        <div id="audio-visualization">
-            <canvas id="waveform-canvas"></canvas>
-            <div id="visualization-caption"></div>
-            <div id="visualization-controls">
-                <button id="toggle-visualization">Change Vizualization</button>
-                <span id="time-display">0.00 / 0.00</span>
-            </div>
+        <div class="setting-group">
+            <label for="sample-rate-select">Sample Rate:</label>
+            <select id="sample-rate-select"></select>
         </div>
-        <div id="output"></div>
+    </div>
 
-        <div id="example-messages">
-            <h3>Example Messages:</h3>
+    <div id="audio-controls">
+      <button id="play-audio" class="btn">Play Audio</button>
+      <button id="play-audio-timed" class="btn">Play Next 15s Slot</button>
+      <button id="stop-audio" class="btn" disabled>Stop Audio</button>
+      <button id="download-audio" class="btn">Download Audio</button>
+      <div id="countdown"></div>
+    </div>
+
+    <div id="piano-roll" style="margin-top: 20px;"></div>
+    <div id="audio-visualization">
+        <canvas id="waveform-canvas"></canvas>
+        <div id="visualization-caption"></div>
+        <div id="visualization-controls">
+            <button id="toggle-visualization">Change Visualization</button>
+            <span id="time-display">0.00 / 0.00</span>
         </div>
+    </div>
+    <div id="output"></div>
+
+    <div id="example-messages">
+        <h3>Example Messages:</h3>
+    </div>
 
         <div>
             Created by Pengo Wray. <br>
@@ -273,6 +404,11 @@
         const encodeOutput = document.getElementById('output');
         const output = document.getElementById('output');
         //const decodeOutput = document.getElementById('decode-output');
+
+        const toggleSettingsButton = document.getElementById('toggle-settings');
+        const audioSettings = document.getElementById('audio-settings');
+        const sampleRateSelect = document.getElementById('sample-rate-select');
+
         const audioControls = document.getElementById('audio-controls');
         const playAudioButton = document.getElementById('play-audio');
         const playAudioTimedButton = document.getElementById('play-audio-timed');
@@ -1057,16 +1193,22 @@
             }
         });
 
-        const sampleRateSelect = document.createElement('select');
-        sampleRateSelect.id = 'sample-rate-select';
-        [8000, 11025, 12000, 16000, 22050, 24000, 44100, 48000].forEach(rate => {
+        toggleSettingsButton.addEventListener('click', () => {
+            audioSettings.classList.toggle('hidden');
+            toggleSettingsButton.textContent = audioSettings.classList.contains('hidden') 
+                ? 'Audio Settings ▼' 
+                : 'Audio Settings ▲';
+        });
+
+        // Populate sample rate dropdown
+        const sampleRates = [8000, 11025, 12000, 16000, 22050, 24000, 44100, 48000];
+        sampleRates.forEach(rate => {
             const option = document.createElement('option');
             option.value = rate;
             option.textContent = `${rate} Hz`;
             if (rate === 12000) option.selected = true;
             sampleRateSelect.appendChild(option);
         });
-        baseFreqInput.parentNode.insertBefore(sampleRateSelect, baseFreqInput.nextSibling);
 
         function createWaveformVisualization(audioSamples, dphiSamples, metadata) {
             audioData = audioSamples;

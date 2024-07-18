@@ -395,6 +395,40 @@
         "<TNX BOB 73 GL>"
     ];
 
+    function encodeFT8Message(message) {
+        try {
+            const packedData = messageToPackedData(message);
+            const symbols = packedDataToSymbols(packedData);
+            return {
+                packedData: packedData,
+                symbols: symbols,
+                message: message
+            };
+        } catch (error) {
+            console.error("Encoding error:", error);
+            throw error;
+        }
+    }
+
+    function generateFT8Audio_test(symbols, baseFreq, sampleRate) {
+        try {
+            const audioResult = symbolsToAudio(symbols, baseFreq, sampleRate);
+            
+            // Process the audio result as needed
+            audioSamples = audioResult.audio;
+            dphiSamples = audioResult.dphi;
+            metadata = JSON.parse(audioResult.metadata);
+
+            // Create waveform visualization, etc.
+            createWaveformVisualization(audioSamples, dphiSamples, metadata);
+
+            return audioResult;
+        } catch (error) {
+            console.error("Audio generation error:", error);
+            throw error;
+        }
+    }
+
     function initializeUI() {
         const encodeButton = document.getElementById('encode-button');
         const decodeButton = document.getElementById('decode-button'); // not used (yet)
@@ -437,6 +471,7 @@
             Module._free(resultPtr);
             return result;
         };
+
         const decodeFT8PackedData = (packedPtr, length) => {
             const resultPtr = Module.ccall('decodeFT8PackedData', 'number', ['number', 'number'], [packedPtr, length]);
             if (resultPtr === 0) return null;
@@ -576,11 +611,101 @@
           }
         }
 
+        function parseFrequencyInput(input) {
+            input = input.trim();
+            
+            // easter egg
+            if (input === "-73") {
+                input = "440 (E4 G4 C5 D5 E5 F5 G5 A5)";
+            }
+
+            // Default base frequency if not provided
+            let baseFreq = 500;
+
+            // Try to parse base frequency
+            const baseFreqMatch = input.match(/^(\d+(\.\d+)?)/);
+            if (baseFreqMatch) {
+                baseFreq = parseFloat(baseFreqMatch[1]);
+            }
+
+            // Check for offsets in brackets
+            const offsetsMatch = input.match(/\((.*?)\)/);
+            
+            // If no offsets provided, use default FT8 spacing
+            if (!offsetsMatch) {
+                return { baseFreq, offsets: [0, 6.25, 12.5, 18.75, 25, 31.25, 37.5, 43.75] };
+            }
+
+            const offsetsStr = offsetsMatch[1].trim();
+            const offsetTokens = offsetsStr.split(/\s+/);
+            let offsets = [];
+
+            if (offsetTokens[0].match(/^[A-G]#?\d$/)) {
+                // Notes provided
+                offsets = offsetTokens.map(note => parseNote(note) - baseFreq);
+            } else {
+                // Numeric offsets provided
+                offsets = offsetTokens.map(offset => parseFloat(offset));
+            }
+
+            // Fill in missing offsets
+            if (offsets.length === 1) {
+                const step = offsets[0] / 7;
+                offsets = Array.from({length: 8}, (_, i) => i * step);
+            } else if (offsets.length === 2) {
+                const step = (offsets[1] - offsets[0]) / 6;
+                offsets = Array.from({length: 8}, (_, i) => offsets[0] + i * step);
+            } else if (offsets.length < 8) {
+                const lastOffset = offsets[offsets.length - 1];
+                while (offsets.length < 8) {
+                    offsets.push(lastOffset);
+                }
+            }
+
+            return { baseFreq, offsets };
+        }
+
+        function generateAudioFromSymbols(symbolsText, baseFreq, offsets, sampleRate) {
+            const symbolsArray = symbolsToArray(symbolsText);
+            const symbolsPtr = Module._malloc(symbolsArray.length);
+            Module.HEAPU8.set(symbolsArray, symbolsPtr);
+
+            const offsetsPtr = Module._malloc(32); // 8 floats * 4 bytes
+            const offsetsHeap = new Float32Array(Module.HEAPU8.buffer, offsetsPtr, 8);
+            offsetsHeap.set(offsets);
+
+            const resultPtr = Module.ccall('symbolsToAudio', 'number',
+                ['number', 'number', 'number', 'number', 'number'],
+                [symbolsPtr, symbolsArray.length, baseFreq, offsetsPtr, sampleRate]
+            );
+
+            if (resultPtr === 0) {
+                throw new Error("Audio generation failed");
+            }
+
+            const result = {
+                audio: new Float32Array(Module.HEAPF32.buffer, Module.getValue(resultPtr + 16, '*'), Module.getValue(resultPtr + 20, 'i32')),
+                dphi: new Float32Array(Module.HEAPF32.buffer, Module.getValue(resultPtr + 24, '*'), Module.getValue(resultPtr + 20, 'i32')),
+                metadata: Module.UTF8ToString(Module.getValue(resultPtr + 32, '*')),
+                metadata_length: Module.getValue(resultPtr + 36, 'i32')
+            };
+
+            Module._free(symbolsPtr);
+            Module._free(offsetsPtr);
+            Module._free(resultPtr);
+
+            return result;
+        }
+
         function updateOutput(result, inputType, originalInput) {
             
             const packedData = new Uint8Array(Module.HEAPU8.buffer, result.packed_data, result.packed_size);
-            const symbols = new Uint8Array(Module.HEAPU8.buffer, result.symbols, result.symbol_count);
-            const symbolsText = Array.from(symbols).join('');
+            console.log(packedData);
+const symbolsArray = result.symbolsArray;
+            //const symbolsArray = new Uint8Array(Module.HEAPU8.buffer, result.symbols, result.symbols.length);
+            //console.log(packedData, symbolsArray);
+            //const symbolsText = Array.from(symbols).join('');
+            const symbolsText = result.symbolsText;
             console.log('symbolsText', symbolsText);
 
             printMessageDetails(symbolsText);
@@ -604,6 +729,7 @@
             }
             output.appendChild(syncSpan);
             output.innerHTML += "<br>";
+
 
             // CRC (14-bits)
             const crcSpan = document.createElement('span');
@@ -639,7 +765,7 @@
             output.innerHTML += `<br>Message Type: ${messageInfo.messageType} (${messageInfo.type})`;
             output.innerHTML += `<br>Explanation: ${explainFT8Message(result.decoded_text, messageInfo)}<br>`;
 
-            createPianoRoll(Array.from(symbols));
+            createPianoRoll(Array.from(symbolsText));
         }
 
         function createPianoRoll(symbols) {
@@ -918,142 +1044,121 @@
             }
         });
 
+   
         encodeButton.addEventListener('click', () => {
-            let resultPtr;
-            try {
-                let input = messageInput.value;
-                let inputType = detectInputType(input);
+             handleEncode();
+             
+             //} catch (error) {
+               // output.innerHTML = "Error: " + error.message;
+              //  console.error(error);
+            //}
+        });
+        
+        function handleEncode() {
+            let input = messageInput.value;
+            let inputType = detectInputType(input);
 
-                baseFreq = parseFreq(baseFreqInput.value);
-                sampleRate = parseInt(sampleRateSelect.value);
+            const freqData = parseFrequencyInput(baseFreqInput.value);
+            if (!freqData) {
+                output.innerHTML = "Error: Invalid frequency input";
+                return;
+            }
 
-                if (inputType === 'free text') {
+            const sampleRate = parseInt(sampleRateSelect.value);
+
+            let packedData, symbolsText;
+
+            switch (inputType) {
+                case 'free text':
                     input = normalizeBracketedFreeText(input);
-                    const packedData = encodeFT8FreeText(input);
-                    const hexStr = packedToHexStr(packedData);
-                    resultPtr = Module.ccall('processPackedHexStr', 'number', ['string', 'number', 'number'], [hexStr, baseFreq, sampleRate]);
-
-                } else if (inputType === 'symbols') {
+                    packedData = encodeFT8FreeText(input);
+                    break;
+                case 'symbols':
                     input = normalizeSymbols(input);
-                    resultPtr = Module.ccall('processSymbols', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
-                } else if (inputType === 'packed') {
-                    if (typeof Module['_processPackedHexStr'] !== 'function') {
-                        console.error('processPackedHexStr function not found in Module');
-                        return;
-                    }
+                    symbolsText = input;
+                    break;
+                case 'packed':
                     input = normalizePackedData(input);
-                    resultPtr = Module.ccall('processPackedHexStr', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
-
-                } else if (inputType == 'telemetry') {
+                    packedData = new Uint8Array(input.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+                    break;
+                case 'telemetry':
                     input = normalizeTelemetry(input);
                     let result = encodeFT8Telemetry(input);
                     if (result.error) {
-                        output.innerHTML = result.error;
-                        return;
-                    } else {
-                        resultPtr = Module.ccall('processPackedHexStr', 'number', ['string', 'number', 'number'], [result.result, baseFreq, sampleRate]);
+                        throw new Error(result.error);
                     }
-
-                } else if (inputType === '77 bits') {
-                    binaryStr = normalizeBinary(input);
-                    input = binaryToHex(binaryStr);
-                    resultPtr = Module.ccall('processPackedHexStr', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
-                } else if (inputType === '77 bits + CRC') {
-                    binaryStr = normalizeBinary(input);
-                    input = binary91ToSymbols(binaryStr);
-                    console.log("input91: ", input);
-                    resultPtr = Module.ccall('processSymbols', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
-                } else if (inputType === '77 bits + CRC + LDPC') {
-                    binaryStr = normalizeBinary(input);
-                    input = binary174ToSymbols(binaryStr);
-                    resultPtr = Module.ccall('processSymbols', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
-                } else if (inputType === 'symbols (as binary)') {
-                    binaryStr = normalizeBinary(input);
-                    input = binary195ToSymbols(binaryStr);
-                    resultPtr = Module.ccall('processSymbols', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
-                } else {
+                    packedData = new Uint8Array(result.result.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+                    break;
+                case '77 bits':
+                    packedData = new Uint8Array(binaryToHex(normalizeBinary(input)).match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+                    break;
+                case '77 bits + CRC':
+                    symbols = binary91ToSymbols(normalizeBinary(input)).split('').map(Number);
+                    break;
+                case '77 bits + CRC + LDPC':
+                    symbols = binary174ToSymbols(normalizeBinary(input)).split('').map(Number);
+                    break;
+                case 'symbols (as binary)':
+                    symbols = binary195ToSymbols(normalizeBinary(input)).split('').map(Number);
+                    break;
+                default:
                     input = normalizeMessage(input);
-                    resultPtr = Module.ccall('encodeFT8', 'number', ['string', 'number', 'number'], [input, baseFreq, sampleRate]);
-                }
-
-                if (inputType !== 'free text' && (!resultPtr || resultPtr === 0)) {
-                    // attempt free text fallback
-                    let textInput = input.trim();
-                    if (textInput.length <= 13 && textInput.length > 0) {
-                        try {
-                            const packedData = encodeFT8FreeText(textInput);
-                            const hexStr = packedToHexStr(packedData);
-                            console.log("packedData", packedData);
-                            resultPtr = Module.ccall('processPackedHexStr', 'number', ['string', 'number', 'number'], [hexStr, baseFreq, sampleRate]);
-                            inputType = 'free text';
-                        } catch (e) {
-                             console.log("not free text", textInput, e)
-                        }
-                    }
-                }
-
-                if (resultPtr === 0) {
-                    output.innerHTML = "Error: Invalid input";
-                    return;
-                }
-
-                const result = {
-                    packed_data: Module.getValue(resultPtr, '*'),
-                    packed_size: Module.getValue(resultPtr + 4, 'i32'),
-                    symbols: Module.getValue(resultPtr + 8, '*'),
-                    symbol_count: Module.getValue(resultPtr + 12, 'i32'),
-                    audio: Module.getValue(resultPtr + 16, '*'),
-                    audio_samples: Module.getValue(resultPtr + 20, 'i32'),
-                    dphi: Module.getValue(resultPtr + 24, '*'),
-                    decoded_text: Module.UTF8ToString(Module.getValue(resultPtr + 28, '*')),
-                    metadata: Module.UTF8ToString(Module.getValue(resultPtr + 32, '*')),
-                    metadata_length: Module.getValue(resultPtr + 36, 'i32')
-                };
-
-                updateOutput(result, inputType, input);
-
-
-                if (result.audio_samples > 0) {
-                    audioSamples = new Float32Array(Module.HEAPF32.buffer, result.audio, result.audio_samples);
-                    dphiSamples = new Float32Array(Module.HEAPF32.buffer, result.dphi, result.audio_samples);
-                    
-                    audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: sampleRate });
-                    audioBuffer = audioContext.createBuffer(1, result.audio_samples, sampleRate);
-                    channelData = audioBuffer.getChannelData(0);
-                    channelData.set(audioSamples);
-                    
-                    let range = findMinAndMax(dphiSamples);
-                    dphiSamples = scaleToRange(dphiSamples, 190, 10) // fit in 0 to 200 (and flip?)
-
-                    try {
-                        metadata = JSON.parse(result.metadata);
-                        console.log(metadata);
-
-                    } catch (e) {
-                        console.error("Error parsing metadata:", e);
-                        metadata = {};
-                    }
-
-                    createWaveformVisualization(audioSamples, dphiSamples, metadata);
-
-                    audioControls.style.display = 'block';
-                    updateButtonState(false);
-                    countdownDiv.style.display = 'none';
-                } else {
-                    console.error("No audio data generated");
-                    output.textContent += "\nError: No audio data generated";
-                    audioControls.style.display = 'none';
-                }
-            } catch (error) {
-                output.innerHTML = "Error: " + error.message;
-                throw (error);
-            } finally {
-                // Free the memory allocated in C
-                if (resultPtr && resultPtr !== 0) {
-                    Module.ccall('freeFT8Result', null, ['number'], [resultPtr]);
-                }
+                    packedData = messageToPackedData(input);
             }
-        });
+
+            if (!symbolsText && packedData) {
+                symbolsText = packedDataToSymbols(packedData);
+            } else if (!packedData && symbolsText) {
+                packedData = symbolsToPackedData(symbolsText);
+            }
+
+            if (!symbolsText) {
+                throw new Error("Failed to generate symbols");
+            }
+            
+            const symbolsArray = symbolsToArray(symbolsText);
+
+            const audioResult = generateAudioFromSymbols(symbolsText, freqData.baseFreq, freqData.offsets, sampleRate);
+
+            updateOutput({
+                packed_data: packedData,
+                packed_size: packedData ? packedData.length : 0,
+                symbolsText: symbolsText,
+                symbolsArray: symbolsArray,
+                audio: audioResult.audio,
+                audio_samples: audioResult.audio.length,
+                dphi: audioResult.dphi,
+                decoded_text: input,
+                metadata: audioResult.metadata,
+                metadata_length: audioResult.metadata.length
+            }, inputType, input);
+
+            if (audioResult.audio.length > 0) {
+                setupAudioPlayback(audioResult.audio, audioResult.dphi, sampleRate, JSON.parse(audioResult.metadata));
+            } else {
+                console.error("No audio data generated");
+                output.textContent += "\nError: No audio data generated";
+                audioControls.style.display = 'none';
+            }
+
+            
+        }
+
+        function setupAudioPlayback(audioSamples, dphiSamples, sampleRate, metadata) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: sampleRate });
+            audioBuffer = audioContext.createBuffer(1, audioSamples.length, sampleRate);
+            channelData = audioBuffer.getChannelData(0);
+            channelData.set(audioSamples);
+
+            dphiSamples = scaleToRange(dphiSamples, 190, 10); // fit in 0 to 200 (and flip?)
+
+            createWaveformVisualization(audioSamples, dphiSamples, metadata);
+
+            audioControls.style.display = 'block';
+            updateButtonState(false);
+            countdownDiv.style.display = 'none';
+        }
+    
 
         exampleMessages.forEach(message => {
             const button = document.createElement('button');

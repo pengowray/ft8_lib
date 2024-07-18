@@ -3,9 +3,11 @@ const FT8_CHAR_TABLE_FULL = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+-./?";
 
 // Costas array for sync
 const COSTAS_ARRAY = [3, 1, 4, 0, 6, 5, 2];
-
 // CRC polynomial
 const CRC_POLYNOMIAL = 0x2757;  // 14-bit CRC polynomial without the leading 1
+
+const FTX_PAYLOAD_LENGTH_BYTES = 10;
+const FT8_NN = 79; // Total channel symbols
 
 // Parity generator matrix for (174,91) LDPC code, stored in bitpacked format (MSB first)
 // const uint8_t kFTX_LDPC_generator[FTX_LDPC_M][FTX_LDPC_K_BYTES] = [
@@ -198,6 +200,7 @@ const GRAY_INV = [0, 1, 3, 2, 6, 4, 5, 7];
 const GRAY_OFF = [0, 1, 2, 3, 4, 5, 6, 7];
 
 function symbolsToBitsStr(symbols) {
+    console.log(symbols);
     return symbols.split('').map(s => GRAY_INV[parseInt(s)].toString(2).padStart(3, '0')).join('');
 }
 
@@ -261,6 +264,15 @@ function checkSync(symbols) {
 }
 
 function printMessageDetails(symbols) {
+    if (!symbols || symbols.length === 0) {
+        console.log("No symbols to print.");
+        return;
+    }
+    if (!symbols.match(/^[0-7]*$/)) {
+        console.log("Symbols contain invalid characters: ", symbols);
+        return;
+    }
+    
     let bitString = symbolsToBitsStrNoCosta(symbols);
 
     if (symbols && symbols.length == 79) {
@@ -474,7 +486,7 @@ function encodeFT8Telemetry(telemetryHex) {
   }
 
   // Convert hex to binary string
-  let binaryString = hexToBinary(telemetryHex).replace(/^0*/g, '');
+  let binaryString = hexToBinary(telemetryHex);
 
   // Add message type 0.5 (000101 in binary)
   binaryString = binaryString.padStart(71, '0') + '101000' // slice(-71)
@@ -538,15 +550,90 @@ function binaryToHex(binaryStr) {
 function hexToBinary(hex) {
   return hex.split('').map(char => 
     parseInt(char, 16).toString(2).padStart(4, '0')
-  ).join('');
+  ).join('').replace(/^0*/g, '');
 }
 
-// Helper function to convert binary string to hex string
-function binaryToHex_V2(binary) {
-  return binary.match(/.{1,8}/g).map(byte => 
-    parseInt(byte, 2).toString(16).padStart(2, '0')
-  ).join('');
+function messageToPackedData(message) {
+    const result = Module.ccall('encodeFT8', 'number', ['string', 'number', 'number'], [message, 0, 0]);
+    if (result === 0) {
+        throw new Error("Encoding failed");
+    }
+    const packedData = new Uint8Array(Module.HEAPU8.buffer, Module.getValue(result, '*'), FTX_PAYLOAD_LENGTH_BYTES);
+    Module._free(result);
+    return packedData;
 }
 
+function packedDataToSymbolsArray(packedData) {
+    const symbolsPtr = Module.ccall('packedToSymbols', 'number', ['array'], [packedData]);
+    const symbols = new Uint8Array(Module.HEAPU8.buffer, symbolsPtr, FT8_NN);
+    const result = new Uint8Array(symbols);
+    Module._free(symbolsPtr);
+    return result;
+}
 
+function packedDataToSymbols(packedData) {
+    const symbolsPtr = Module.ccall('packedToSymbols', 'number', ['array'], [packedData]);
+    const symbols = new Uint8Array(Module.HEAPU8.buffer, symbolsPtr, FT8_NN);
+    const result = new Uint8Array(symbols);
+    Module._free(symbolsPtr);
+    
+    return arrayToSymbols(result);
+}
 
+function arrayToSymbols(toneArray) {
+  // Convert the Uint8Array to a regular array of numbers
+  const numbers = Array.from(toneArray);
+  
+  // Convert numbers back to string characters
+  const tones = numbers.map(num => num.toString());
+  
+  // Join the array into a single string
+  return tones.join('');
+}
+
+function symbolsToArray(toneString) {
+  // Remove any whitespace and split the string into an array of characters
+  const tones = toneString.replace(/\s/g, '').split('');
+  
+  // Convert characters
+  const arrayTones = tones.map(tone => {
+    const num = parseInt(tone, 10);
+  });
+  
+  return new Uint8Array(arrayTones);
+}
+
+function symbolsToPackedData(symbolsText) {
+  // returns Uint8Array
+  
+  const messageBits = symbolsToBitsStrNoCosta(symbolsText).slice(0, 77).padEnd(80, '0');
+  const packedData = new Uint8Array(10);
+  
+  for (let i = 0; i < 10; i++) {
+    let byte = 0;
+    for (let j = 0; j < 8; j++) {
+      if (i * 8 + j < messageBits.length) {
+        byte |= (messageBits[i * 8 + j] === '1' ? 1 : 0) << (7 - j);
+      }
+    }
+    packedData[i] = byte;
+  }
+  // debug:
+  console.log('symbolsText, messageBits, packedData', symbolsText, messageBits, packedData);
+
+  return packedData;
+}
+
+function symbolsToAudio(symbols, baseFreq, sampleRate) {
+    const symbolArray = symbolsToArray(symbols);
+    const resultPtr = Module.ccall('symbolsToAudio', 'number', ['array', 'number', 'number'], [symbolArray, baseFreq, sampleRate]);
+    const result = {
+        symbols: new Uint8Array(Module.HEAPU8.buffer, Module.getValue(resultPtr + 8, '*'), FT8_NN),
+        audio: new Float32Array(Module.HEAPF32.buffer, Module.getValue(resultPtr + 16, '*'), Module.getValue(resultPtr + 20, 'i32')),
+        dphi: new Float32Array(Module.HEAPF32.buffer, Module.getValue(resultPtr + 24, '*'), Module.getValue(resultPtr + 20, 'i32')),
+        metadata: Module.UTF8ToString(Module.getValue(resultPtr + 32, '*')),
+        metadata_length: Module.getValue(resultPtr + 36, 'i32')
+    };
+    Module._free(resultPtr);
+    return result;
+}

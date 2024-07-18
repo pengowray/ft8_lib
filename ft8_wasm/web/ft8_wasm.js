@@ -2018,6 +2018,9 @@ var _malloc = Module["_malloc"] = createExportWrapper("malloc");
 var _processSymbols = Module["_processSymbols"] = createExportWrapper("processSymbols");
 
 /** @type {function(...*):?} */
+var _synth_gfsk = Module["_synth_gfsk"] = createExportWrapper("synth_gfsk");
+
+/** @type {function(...*):?} */
 var _processPackedHexStr = Module["_processPackedHexStr"] = createExportWrapper("processPackedHexStr");
 
 /** @type {function(...*):?} */
@@ -2042,7 +2045,22 @@ var _encodeFT8_packed = Module["_encodeFT8_packed"] = createExportWrapper("encod
 var _encodeFT8_audio = Module["_encodeFT8_audio"] = createExportWrapper("encodeFT8_audio");
 
 /** @type {function(...*):?} */
+var _encodeFT8Message = Module["_encodeFT8Message"] = createExportWrapper("encodeFT8Message");
+
+/** @type {function(...*):?} */
+var _encodeFT8MessageToSymbols = Module["_encodeFT8MessageToSymbols"] = createExportWrapper("encodeFT8MessageToSymbols");
+
+/** @type {function(...*):?} */
+var _packedToSymbols = Module["_packedToSymbols"] = createExportWrapper("packedToSymbols");
+
+/** @type {function(...*):?} */
+var _symbolsToAudio = Module["_symbolsToAudio"] = createExportWrapper("symbolsToAudio");
+
+/** @type {function(...*):?} */
 var _decodeFT8 = Module["_decodeFT8"] = createExportWrapper("decodeFT8");
+
+/** @type {function(...*):?} */
+var _synth_gfsk_custom = Module["_synth_gfsk_custom"] = createExportWrapper("synth_gfsk_custom");
 
 /** @type {function(...*):?} */
 var ___errno_location = Module["___errno_location"] = createExportWrapper("__errno_location");

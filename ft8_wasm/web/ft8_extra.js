@@ -554,13 +554,41 @@ function hexToBinary(hex) {
 }
 
 function messageToPackedData(message) {
-    const result = Module.ccall('encodeFT8', 'number', ['string', 'number', 'number'], [message, 0, 0]);
-    if (result === 0) {
-        throw new Error("Encoding failed");
+    const resultPtr = Module.ccall('encodeFT8Message', 'number', ['string'], [message]);
+    if (resultPtr === 0) {
+        return {
+            success: false,
+            errorCode: -1,
+            errorMessage: "Failed to allocate memory for result"
+        };
     }
-    const packedData = new Uint8Array(Module.HEAPU8.buffer, Module.getValue(result, '*'), FTX_PAYLOAD_LENGTH_BYTES);
-    Module._free(result);
-    return packedData;
+
+    const result = {
+        data: Module.getValue(resultPtr, '*'),
+        size: Module.getValue(resultPtr + 4, 'i32'),
+        errorCode: Module.getValue(resultPtr + 8, 'i32'),
+        errorMessage: Module.getValue(resultPtr + 12, '*')
+    };
+
+    let returnObject;
+
+    if (result.errorCode !== 0) {
+        returnObject = {
+            success: false,
+            errorCode: result.errorCode,
+            errorMessage: Module.UTF8ToString(result.errorMessage)
+        };
+    } else {
+        const packedData = new Uint8Array(Module.HEAPU8.buffer, result.data, result.size);
+        returnObject = {
+            success: true,
+            data: new Uint8Array(packedData)
+        };
+    }
+
+    Module.ccall('freeFT8EncodeResult', 'void', ['number'], [resultPtr]);
+    
+    return returnObject;
 }
 
 function packedDataToSymbolsArray(packedData) {

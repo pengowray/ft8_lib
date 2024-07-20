@@ -395,21 +395,6 @@
         "<TNX BOB 73 GL>"
     ];
 
-    function encodeFT8Message(message) {
-        try {
-            const packedData = messageToPackedData(message);
-            const symbols = packedDataToSymbols(packedData);
-            return {
-                packedData: packedData,
-                symbols: symbols,
-                message: message
-            };
-        } catch (error) {
-            console.error("Encoding error:", error);
-            throw error;
-        }
-    }
-
     function generateFT8Audio_test(symbols, baseFreq, sampleRate) {
         try {
             const audioResult = symbolsToAudio(symbols, baseFreq, sampleRate);
@@ -758,9 +743,10 @@
 
         function updateOutput(result, inputType, originalInput) {
             
-            const packedData = new Uint8Array(Module.HEAPU8.buffer, result.packed_data, result.packed_size);
-            console.log(packedData);
-const symbolsArray = result.symbolsArray;
+            //const packedData = new Uint8Array(Module.HEAPU8.buffer, result.packed_data, result.packed_size);
+            //console.log(packedData);
+            const packedData = result.packed_data;
+            const symbolsArray = result.symbolsArray;
             //const symbolsArray = new Uint8Array(Module.HEAPU8.buffer, result.symbols, result.symbols.length);
             //console.log(packedData, symbolsArray);
             //const symbolsText = Array.from(symbols).join('');
@@ -1105,12 +1091,13 @@ const symbolsArray = result.symbolsArray;
 
    
         encodeButton.addEventListener('click', () => {
-             handleEncode();
+            try {
+                handleEncode();
              
-             //} catch (error) {
-               // output.innerHTML = "Error: " + error.message;
-              //  console.error(error);
-            //}
+            } catch (error) {
+                output.innerHTML = "Error: " + error.message;
+                console.error(error);
+            }
         });
         
         function handleEncode() {
@@ -1132,6 +1119,7 @@ const symbolsArray = result.symbolsArray;
                 case 'free text':
                     input = normalizeBracketedFreeText(input);
                     packedData = encodeFT8FreeText(input);
+                    console.log("free text packed data", packedData);
                     break;
                 case 'symbols':
                     input = normalizeSymbols(input);
@@ -1163,24 +1151,38 @@ const symbolsArray = result.symbolsArray;
                     break;
                 default:
                     input = normalizeMessage(input);
-                    packedData = messageToPackedData(input);
+                    const packingResult = messageToPackedData(input);
+                    if (packingResult.success) {
+                        console.log("Packed data:", packingResult);
+                        packedData = packingResult.data;
+                    } else {
+                        throw new Error(`Encoding failed (code ${packingResult.errorCode}): ${packingResult.errorMessage}`);
+                    }
+                    break;
             }
 
-            if (!symbolsText && packedData) {
+            if (symbolsText == null && packedData != null) {
                 symbolsText = packedDataToSymbols(packedData);
-            } else if (!packedData && symbolsText) {
+            } else if (packedData == null && symbolsText != null) {
+                console.log("empty packed data, generating from symbols");
                 packedData = symbolsToPackedData(symbolsText);
             }
 
-            if (!symbolsText) {
+            if (symbolsText == null) {
                 throw new Error("Failed to generate symbols");
+            }
+
+            if (packedData == null) {
+                throw new Error("Failed to generate packed data");
             }
             
             const symbolsArray = symbolsToArray(symbolsText);
-            console.log("symbols", symbolsText, symbolsArray);
+            //console.log("symbols", symbolsText, symbolsArray);
+            
+            const reDecoded = decodeFT8PackedData(packedData, packedData.length);
             
             const options = {
-                sampleRate: 12000,
+                sampleRate: sampleRate,
                 baseFrequency: freqData.baseHz,
                 customToneFrequencies: freqData.customTones,
             };
@@ -1196,7 +1198,7 @@ const symbolsArray = result.symbolsArray;
                 audio: audioResult.audio,
                 audio_samples: audioResult.audio.length,
                 dphi: audioResult.dphi,
-                decoded_text: input,
+                decoded_text: reDecoded, // input,
                 metadata: audioResult.metadata,
                 metadata_length: audioResult.metadata.length
             }, inputType, input);

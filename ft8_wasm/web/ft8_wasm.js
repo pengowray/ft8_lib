@@ -2051,6 +2051,9 @@ var _encodeFT8_audio = Module["_encodeFT8_audio"] = createExportWrapper("encodeF
 var _encodeFT8Message = Module["_encodeFT8Message"] = createExportWrapper("encodeFT8Message");
 
 /** @type {function(...*):?} */
+var _freeFT8EncodeResult = Module["_freeFT8EncodeResult"] = createExportWrapper("freeFT8EncodeResult");
+
+/** @type {function(...*):?} */
 var _encodeFT8MessageToSymbols = Module["_encodeFT8MessageToSymbols"] = createExportWrapper("encodeFT8MessageToSymbols");
 
 /** @type {function(...*):?} */

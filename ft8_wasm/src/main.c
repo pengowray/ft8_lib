@@ -351,21 +351,73 @@ float* encodeFT8_audio(const char* message, float base_freq, int* num_samples, i
     return audio;
 }
 
+typedef struct {
+    uint8_t* data;
+    int size;
+    int error_code;
+    char* error_message;
+} FT8EncodeResult;
+
 EMSCRIPTEN_KEEPALIVE
-uint8_t* encodeFT8Message(const char* message, int* packed_size) {
-    ftx_message_t msg;
-    ftx_message_rc_t rc = ftx_message_encode(&msg, NULL, message);
-    if (rc != FTX_MESSAGE_RC_OK) {
-        return NULL;
+FT8EncodeResult* encodeFT8Message(const char* message) {
+    FT8EncodeResult* result = (FT8EncodeResult*)malloc(sizeof(FT8EncodeResult));
+    if (!result) {
+        return NULL; // Memory allocation failed
     }
     
-    uint8_t* packed_data = (uint8_t*)malloc(FTX_PAYLOAD_LENGTH_BYTES);
-    memcpy(packed_data, msg.payload, FTX_PAYLOAD_LENGTH_BYTES);
-    *packed_size = FTX_PAYLOAD_LENGTH_BYTES;
+    ftx_message_t msg;
+    ftx_message_rc_t rc = ftx_message_encode(&msg, NULL, message);
     
-    return packed_data;
+    result->error_code = rc;
+    if (rc != FTX_MESSAGE_RC_OK) {
+        result->data = NULL;
+        result->size = 0;
+        
+        const char* error_text;
+        switch (rc) {
+            case FTX_MESSAGE_RC_ERROR_CALLSIGN1:
+                error_text = "Invalid first callsign";
+                break;
+            case FTX_MESSAGE_RC_ERROR_CALLSIGN2:
+                error_text = "Invalid second callsign";
+                break;
+            case FTX_MESSAGE_RC_ERROR_SUFFIX:
+                error_text = "Invalid callsign suffix";
+                break;
+            case FTX_MESSAGE_RC_ERROR_GRID:
+                error_text = "Invalid grid locator";
+                break;
+            case FTX_MESSAGE_RC_ERROR_TYPE:
+                error_text = "Unsupported message type";
+                break;
+            default:
+                error_text = "Unknown error";
+        }
+        result->error_message = strdup(error_text);
+    } else {
+        result->data = (uint8_t*)malloc(FTX_PAYLOAD_LENGTH_BYTES);
+        if (!result->data) {
+            result->error_code = -1;
+            result->size = 0;
+            result->error_message = strdup("Memory allocation failed");
+        } else {
+            memcpy(result->data, msg.payload, FTX_PAYLOAD_LENGTH_BYTES);
+            result->size = FTX_PAYLOAD_LENGTH_BYTES;
+            result->error_message = NULL;
+        }
+    }
+    
+    return result;
 }
 
+EMSCRIPTEN_KEEPALIVE
+void freeFT8EncodeResult(FT8EncodeResult* result) {
+    if (result) {
+        free(result->data);
+        free(result->error_message);
+        free(result);
+    }
+}
 
 EMSCRIPTEN_KEEPALIVE
 uint8_t* encodeFT8MessageToSymbols(const char* message, int* packed_size) {

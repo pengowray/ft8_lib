@@ -30,57 +30,83 @@ void gfsk_pulse(int n_spsym, float symbol_bt, float* pulse)
 }
 
 EMSCRIPTEN_KEEPALIVE
-void synth_gfsk_custom(const uint8_t* symbols, int n_sym, float f0, const float* tone_offsets, float symbol_bt, float symbol_period, int signal_rate, float* signal, float* dphi_out, int* metadata_length, char** metadata_json)
+void synth_gfsk_custom(const uint8_t* symbols, int n_sym, float f0, const float* custom_tones, float symbol_bt, float symbol_period, int signal_rate, float* signal, float* dphi_out, int* metadata_length, char** metadata_json)
 {
     int n_spsym = (int)(0.5f + signal_rate * symbol_period);
     int n_ramp = n_spsym / 8;
     int n_total = calculate_num_samples(n_sym, symbol_period, signal_rate);
     int n_wave = n_sym * n_spsym;
     float hmod = 1.0f;
+    float tone_spacing = custom_tones ? (custom_tones[1] - custom_tones[0]) : FT8_TONE_SPACING;
+    float dphi_peak = 2 * M_PI * hmod / n_spsym;
 
     float* extended_signal = (float*)malloc(n_total * sizeof(float));
     float* dphi = (float*)malloc((n_total + 2 * n_spsym) * sizeof(float));
 
     // Calculate absolute frequencies
     float frequencies[FT8_TONE_COUNT];
-    float min_freq = f0 + tone_offsets[0];
-    float max_freq = f0 + tone_offsets[0];
+    float min_freq = custom_tones ? custom_tones[0] : f0;
+    float max_freq = custom_tones ? custom_tones[0] : f0;
     for (int i = 0; i < FT8_TONE_COUNT; i++) {
-        frequencies[i] = f0 + tone_offsets[i];
+        if (custom_tones) {
+            frequencies[i] = custom_tones[i];
+        } else {
+            frequencies[i] = f0 + i * FT8_TONE_SPACING;
+        }
         if (frequencies[i] < min_freq) min_freq = frequencies[i];
         if (frequencies[i] > max_freq) max_freq = frequencies[i];
     }
 
     // Initialize dphi with base frequency
-    for (int i = 0; i < n_total + 2 * n_spsym; ++i) {
+    for (int i = 0; i < n_total + 2 * n_spsym; ++i)
+    {
         dphi[i] = 2 * M_PI * f0 / signal_rate;
     }
 
     float* pulse = (float*)malloc(3 * n_spsym * sizeof(float));
     gfsk_pulse(n_spsym, symbol_bt, pulse);
 
-    for (int i = 0; i < n_sym; ++i) {
-        int ib = i * n_spsym + n_ramp;
-        float dphi_peak = 2 * M_PI * (frequencies[symbols[i]] - f0) / signal_rate;
-        for (int j = 0; j < 3 * n_spsym; ++j) {
-            dphi[j + ib] += dphi_peak * pulse[j];
+    // Apply frequency changes for each symbol
+    if (custom_tones) {
+        for (int i = 0; i < n_sym; ++i)
+        {
+            int ib = i * n_spsym + n_ramp;
+            float symbol_freq = custom_tones ? custom_tones[symbols[i]] : (f0 + symbols[i] * tone_spacing);
+            float symbol_dphi = 2 * M_PI * (symbol_freq - f0) / signal_rate;
+
+            for (int j = 0; j < 3 * n_spsym; ++j)
+            {
+                dphi[j + ib] += symbol_dphi * pulse[j];
+            }
         }
-    }
-
+    } else {
+        for (int i = 0; i < n_sym; ++i)
+        {
+            int ib = i * n_spsym + n_ramp;
+            for (int j = 0; j < 3 * n_spsym; ++j)
+            {
+                dphi[j + ib] += dphi_peak * symbols[i] * pulse[j];
+            }
+        }
+    }    
     // Apply ramps at the beginning and end
-    for (int j = 0; j < 2 * n_spsym; ++j) {
-        dphi[j] += 2 * M_PI * (frequencies[symbols[0]] - f0) / signal_rate * pulse[j + n_spsym];
-        dphi[j + n_total - 2 * n_spsym] += 2 * M_PI * (frequencies[symbols[n_sym - 1]] - f0) / signal_rate * pulse[j];
+    for (int j = 0; j < 2 * n_spsym; ++j)
+    {
+        dphi[j] += dphi_peak * pulse[j + n_spsym] * symbols[0];
+        dphi[j + n_total - 2 * n_spsym] += dphi_peak * pulse[j] * symbols[n_sym - 1];
     }
 
+    // Generate the signal
     float phi = 0;
-    for (int k = 0; k < n_total; ++k) {
+    for (int k = 0; k < n_total; ++k)
+    {
         extended_signal[k] = sinf(phi);
         phi = fmodf(phi + dphi[k], 2 * M_PI);
     }
 
     // Apply envelope shaping
-    for (int i = 0; i < n_ramp; ++i) {
+    for (int i = 0; i < n_ramp; ++i)
+    {
         float env = (1 - cosf(2 * M_PI * i / (2 * n_ramp))) / 2;
         extended_signal[i] *= env;
         extended_signal[n_total - 1 - i] *= env;
@@ -88,15 +114,23 @@ void synth_gfsk_custom(const uint8_t* symbols, int n_sym, float f0, const float*
 
     memcpy(signal, extended_signal, n_total * sizeof(float));
 
-    if (dphi_out != NULL) {
-        //todo: option to export whole dphi
+    if (dphi_out != NULL)
+    {
         memcpy(dphi_out, dphi + n_ramp, n_total * sizeof(float));
     }
 
     // Generate metadata JSON
-    if (metadata_json != NULL && metadata_length != NULL) {
-        char* json = (char*)malloc(2048); // Increased size for additional data
-        int len = snprintf(json, 2048,
+    if (metadata_json != NULL && metadata_length != NULL)
+    {
+        // Convert symbols to a string of digits
+        char* symbols_str = (char*)malloc(n_sym + 1);
+        for (int i = 0; i < n_sym; i++) {
+            symbols_str[i] = '0' + symbols[i];
+        }
+        symbols_str[n_sym] = '\0';
+
+        char* json = (char*)malloc(2048 + n_sym);  // Increased size to accommodate symbols string
+        int len = snprintf(json, 2048 + n_sym,
             "{"
             "\"sample_rate\": %d,"
             "\"symbol_count\": %d,"
@@ -105,19 +139,24 @@ void synth_gfsk_custom(const uint8_t* symbols, int n_sym, float f0, const float*
             "\"base_frequency\": %.1f,"
             "\"min_frequency\": %.1f,"
             "\"max_frequency\": %.1f,"
-            "\"tone_offsets\": [%.1f, %.1f, %.1f, %.1f, %.1f, %.1f, %.1f, %.1f],"
+            "\"custom_tones\": [%.1f, %.1f, %.1f, %.1f, %.1f, %.1f, %.1f, %.1f],"
             "\"first_symbol_start\": %d,"
             "\"last_symbol_end\": %d,"
             "\"ramp_length\": %d,"
-            "\"total_samples\": %d"
+            "\"total_samples\": %d,"
+            "\"symbols\": \"%s\""
             "}",
-            signal_rate, n_sym, symbol_period, symbol_bt, f0, min_freq, max_freq,
-            tone_offsets[0], tone_offsets[1], tone_offsets[2], tone_offsets[3],
-            tone_offsets[4], tone_offsets[5], tone_offsets[6], tone_offsets[7],
-            n_ramp, n_total - n_ramp, n_ramp, n_total
+            signal_rate, n_sym, symbol_period, symbol_bt, f0,
+            min_freq, max_freq,
+            frequencies[0], frequencies[1], frequencies[2], frequencies[3],
+            frequencies[4], frequencies[5], frequencies[6], frequencies[7],
+            n_ramp, n_total - n_ramp, n_ramp, n_total,
+            symbols_str
         );
         *metadata_json = json;
         *metadata_length = len;
+
+        free(symbols_str);
     }
 
     free(extended_signal);
@@ -129,9 +168,5 @@ void synth_gfsk_custom(const uint8_t* symbols, int n_sym, float f0, const float*
 EMSCRIPTEN_KEEPALIVE
 void synth_gfsk(const uint8_t* symbols, int n_sym, float f0, float symbol_bt, float symbol_period, int signal_rate, float* signal, float* dphi_out, int* metadata_length, char** metadata_json)
 {
-    float tone_offsets[FT8_TONE_COUNT];
-    for (int i = 0; i < FT8_TONE_COUNT; i++) {
-        tone_offsets[i] = i * FT8_TONE_SPACING;
-    }
-    synth_gfsk_custom(symbols, n_sym, f0, tone_offsets, symbol_bt, symbol_period, signal_rate, signal, dphi_out, metadata_length, metadata_json);
+    synth_gfsk_custom(symbols, n_sym, f0, NULL, symbol_bt, symbol_period, signal_rate, signal, dphi_out, metadata_length, metadata_json);
 }

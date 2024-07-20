@@ -595,10 +595,9 @@ function symbolsToArray(toneString) {
   // Remove any whitespace and split the string into an array of characters
   const tones = toneString.replace(/\s/g, '').split('');
   
-  // Convert characters
-  const arrayTones = tones.map(tone => {
-    const num = parseInt(tone, 10);
-  });
+  // Convert characters to numbers and filter out any NaN values
+  const arrayTones = tones.map(tone => parseInt(tone, 10))
+                          .filter(num => !isNaN(num));
   
   return new Uint8Array(arrayTones);
 }

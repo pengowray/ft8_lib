@@ -616,9 +616,9 @@
             
             // easter eggs
             if (input === "-73") {
-                input = "440 (E4 G4 C5 D5 E5 F5 G5 A5)"; //mar10
+                input = "440 (E4 G4 C5 D5 E5 F5 G5 A5)"; // C major / mario3
             } else if (input === "-1") {
-                input = "440 (C4 D4 D#4 F4 G4 A#4 C5 G5)"; // underworld
+                input = "440 (C4 D4 D#4 F4 G4 A#4 C5 G5)"; // C minor / underworld
             }
 
             // Default base frequency if not provided
@@ -739,6 +739,7 @@
             const metadataLength = Module.HEAP32[metadataLengthPtr / 4];
             const metadataJsonPtr = Module.HEAP32[metadataJsonPtrPtr / 4];
             const metadata = JSON.parse(Module.UTF8ToString(metadataJsonPtr, metadataLength));
+            console.log(metadata);
 
             // Free allocated memory
             Module._free(symbolsPtr);
@@ -1176,10 +1177,12 @@ const symbolsArray = result.symbolsArray;
             }
             
             const symbolsArray = symbolsToArray(symbolsText);
+            console.log("symbols", symbolsText, symbolsArray);
+            
             const options = {
                 sampleRate: 12000,
                 baseFrequency: freqData.baseHz,
-                customToneFrequencies: freqData.customTones
+                customToneFrequencies: freqData.customTones,
             };
 
             //const { audio, dphi, metadata } = generateAudioFromSymbols(symbolsArray, baseFrequency, sampleRate);

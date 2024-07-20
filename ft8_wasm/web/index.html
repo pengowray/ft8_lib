@@ -614,9 +614,11 @@
         function parseFrequencyInput(input) {
             input = input.trim();
             
-            // easter egg
+            // easter eggs
             if (input === "-73") {
-                input = "440 (E4 G4 C5 D5 E5 F5 G5 A5)";
+                input = "440 (E4 G4 C5 D5 E5 F5 G5 A5)"; //mar10
+            } else if (input === "-1") {
+                input = "440 (C4 D4 D#4 F4 G4 A#4 C5 G5)"; // underworld
             }
 
             // Default base frequency if not provided
@@ -625,7 +627,7 @@
             // Try to parse base frequency
             const baseFreqMatch = input.match(/^(\d+(\.\d+)?)/);
             if (baseFreqMatch) {
-                baseFreq = parseFloat(baseFreqMatch[1]);
+                baseFreq = parseFloat(baseFreqMatch[1]) || baseFreq;
             }
 
             // Check for offsets in brackets
@@ -633,68 +635,124 @@
             
             // If no offsets provided, use default FT8 spacing
             if (!offsetsMatch) {
-                return { baseFreq, offsets: [0, 6.25, 12.5, 18.75, 25, 31.25, 37.5, 43.75] };
+                return defaultTonesFT8(baseFreq); 
             }
 
-            const offsetsStr = offsetsMatch[1].trim();
-            const offsetTokens = offsetsStr.split(/\s+/);
-            let offsets = [];
+            //todo: perhaps treat customTones as offsets if start with +
+            //todo: most verbose, json based notation
+            const customTonesStr = offsetsMatch[1].trim();
+            const customTonesTokens = customTonesStr.split(/\s+/);
+            let customTones = [];
 
-            if (offsetTokens[0].match(/^[A-G]#?\d$/)) {
+            //TODO: allow mix and match of hz and notes
+            if (customTonesTokens[0].match(/^[A-G]#?\d$/)) {
                 // Notes provided
-                offsets = offsetTokens.map(note => parseNote(note) - baseFreq);
+                //offsets = offsetTokens.map(note => parseNote(note) - baseFreq); 
+                customTones = customTonesTokens.map(note => parseNote(note)); 
             } else {
-                // Numeric offsets provided
-                offsets = offsetTokens.map(offset => parseFloat(offset));
+                // Frequencies in Hz provided
+                customTones = customTonesTokens.map(offset => parseFloat(offset));
             }
 
             // Fill in missing offsets
-            if (offsets.length === 1) {
-                const step = offsets[0] / 7;
-                offsets = Array.from({length: 8}, (_, i) => i * step);
-            } else if (offsets.length === 2) {
-                const step = (offsets[1] - offsets[0]) / 6;
-                offsets = Array.from({length: 8}, (_, i) => offsets[0] + i * step);
-            } else if (offsets.length < 8) {
-                const lastOffset = offsets[offsets.length - 1];
-                while (offsets.length < 8) {
-                    offsets.push(lastOffset);
+            if (customTones.length === 1) {
+                //const step = offsets[0] / 7;
+                //offsets = Array.from({length: 8}, (_, i) => i * step);
+                let step = customTones[0] - baseFreq;
+                if (step == 0) step = 6.25;
+                customTones = Array.from({length: 8}, (_, i) => baseFreq + i * step);
+            } else if (customTones.length < 8) {
+                while (customTones.length < 8) {
+                    const step = customTones[offsets.length - 1] - customTones[offsets.length - 2];
+                    customTones.push(customTones[customTones.length - 1] + step);
                 }
+            } else if (customTones.length > 8) {
+                //todo: show error to user
+                console.log("Too many custom tones.");
+                //return defaultTonesFT8(baseFreq); 
+                return { baseHz: baseFreq, customTones: customTones.slice(0, 7) };
             }
-
-            return { baseFreq, offsets };
+            return { baseHz: baseFreq, customTones: customTones };
         }
 
-        function generateAudioFromSymbols(symbolsText, baseFreq, offsets, sampleRate) {
-            const symbolsArray = symbolsToArray(symbolsText);
-            const symbolsPtr = Module._malloc(symbolsArray.length);
-            Module.HEAPU8.set(symbolsArray, symbolsPtr);
+        function defaultTonesFT8(baseHz) {
+            const offsets = [0, 6.25, 12.5, 18.75, 25, 31.25, 37.5, 43.75];
+            return { baseHz: baseHz, customTones: offsets.map( offset => baseHz + offset) };
+        }
 
-            const offsetsPtr = Module._malloc(32); // 8 floats * 4 bytes
-            const offsetsHeap = new Float32Array(Module.HEAPU8.buffer, offsetsPtr, 8);
-            offsetsHeap.set(offsets);
+        function generateAudioFromSymbols(symbols, options = {}) {
+            const {
+                baseFrequency = 1000,
+                sampleRate = 12000,
+                toneSpacing = 6.25,
+                customToneFrequencies = null,
+                symbolBT = 2.0,
+                symbolPeriod = 0.160
+            } = options;
 
-            const resultPtr = Module.ccall('symbolsToAudio', 'number',
-                ['number', 'number', 'number', 'number', 'number'],
-                [symbolsPtr, symbolsArray.length, baseFreq, offsetsPtr, sampleRate]
-            );
+            const numSymbols = symbols.length;
+            
+            // Allocate memory for symbols
+            const symbolsPtr = Module._malloc(numSymbols);
+            Module.HEAPU8.set(symbols, symbolsPtr);
 
-            if (resultPtr === 0) {
-                throw new Error("Audio generation failed");
+            // Calculate number of samples
+            const numSamples = Module._calculate_num_samples(numSymbols, symbolPeriod, sampleRate);
+
+            // Allocate memory for audio and dphi
+            const audioPtr = Module._malloc(numSamples * 4);
+            const dphiPtr = Module._malloc(numSamples * 4);
+
+            // Allocate memory for metadata
+            const metadataLengthPtr = Module._malloc(4);
+            const metadataJsonPtrPtr = Module._malloc(4);
+            const FT8_TONE_COUNT = 8;
+
+            let result;
+            if (customToneFrequencies) {
+                // Use custom tone frequencies
+                const toneOffsetsPtr = Module._malloc(FT8_TONE_COUNT * 4);
+                const toneOffsets = new Float32Array(Module.HEAPF32.buffer, toneOffsetsPtr, FT8_TONE_COUNT);
+                for (let i = 0; i < FT8_TONE_COUNT; i++) {
+                    toneOffsets[i] = customToneFrequencies[i]; - baseFrequency;
+                }
+
+                result = Module._synth_gfsk_custom(
+                    symbolsPtr, numSymbols, baseFrequency, toneOffsetsPtr,
+                    symbolBT, symbolPeriod, sampleRate,
+                    audioPtr, dphiPtr, metadataLengthPtr, metadataJsonPtrPtr
+                );
+
+                Module._free(toneOffsetsPtr);
+            } else {
+                // Use default FT8 frequencies
+                result = Module._synth_gfsk(
+                    symbolsPtr, numSymbols, baseFrequency,
+                    symbolBT, symbolPeriod, sampleRate,
+                    audioPtr, dphiPtr, metadataLengthPtr, metadataJsonPtrPtr
+                );
             }
 
-            const result = {
-                audio: new Float32Array(Module.HEAPF32.buffer, Module.getValue(resultPtr + 16, '*'), Module.getValue(resultPtr + 20, 'i32')),
-                dphi: new Float32Array(Module.HEAPF32.buffer, Module.getValue(resultPtr + 24, '*'), Module.getValue(resultPtr + 20, 'i32')),
-                metadata: Module.UTF8ToString(Module.getValue(resultPtr + 32, '*')),
-                metadata_length: Module.getValue(resultPtr + 36, 'i32')
-            };
+            const audio = new Float32Array(Module.HEAPF32.buffer, audioPtr, numSamples);
+            const dphi = new Float32Array(Module.HEAPF32.buffer, dphiPtr, numSamples);
 
+            const metadataLength = Module.HEAP32[metadataLengthPtr / 4];
+            const metadataJsonPtr = Module.HEAP32[metadataJsonPtrPtr / 4];
+            const metadata = JSON.parse(Module.UTF8ToString(metadataJsonPtr, metadataLength));
+
+            // Free allocated memory
             Module._free(symbolsPtr);
-            Module._free(offsetsPtr);
-            Module._free(resultPtr);
+            Module._free(audioPtr);
+            Module._free(dphiPtr);
+            Module._free(metadataLengthPtr);
+            Module._free(metadataJsonPtrPtr);
+            Module._free(metadataJsonPtr);
 
-            return result;
+            return {
+                audio: Array.from(audio),
+                dphi: Array.from(dphi),
+                metadata: metadata
+            };
         }
 
         function updateOutput(result, inputType, originalInput) {
@@ -1063,6 +1121,7 @@ const symbolsArray = result.symbolsArray;
                 output.innerHTML = "Error: Invalid frequency input";
                 return;
             }
+            console.log(`freq: ${freqData.baseHz} (${freqData.customTones.join(' ')})`);
 
             const sampleRate = parseInt(sampleRateSelect.value);
 
@@ -1117,8 +1176,14 @@ const symbolsArray = result.symbolsArray;
             }
             
             const symbolsArray = symbolsToArray(symbolsText);
+            const options = {
+                sampleRate: 12000,
+                baseFrequency: freqData.baseHz,
+                customToneFrequencies: freqData.customTones
+            };
 
-            const audioResult = generateAudioFromSymbols(symbolsText, freqData.baseFreq, freqData.offsets, sampleRate);
+            //const { audio, dphi, metadata } = generateAudioFromSymbols(symbolsArray, baseFrequency, sampleRate);
+            const audioResult = generateAudioFromSymbols(symbolsArray, options);
 
             updateOutput({
                 packed_data: packedData,
@@ -1134,7 +1199,7 @@ const symbolsArray = result.symbolsArray;
             }, inputType, input);
 
             if (audioResult.audio.length > 0) {
-                setupAudioPlayback(audioResult.audio, audioResult.dphi, sampleRate, JSON.parse(audioResult.metadata));
+                setupAudioPlayback(audioResult.audio, audioResult.dphi, sampleRate, audioResult.metadata);
             } else {
                 console.error("No audio data generated");
                 output.textContent += "\nError: No audio data generated";

@@ -207,7 +207,7 @@ FT8Result* processPackedHexStr(const char* packedDataHex, float base_freq, int s
 }
 */
 
-EMSCRIPTEN_KEEPALIVE
+EMSCRIPTEN_KEEPALIVE 
 char* decodeFT8Symbols(const uint8_t* symbols, int symbol_count) {
     char* decoded_text = (char*)malloc(FTX_MAX_MESSAGE_LENGTH);
     if (decoded_text && decft8_decode_symbols(symbols, symbol_count, decoded_text, FTX_MAX_MESSAGE_LENGTH)) {
@@ -266,7 +266,7 @@ FT8Result* encodeFT8(const char* message, float base_freq, int sample_rate)
     result->metadata = metadata_json;
     result->metadata_length = metadata_length;
 
-    // Decode the symbols back to text
+    // Decode the symbols back to text for verification
     char* decoded_text = decodeFT8Symbols(result->symbols, result->symbol_count);
     if (decoded_text) {
         result->decoded_text = decoded_text;
@@ -317,6 +317,7 @@ char* encodeFT8_packed(const char* message) {
     return allocate_string(result);
 }
 
+// unused (delete?)
 EMSCRIPTEN_KEEPALIVE
 float* encodeFT8_audio(const char* message, float base_freq, int* num_samples, int sample_rate) {
     // Encode the message
@@ -351,9 +352,65 @@ float* encodeFT8_audio(const char* message, float base_freq, int* num_samples, i
 }
 
 EMSCRIPTEN_KEEPALIVE
+uint8_t* encodeFT8Message(const char* message, int* packed_size) {
+    ftx_message_t msg;
+    ftx_message_rc_t rc = ftx_message_encode(&msg, NULL, message);
+    if (rc != FTX_MESSAGE_RC_OK) {
+        return NULL;
+    }
+    
+    uint8_t* packed_data = (uint8_t*)malloc(FTX_PAYLOAD_LENGTH_BYTES);
+    memcpy(packed_data, msg.payload, FTX_PAYLOAD_LENGTH_BYTES);
+    *packed_size = FTX_PAYLOAD_LENGTH_BYTES;
+    
+    return packed_data;
+}
+
+
+EMSCRIPTEN_KEEPALIVE
+uint8_t* encodeFT8MessageToSymbols(const char* message, int* packed_size) {
+    ftx_message_t msg;
+    ftx_message_rc_t rc = ftx_message_encode(&msg, NULL, message);
+    if (rc != FTX_MESSAGE_RC_OK) {
+        return NULL;
+    }
+    
+    uint8_t* packed_data = (uint8_t*)malloc(FTX_PAYLOAD_LENGTH_BYTES);
+    memcpy(packed_data, msg.payload, FTX_PAYLOAD_LENGTH_BYTES);
+    *packed_size = FTX_PAYLOAD_LENGTH_BYTES;
+    
+    uint8_t* symbols = (uint8_t*)malloc(FT8_NN);
+    ft8_encode(packed_data, symbols);
+    return symbols;
+}
+
+EMSCRIPTEN_KEEPALIVE
+uint8_t* packedToSymbols(const uint8_t* packed_data) {
+    uint8_t* symbols = (uint8_t*)malloc(FT8_NN);
+    ft8_encode(packed_data, symbols);
+    return symbols;
+}
+
+EMSCRIPTEN_KEEPALIVE
+FT8Result* symbolsToAudio(const uint8_t* symbols, float base_freq, int sample_rate) {
+    FT8Result* result = (FT8Result*)malloc(sizeof(FT8Result));
+    
+    result->symbols = (uint8_t*)malloc(FT8_NN);
+    memcpy(result->symbols, symbols, FT8_NN);
+    result->symbol_count = FT8_NN;
+
+    result->audio_samples = calculate_num_samples(FT8_NN, FT8_SYMBOL_PERIOD, sample_rate);
+    result->audio = (float*)malloc(result->audio_samples * sizeof(float));
+    result->dphi = (float*)malloc(result->audio_samples * sizeof(float));
+
+    synth_gfsk(symbols, FT8_NN, base_freq, FT8_SYMBOL_BT, FT8_SYMBOL_PERIOD, sample_rate, 
+               result->audio, result->dphi, &result->metadata_length, &result->metadata);
+
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE
 char* decodeFT8(const float* audio, int num_samples) {
     // This is a stub implementation
     return allocate_string("Decoding not implemented yet");
 }
-
-

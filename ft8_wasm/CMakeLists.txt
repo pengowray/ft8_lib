@@ -26,10 +26,9 @@ add_executable(ft8_wasm
     ../fft/kiss_fftr.c
 )
 
-# Set Emscripten link flags
 set_target_properties(ft8_wasm PROPERTIES LINK_FLAGS "\
     -s WASM=1 \
-    -s EXPORTED_FUNCTIONS=['_malloc','_free','_encodeFT8','_freeFT8Result','_decodeFT8Symbols','_decodeFT8PackedData','_processSymbols','_processPackedHexStr'] \
+    -s EXPORTED_FUNCTIONS=['_malloc','_free','_encodeFT8','_freeFT8Result','_decodeFT8Symbols','_decodeFT8PackedData','_processSymbols','_processPackedHexStr','_synth_gfsk','_synth_gfsk_custom','_encodeFT8Message','_encodeFT8MessageToSymbols','_packedToSymbols','_symbolsToAudio','_calculate_num_samples'] \
     -s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','getValue','UTF8ToString'] \
     -s ALLOW_MEMORY_GROWTH=1 \
 ")

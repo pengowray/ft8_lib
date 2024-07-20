@@ -2018,6 +2018,9 @@ var _malloc = Module["_malloc"] = createExportWrapper("malloc");
 var _processSymbols = Module["_processSymbols"] = createExportWrapper("processSymbols");
 
 /** @type {function(...*):?} */
+var _calculate_num_samples = Module["_calculate_num_samples"] = createExportWrapper("calculate_num_samples");
+
+/** @type {function(...*):?} */
 var _synth_gfsk = Module["_synth_gfsk"] = createExportWrapper("synth_gfsk");
 
 /** @type {function(...*):?} */

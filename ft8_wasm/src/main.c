@@ -218,14 +218,76 @@ char* decodeFT8Symbols(const uint8_t* symbols, int symbol_count) {
 }
 
 
+typedef struct {
+    char* decoded_text;
+    int error_code;
+    char* error_message;
+} FT8DecodeResult;
+
 EMSCRIPTEN_KEEPALIVE
-char* decodeFT8PackedData(const uint8_t* packed_data, int packed_size) {
-    char* decoded_text = (char*)malloc(FTX_MAX_MESSAGE_LENGTH);
-    if (decoded_text && decft8_decode_packed(packed_data, packed_size, decoded_text, FTX_MAX_MESSAGE_LENGTH)) {
-        return decoded_text;
+FT8DecodeResult* decodeFT8PackedData(const uint8_t* packed_data, int packed_size) {
+    FT8DecodeResult* result = (FT8DecodeResult*)malloc(sizeof(FT8DecodeResult));
+    if (!result) {
+        return NULL; // Memory allocation failed
     }
-    free(decoded_text);
-    return NULL;
+    
+    result->decoded_text = (char*)malloc(FTX_MAX_MESSAGE_LENGTH);
+    if (!result->decoded_text) {
+        free(result);
+        return NULL; // Memory allocation failed
+    }
+    
+    if (packed_size != FTX_PAYLOAD_LENGTH_BYTES) {
+        result->error_code = -2; // Custom error code for invalid size
+        result->error_message = strdup("Invalid packed data size");
+        result->decoded_text[0] = '\0';
+        return result;
+    }
+    
+    ftx_message_t message;
+    memcpy(message.payload, packed_data, packed_size);
+    
+    //ftx_message_rc_t rc = ftx_message_decode(&message, &hash_if, result->decoded_text);
+    ftx_message_rc_t rc = ftx_message_decode(&message, NULL, result->decoded_text);
+    
+    result->error_code = rc;
+    if (rc != FTX_MESSAGE_RC_OK) {
+        const char* error_text;
+        switch (rc) {
+            case FTX_MESSAGE_RC_ERROR_CALLSIGN1:
+                error_text = "Invalid first callsign";
+                break;
+            case FTX_MESSAGE_RC_ERROR_CALLSIGN2:
+                error_text = "Invalid second callsign";
+                break;
+            case FTX_MESSAGE_RC_ERROR_SUFFIX:
+                error_text = "Invalid callsign suffix";
+                break;
+            case FTX_MESSAGE_RC_ERROR_GRID:
+                error_text = "Invalid grid locator";
+                break;
+            case FTX_MESSAGE_RC_ERROR_TYPE:
+                error_text = "Unsupported message type";
+                break;
+            default:
+                error_text = "Unknown decoding error";
+        }
+        result->error_message = strdup(error_text);
+        result->decoded_text[0] = '\0';
+    } else {
+        result->error_message = NULL;
+    }
+    
+    return result;
+}
+
+EMSCRIPTEN_KEEPALIVE
+void freeFT8DecodeResult(FT8DecodeResult* result) {
+    if (result) {
+        free(result->decoded_text);
+        free(result->error_message);
+        free(result);
+    }
 }
 
 EMSCRIPTEN_KEEPALIVE

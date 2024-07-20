@@ -457,12 +457,37 @@
             return result;
         };
 
-        const decodeFT8PackedData = (packedPtr, length) => {
-            const resultPtr = Module.ccall('decodeFT8PackedData', 'number', ['number', 'number'], [packedPtr, length]);
-            if (resultPtr === 0) return null;
-            const result = Module.UTF8ToString(resultPtr);
-            Module._free(resultPtr);
-            return result;
+        const decodeFT8PackedData = (packedData) => {
+            const packedDataArray = new Uint8Array(packedData);
+            const packedDataPtr = Module._malloc(packedDataArray.length);
+            Module.HEAPU8.set(packedDataArray, packedDataPtr);
+            
+            const resultPtr = Module.ccall('decodeFT8PackedData', 'number', ['number', 'number'], [packedDataPtr, packedDataArray.length]);
+            
+            Module._free(packedDataPtr);
+            
+            if (resultPtr === 0) {
+                return {
+                    success: false,
+                    errorCode: -1,
+                    errorMessage: "Failed to allocate memory for result"
+                };
+            }
+
+            const result = {
+                decodedText: Module.UTF8ToString(Module.getValue(resultPtr, '*')),
+                errorCode: Module.getValue(resultPtr + 4, 'i32'),
+                errorMessage: Module.UTF8ToString(Module.getValue(resultPtr + 8, '*'))
+            };
+
+            Module.ccall('freeFT8DecodeResult', 'void', ['number'], [resultPtr]);
+            
+            return {
+                success: result.errorCode === 0,
+                decodedText: result.decodedText,
+                errorCode: result.errorCode,
+                errorMessage: result.errorMessage
+            };
         };
 
         function normalizeMessage(message) {
@@ -775,7 +800,6 @@
             output.appendChild(syncSpan);
             output.innerHTML += "<br>";
 
-
             // CRC (14-bits)
             const crcSpan = document.createElement('span');
             crcSpan.textContent = `CRC check: ${crcCheckResult.result}`;
@@ -800,16 +824,37 @@
 
             // re-decoded
             const decodedSpan = document.createElement('span');
-            decodedSpan.textContent = `Decoded: ${result.decoded_text}`;
-            if (inputType === 'message' && normalizeMessage(result.decoded_text) !== normalizeMessage(originalInput)) {
+            let noMatchWarning;
+            if (result.decoded_result.success) {
+                const decoded = result.decoded_result.decodedText
+                decodedSpan.textContent = `Decoded: ${decoded}`;
+                if (inputType === 'message' && normalizeMessage(decoded) !== normalizeMessage(originalInput)) {
+                    decodedSpan.style.color = 'orange';
+                    noMatchWarning = "Decoded message does not appear to match input.";
+                    if (normalizeBracketedFreeText(originalInput).toUpperCase().startsWith(decoded.toUpperCase())) {
+                        noMatchWarning = "Original message appears to be truncated.";
+                    }
+                } else if (inputType === 'free text' && decoded.toUpperCase() !== normalizeBracketedFreeText(originalInput).toUpperCase()) {
+                    decodedSpan.style.color = 'orange';
+                    noMatchWarning = "Decoded message does not appear to match free text input.";
+                    if (normalizeBracketedFreeText(originalInput).toUpperCase().startsWith(decoded.toUpperCase())) {
+                        noMatchWarning = "Original message has been truncated to fit 13 character limit of free text.";
+                    }
+                }
+                if (noMatchWarning != null) {
+                    decodedSpan.innerHTML += `<br>Decode warning: ${noMatchWarning}`;
+                }
+            } else {
                 decodedSpan.style.color = 'red';
+                decodedSpan.textContent = `Error Decoding: ${result.decoded_result.errorCode}: ${result.decoded_result.errorMessage}`;
             }
             output.appendChild(decodedSpan);
 
             const messageInfo = FT8MessageTypeInfo(packedData);
             output.innerHTML += `<br>Message Type: ${messageInfo.messageType} (${messageInfo.type})`;
-            output.innerHTML += `<br>Explanation: ${explainFT8Message(result.decoded_text, messageInfo)}<br>`;
-
+            if (result.decoded_result.success) {
+                output.innerHTML += `<br>Explanation: ${explainFT8Message(result.decoded_result.decodedText, messageInfo)}<br>`;
+            }
             createPianoRoll(Array.from(symbolsText));
         }
 
@@ -1095,8 +1140,9 @@
                 handleEncode();
              
             } catch (error) {
-                output.innerHTML = "Error: " + error.message;
-                console.error(error);
+                //output.innerHTML = "Error: " + error.message;
+                output.innerHTML = "Error: " + error;
+                console.error("handle encode error", error);
             }
         });
         
@@ -1179,7 +1225,7 @@
             const symbolsArray = symbolsToArray(symbolsText);
             //console.log("symbols", symbolsText, symbolsArray);
             
-            const reDecoded = decodeFT8PackedData(packedData, packedData.length);
+            const reDecodedResult = decodeFT8PackedData(packedData, packedData.length);
             
             const options = {
                 sampleRate: sampleRate,
@@ -1198,7 +1244,8 @@
                 audio: audioResult.audio,
                 audio_samples: audioResult.audio.length,
                 dphi: audioResult.dphi,
-                decoded_text: reDecoded, // input,
+                decoded_result: reDecodedResult,
+                //decoded_text: reDecodedResult.decodedText, // input,
                 metadata: audioResult.metadata,
                 metadata_length: audioResult.metadata.length
             }, inputType, input);

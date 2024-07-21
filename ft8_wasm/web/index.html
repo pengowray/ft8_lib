@@ -395,25 +395,6 @@
         "<TNX BOB 73 GL>"
     ];
 
-    function generateFT8Audio_test(symbols, baseFreq, sampleRate) {
-        try {
-            const audioResult = symbolsToAudio(symbols, baseFreq, sampleRate);
-            
-            // Process the audio result as needed
-            audioSamples = audioResult.audio;
-            dphiSamples = audioResult.dphi;
-            metadata = JSON.parse(audioResult.metadata);
-
-            // Create waveform visualization, etc.
-            createWaveformVisualization(audioSamples, dphiSamples, metadata);
-
-            return audioResult;
-        } catch (error) {
-            console.error("Audio generation error:", error);
-            throw error;
-        }
-    }
-
     function initializeUI() {
         const encodeButton = document.getElementById('encode-button');
         const decodeButton = document.getElementById('decode-button'); // not used (yet)
@@ -522,7 +503,7 @@
                 .replace(/^[Tt](ELEMETRY)?:\s*/g, '') // remove initial "T:" or telemetry:
                 .replace(/\#T(ELEMETRY)?\s*$/g, '') // remove "#TELEMETRY "
                 .replace(/[ \-\:]/g, '') // remove any space - :
-                .replace(/^[0]*/g, ''); // initial 0's hopefully
+                .replace(/^[0]*/g, ''); // initial 0's
             return trimmed;
         }
 
@@ -717,12 +698,12 @@
             const FT8_TONE_COUNT = 8;
 
             let result;
-            if (customToneFrequencies) {
+            if (customToneFrequencies != null) {
                 // Use custom tone frequencies
                 const toneOffsetsPtr = Module._malloc(FT8_TONE_COUNT * 4);
                 const toneOffsets = new Float32Array(Module.HEAPF32.buffer, toneOffsetsPtr, FT8_TONE_COUNT);
                 for (let i = 0; i < FT8_TONE_COUNT; i++) {
-                    toneOffsets[i] = customToneFrequencies[i]; - baseFrequency;
+                    toneOffsets[i] = customToneFrequencies[i]; // - baseFrequency;
                 }
 
                 result = Module._synth_gfsk_custom(
@@ -802,10 +783,11 @@
 
             // CRC (14-bits)
             const crcSpan = document.createElement('span');
-            crcSpan.textContent = `CRC check: ${crcCheckResult.result}`;
+            crcSpan.textContent = `CRC check: ${crcCheckResult.result}`; // "OK" or "FAILED"
             if (crcCheckResult.result !== 'OK' ) {
                 crcSpan.style.color = 'red';
-                console.log('CRC', crcCheckResult);
+                crcSpan.textContent += `. Expected: ${crcCheckResult.crc}, Actual: ${crcCheckResult.received}`; //TODO: only make wrong bits red 
+                //console.log('CRC', crcCheckResult);
             }
             output.appendChild(crcSpan);
             output.innerHTML += "<br>";
@@ -918,11 +900,6 @@
             // Update position line
             const progress = currentTime / audioBuffer.duration;
             positionLine.style.left = `${progress * 100}%`;
-        }
-
-        function getHighlightColor(symbol) {
-            const colors = ['#ff6b6b', '#feca57', '#48dbfb', '#ff9ff3', '#54a0ff', '#5f27cd', '#ff6b6b', '#ff6b6b'];
-            return colors[symbol];
         }
 
         function getHighlightColor(symbol) {

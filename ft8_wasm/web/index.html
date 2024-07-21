@@ -583,14 +583,19 @@
 
         const parseNote = (note) => {
           const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-          const flatToSharp = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
-          
+          //const flatToSharp = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
+          const flatToSharp = { 'DB': 'C#', 'EB': 'D#', 'GB': 'F#', 'AB': 'G#', 'BB': 'A#' };          
           // Validate input
+
           if (typeof note !== 'string') return NaN;
+          note = note.toUpperCase();
           
           // Convert flat notation to sharp notation if necessary
-          let normalizedNote = note.replace(/([A-G])b(\d?)$/, (_, noteLetter, octave) => 
-            (flatToSharp[noteLetter + 'b'] || noteLetter + 'b') + octave
+          //let normalizedNote = note.replace(/([A-G])b(\d?)$/, (_, noteLetter, octave) => 
+          //  (flatToSharp[noteLetter + 'b'] || noteLetter + 'b') + octave
+          //);
+          let normalizedNote = note.replace(/([A-G])B(\d?)$/, (_, noteLetter, octave) => 
+            (flatToSharp[noteLetter + 'B'] || noteLetter + 'B') + octave
           );
           
           const octave = parseInt(normalizedNote.slice(-1)) || 4;
@@ -605,8 +610,9 @@
 
         function detectNoteNotation(input) {
           // Regular expression to match note notation
-          const notePattern = /^([A-G](#|b)?)(\d)?$/;
-          const match = input.match(notePattern);
+          //const notePattern = /^([A-G](#|b)?)(\d)?$/;
+          const notePattern = /^([A-G](#|B)?)(\d)?$/;
+          const match = input.toUpperCase().match(notePattern);
           
           if (match) {
             const [, note, accidental, octave] = match;
@@ -635,9 +641,10 @@
             let baseFreq = 500;
 
             // Try to parse base frequency
-            const baseFreqMatch = input.match(/^(\d+(\.\d+)?)/);
+            //const baseFreqMatch = input.match(/^(\d+(\.\d+)?)/);
+            const baseFreqMatch = input.match(/^\s*(\S*)[\s\(]?/);
             if (baseFreqMatch) {
-                baseFreq = parseFloat(baseFreqMatch[1]) || baseFreq;
+                baseFreq = parseFreq(baseFreqMatch[1]) || baseFreq;
             }
 
             // Check for offsets in brackets
@@ -654,26 +661,17 @@
             const customTonesTokens = customTonesStr.split(/\s+/);
             let customTones = [];
 
-            //TODO: allow mix and match of hz and notes
-            if (customTonesTokens[0].match(/^[A-G]#?\d$/)) {
-                // Notes provided
-                //offsets = offsetTokens.map(note => parseNote(note) - baseFreq); 
-                customTones = customTonesTokens.map(note => parseNote(note)); 
-            } else {
-                // Frequencies in Hz provided
-                customTones = customTonesTokens.map(offset => parseFloat(offset));
-            }
+            customTones = customTonesTokens.map(token => parseNote(token) || parseFloat(token) || NaN); 
 
             // Fill in missing offsets
             if (customTones.length === 1) {
                 //const step = offsets[0] / 7;
-                //offsets = Array.from({length: 8}, (_, i) => i * step);
                 let step = customTones[0] - baseFreq;
                 if (step == 0) step = 6.25;
                 customTones = Array.from({length: 8}, (_, i) => baseFreq + i * step);
             } else if (customTones.length < 8) {
                 while (customTones.length < 8) {
-                    const step = customTones[offsets.length - 1] - customTones[offsets.length - 2];
+                    const step = customTones[customTones.length - 1] - customTones[customTones.length - 2];
                     customTones.push(customTones[customTones.length - 1] + step);
                 }
             } else if (customTones.length > 8) {
@@ -748,7 +746,9 @@
 
             const metadataLength = Module.HEAP32[metadataLengthPtr / 4];
             const metadataJsonPtr = Module.HEAP32[metadataJsonPtrPtr / 4];
-            const metadata = JSON.parse(Module.UTF8ToString(metadataJsonPtr, metadataLength));
+            const metadataStr = Module.UTF8ToString(metadataJsonPtr, metadataLength);
+            console.log(metadataStr);            
+            const metadata = JSON.parse(metadataStr);
             console.log(metadata);
 
             // Free allocated memory
@@ -1187,13 +1187,13 @@
                     packedData = new Uint8Array(binaryToHex(normalizeBinary(input)).match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
                     break;
                 case '77 bits + CRC':
-                    symbols = binary91ToSymbols(normalizeBinary(input)).split('').map(Number);
+                    symbolsText = binary91ToSymbols(normalizeBinary(input));
                     break;
                 case '77 bits + CRC + LDPC':
-                    symbols = binary174ToSymbols(normalizeBinary(input)).split('').map(Number);
+                    symbolsText = binary174ToSymbols(normalizeBinary(input));
                     break;
                 case 'symbols (as binary)':
-                    symbols = binary195ToSymbols(normalizeBinary(input)).split('').map(Number);
+                    symbolsText = binary195ToSymbols(normalizeBinary(input));
                     break;
                 default:
                     input = normalizeMessage(input);
@@ -1222,7 +1222,7 @@
                 throw new Error("Failed to generate packed data");
             }
             
-            const symbolsArray = symbolsToArray(symbolsText);
+            const symbolsArray = symbolsToArray(symbolsText); // .split('').map(Number)
             //console.log("symbols", symbolsText, symbolsArray);
             
             const reDecodedResult = decodeFT8PackedData(packedData, packedData.length);

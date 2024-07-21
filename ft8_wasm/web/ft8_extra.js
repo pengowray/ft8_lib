@@ -486,15 +486,16 @@ function encodeFT8Telemetry(telemetryHex) {
   }
 
   // Convert hex to binary string
-  let binaryString = hexToBinary(telemetryHex);
+  let binaryString = hexToBinary(telemetryHex); // leading 0's are trimmed
+
+  // Check if the binary string starts with 1 (exceeding 71 bits)
+  if (binaryString.length > 71) { // || binaryString[0] == '1'
+    return { "error": "Error: First digit of 18-character hex string telemetry data must fall in the range 0 to 7." };
+  }
 
   // Add message type 0.5 (000101 in binary)
   binaryString = binaryString.padStart(71, '0') + '101000' // slice(-71)
 
-  // Check if the binary string starts with 1 (exceeding 71 bits)
-  if (binaryString[0] === '1' || binaryString.length > 77) {
-    return { "error": "Error: First digit of 18-character hex string telemetry data must fall in the range 0 to 7." };
-  }
 
   //console.log('telemetry', binaryString);
   // Convert binary string back to hex string

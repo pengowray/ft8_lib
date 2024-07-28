@@ -385,7 +385,7 @@
     let channelData;
     let baseFreq = 500;
     let sampleRate = 12000;
-
+    
     const exampleMessages = [
         "CQ K1ABC FN42",
         "K1ABC W9XYZ -15",
@@ -1374,7 +1374,7 @@
                 explanation = `This is a free-text message: "${message}".`; // Free-text messages in FT8 are limited to 13 characters.
             } else if (typeInfo.type === '0.5') {
                 explanation = `This is a telemetry message containing hexadecimal digits: ${message.replace(/^0*/g, '')}. The specific meaning depends on the implementation.`;
-            } else if (/^[0-9A-F]{4,18}$/.test(message)) { 
+            } else if (/^[0-9A-F]{4,18}$/.test(message) && /[A-F]/.test(message)) { // all hex digits with at least one A-F 
                 explanation = `This message is made up of hexadecimal digits, but it is not a telemetry message type.`;
             } else {
                 explanation = '';

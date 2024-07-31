@@ -263,7 +263,7 @@ function checkSync(symbols) {
     };
 }
 
-function printMessageDetails(symbols) {
+function debugPrintMessageDetails(symbols) {
     if (!symbols || symbols.length === 0) {
         console.log("No symbols to print.");
         return;
@@ -665,3 +665,51 @@ function symbolsToAudio(symbols, baseFreq, sampleRate) {
     Module._free(resultPtr);
     return result;
 }
+
+const encodeFT8 = Module.cwrap('encodeFT8', 'number', ['string', 'number', 'number']);
+const freeFT8Result = Module.cwrap('freeFT8Result', null, ['number']);
+//const decodeFT8Symbols = Module.cwrap('decodeFT8Symbols', 'string', ['number', 'number']);
+//const decodeFT8PackedData = Module.cwrap('decodeFT8PackedData', 'string', ['number', 'number']);
+const decodeFT8Symbols = (symbolsPtr, length) => {
+    const resultPtr = Module.ccall('decodeFT8Symbols', 'number', ['number', 'number'], [symbolsPtr, length]);
+    if (resultPtr === 0) {
+        console.error("Decoding failed");
+        return null;
+    }
+    const result = Module.UTF8ToString(resultPtr);
+    Module._free(resultPtr);
+    return result;
+};
+
+const decodeFT8PackedData = (packedData) => {
+    const packedDataArray = new Uint8Array(packedData);
+    const packedDataPtr = Module._malloc(packedDataArray.length);
+    Module.HEAPU8.set(packedDataArray, packedDataPtr);
+    
+    const resultPtr = Module.ccall('decodeFT8PackedData', 'number', ['number', 'number'], [packedDataPtr, packedDataArray.length]);
+    
+    Module._free(packedDataPtr);
+    
+    if (resultPtr === 0) {
+        return {
+            success: false,
+            errorCode: -1,
+            errorMessage: "Failed to allocate memory for result"
+        };
+    }
+
+    const result = {
+        decodedText: Module.UTF8ToString(Module.getValue(resultPtr, '*')),
+        errorCode: Module.getValue(resultPtr + 4, 'i32'),
+        errorMessage: Module.UTF8ToString(Module.getValue(resultPtr + 8, '*'))
+    };
+
+    Module.ccall('freeFT8DecodeResult', 'void', ['number'], [resultPtr]);
+    
+    return {
+        success: result.errorCode === 0,
+        decodedText: result.decodedText,
+        errorCode: result.errorCode,
+        errorMessage: result.errorMessage
+    };
+};

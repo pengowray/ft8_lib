@@ -11,12 +11,7 @@ const exampleMessages = [
 function initializeUI() {
     //let currentTime = 0;
 
-    let audioSource = null;
-    let audioContext = null;
-
-    let audioBuffer = null;
     let countdownInterval = null;
-    let channelData;
     
     const messageManager = new MessageManager(); // from ft8_msg.js
     //window.messageManager = new MessageManager();
@@ -162,9 +157,11 @@ function initializeUI() {
     }
 
     function stopAudio() {
-        if (audioSource) {
-            audioSource.stop();
-            resetAudioState();
+        const msg = messageManager.getCurrentMessage();
+
+        if (msg != null && msg.audioSource) {
+            msg.audioSource.stop();
+            resetAudioState(msg);
         }
         if (countdownInterval) {
             clearInterval(countdownInterval);
@@ -178,8 +175,9 @@ function initializeUI() {
         updateButtonState(false);
     }
 
-    function resetAudioState() {
-        audioSource = null;
+    function resetAudioState(msg) {
+        msg.audioSource = null;
+
         updateButtonState(false);
         if (pianoRollInterval) {
             clearInterval(pianoRollInterval);
@@ -199,14 +197,15 @@ function initializeUI() {
     }
 
     function playAudio() {
-        const currentMessage = messageManager.getCurrentMessage();
-        if (currentMessage != null && audioBuffer && !audioSource) {
-            audioContext.resume().then(() => {
-                audioSource = audioContext.createBufferSource();
-                audioSource.buffer = audioBuffer;
-                audioSource.connect(audioContext.destination);
-                audioSource.start();
-                audioSource.onended = resetAudioState;
+        const msg = messageManager.getCurrentMessage();
+        msg.readyAudioAndBuffer();
+        if (msg != null && msg.audioBuffer && !msg.audioSource) {
+            msg.audioContext.resume().then(() => {
+                msg.audioSource = msg.audioContext.createBufferSource();
+                msg.audioSource.buffer = msg.audioBuffer;
+                msg.audioSource.connect(msg.audioContext.destination);
+                msg.audioSource.start();
+                msg.audioSource.onended = () => resetAudioState(msg);
                 updateButtonState(true);
 
                 // Show position line
@@ -214,14 +213,14 @@ function initializeUI() {
                 positionLine.style.display = 'block';
                 positionLine.style.backgroundColor = document.body.classList.contains('dark-mode') ? 'white' : 'red';
 
-                const startTime = audioContext.currentTime;
+                const startTime = msg.audioContext.currentTime;
                 pianoRollInterval = setInterval(() => {
-                    const currentTime = audioContext.currentTime - startTime;
+                    const currentTime = msg.audioContext.currentTime - startTime;
                     drawWaveform(currentTime);
                     highlightCurrentSymbol(currentTime);
-                    if (currentTime >= audioBuffer.duration) {
+                    if (currentTime >= msg.audioBuffer.duration) {
                         clearInterval(pianoRollInterval);
-                        resetAudioState();
+                        resetAudioState(msg);
                     }
                 }, 50); // Update every 50ms
             });
@@ -236,32 +235,38 @@ function initializeUI() {
     }
 
     function playAudioTimed() {
-        const currentMessage = messageManager.getCurrentMessage();
+        const msg = messageManager.getCurrentMessage();
+        msg.readyAudioAndBuffer();
 
-        if (currentMessage != null && currentMessage.audioSamples != null && !audioSource) {
-            const now = new Date();
-            const secondsUntilNext15 = 15 - (now.getSeconds() % 15);
-            let totalSeconds = secondsUntilNext15;
+        if (msg != null && msg.audioSamples != null && !msg.audioSource) {
+            const now = new Date().getSeconds();
+            const latency = (msg.audioContext?.outputLatency ?? 0);
+            const secondsUntilNext15 = 15 - ((now + latency) % 15);
+            //const displaySecondsUntilNext15 = 15 - (now % 15);
+            let totalSecondsTilNext = secondsUntilNext15;
+            let nextCycleTime = new Date().getTime() + totalSecondsTilNext * 1000;
 
             updateButtonState(true);
             countdownDiv.style.display = 'block';
 
             function updateCountdown() {
-                const minutes = Math.floor(totalSeconds / 60);
-                const seconds = totalSeconds % 60;
-                countdownDiv.textContent = `Playing in ${minutes}:${seconds.toString().padStart(2, '0')}`;
+                const timeRemaining = (nextCycleTime - new Date().getTime()) / 1000;
+
+                //const minutes = Math.floor(timeRemaining / 60);
+                const seconds = timeRemaining % 60;
+                countdownDiv.textContent = `Playing in ${seconds.toFixed(1).toString().padStart(2, '0')}`;
                 
-                if (totalSeconds <= 0) {
+                if (timeRemaining <= 0) {
                     clearInterval(countdownInterval);
                     countdownInterval = null;
                     countdownDiv.style.display = 'none';
                     playAudio();
                 }
-                totalSeconds--;
+                //totalSeconds--;
             }
 
             updateCountdown(); // Call immediately to show correct time
-            countdownInterval = setInterval(updateCountdown, 1000);
+            countdownInterval = setInterval(updateCountdown, 12); // 12ms update interval
         }
     }
 
@@ -272,6 +277,8 @@ function initializeUI() {
 
     function downloadAudio() {
         const msg = messageManager.getCurrentMessage();
+        msg.readyAudio();
+
         if (msg == null) return;
 
         if (msg.audioSamples == null) return;
@@ -282,7 +289,7 @@ function initializeUI() {
         const a = document.createElement('a');
         a.style.display = 'none';
         a.href = url;
-        const baseFreq = msg.baseFreq || 1000;
+        const baseFreq = msg.getBaseFrequency();
         const message = messageInput.value.replace(/\s+/g, '_');
         a.download = `FT8-${Math.round(baseFreq)}Hz_${msg}.wav`;
         document.body.appendChild(a);
@@ -301,16 +308,26 @@ function initializeUI() {
     function audioBufferToWav(msg) {
         if (msg == null || msg.audioSamples == null) return null;
 
-        const buffer = msg.audioSamples;
+        //TODO: don't require AudioBuffer, so can just use readyAudio(); 
+        msg.readyAudioAndBuffer();
+        //msg.readyAudio(); 
 
+        if (msg.audioSamples == null || msg.audioBuffer == null) return null;
+
+        const buffer = msg.audioBuffer;
+
+        //const numChannels = 1; 
         const numChannels = buffer.numberOfChannels;
+        //const sampleRate = msg.getSampleRate(); // buffer.sampleRate;
         const sampleRate = buffer.sampleRate;
         const format = 1; // PCM
         const bitDepth = 16;
 
         let byteRate = sampleRate * numChannels * bitDepth / 8;
         let blockAlign = numChannels * bitDepth / 8;
+        //let dataSize = msg.audioSamples.length * numChannels * bitDepth / 8;
         let dataSize = buffer.length * numChannels * bitDepth / 8;
+
         let headerSize = 44;
         let totalSize = headerSize + dataSize;
 
@@ -447,6 +464,8 @@ function initializeUI() {
         }
         output.innerHTML += `Symbols: ${message.symbolsText}<br>`;
 
+        output.innerHTML += `Packed: ${packedToHexStrSp(packedData)}<br>`;
+
         // sync check (costas)
         const syncSpan = document.createElement('span');
         syncSpan.textContent = `Sync check: ${syncCheckResult.result}`;
@@ -479,7 +498,7 @@ function initializeUI() {
         }
         output.appendChild(paritySpan);
 
-        output.innerHTML += `<br>Packed: ${packedToHexStrSp(packedData)}<br>`;
+        output.innerHTML += '<br>'
 
         // re-decoded
         const decodedSpan = document.createElement('span');
@@ -489,20 +508,20 @@ function initializeUI() {
             const decoded = message.reDecodedResult.decodedText;
             decodedSpan.textContent = `Decoded: ${decoded}`;
             if (inputType === 'message' && normalizeMessage(decoded) !== normalizeMessage(originalInput)) {
-                decodedSpan.style.color = 'orange';
+                decodedSpan.className = 'warning';
                 noMatchWarning = "Decoded message does not appear to match input.";
                 if (normalizeBracketedFreeText(originalInput).toUpperCase().startsWith(decoded.toUpperCase())) {
                     noMatchWarning = "Original message appears to be truncated.";
                 }
             } else if (inputType === 'free text' && decoded.toUpperCase() !== normalizeBracketedFreeText(originalInput).toUpperCase()) {
-                decodedSpan.style.color = 'orange';
+                decodedSpan.className = 'warning';
                 noMatchWarning = "Decoded message does not appear to match free text input.";
                 if (normalizeBracketedFreeText(originalInput).toUpperCase().startsWith(decoded.toUpperCase())) {
                     noMatchWarning = "Original message has been truncated to fit 13 character limit of free text.";
                 }
             }
             if (noMatchWarning != null) {
-                decodedSpan.innerHTML += `<br>Decode warning: ${noMatchWarning}`;
+                decodedSpan.innerHTML += `<br>⚠ Decode warning: ${noMatchWarning}`;
             }
         } else {
             decodedSpan.style.color = 'red';
@@ -514,6 +533,11 @@ function initializeUI() {
         output.innerHTML += `<br>Message Type: ${messageInfo.messageType} (${messageInfo.type})`;
         if (message.reDecodedResult.success) {
             output.innerHTML += `<br>Explanation: ${explainFT8Message(message.reDecodedResult.decodedText, messageInfo)}<br>`;
+        }
+
+        if (message.encodeError_ft8lib) {
+            console.log('FT8Lib error', message.encodeError_ft8lib);
+            output.innerHTML += `Fallback to free text reason: ${message.encodeError_ft8lib}<br>`;
         }
 
     }
@@ -562,10 +586,10 @@ function initializeUI() {
     }
 
     function highlightCurrentSymbol(currentTime) {
-        const message = messageManager.getCurrentMessage();
-        if (!message || !audioBuffer) return;
+        const msg = messageManager.getCurrentMessage();
+        if (!msg || !msg.audioBuffer) return;
 
-        const symbolDuration = audioBuffer.duration / 79; // 79 symbols in FT8
+        const symbolDuration = msg.audioBuffer.duration / 79; // 79 symbols in FT8
         currentSymbolIndex = Math.floor(currentTime / symbolDuration);
         
         const pianoRollDiv = document.getElementById('piano-roll');
@@ -581,7 +605,7 @@ function initializeUI() {
         }
 
         // Update position line
-        const progress = currentTime / audioBuffer.duration;
+        const progress = currentTime / msg.audioBuffer.duration;
         positionLine.style.left = `${progress * 100}%`;
     }
 
@@ -597,15 +621,6 @@ function initializeUI() {
     function setupAudioPlayback(message) {
         //was:     function setupAudioPlayback(audioSamples, dphiSamples, sampleRate, metadata) {
 
-        const audioSamples = message.audioSamples;
-        const dphiSamples = message.dphiSamples;
-        const sampleRate = message.sampleRate;
-        const metadata = message.metadata;
-
-        audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: sampleRate });
-        audioBuffer = audioContext.createBuffer(1, audioSamples.length, sampleRate);
-        channelData = audioBuffer.getChannelData(0);
-        channelData.set(audioSamples);
 
         // Set canvas size
         waveformCanvas.width = waveformCanvas.clientWidth;

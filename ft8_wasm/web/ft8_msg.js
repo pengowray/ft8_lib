@@ -20,7 +20,13 @@ class FT8Message {
       this.customToneFrequencies = null;
       this.symbolBT = null; // 2.0
       this.symbolPeriod = null; // 0.160
-      
+
+      // for playing
+      this.audioContext = null;
+      this.audioBuffer = null;
+      this.channelData = null;
+      this.audioSource = null; // only not null while playing
+
     }
     detectInputType() {
         this.inputType = doDetectInputType(this.inputText);
@@ -116,19 +122,68 @@ class FT8Message {
         this.customToneFrequencies = customToneFrequencies;
     }
 
-    /*
-    updates this.audioSamples, this.dphiSamples, this.metadata
-    */
-    generateAudio() {
-        // was generateAudioFromSymbols(symbols, options = {}) 
-        const options = {
-            baseFrequency: this.baseFrequency ?? 1000,
-            sampleRate: this.sampleRate ?? 12000,
+    
+    clearAudioAndBuffer() {
+        this.audioSamples = null;
+        this.dphiSamples = null;
+        //this.metadata = null;
+        this.audioBuffer = null;
+        this.channelData = null;
+        //this.audioContext = null; // stop audio first?
+        this.audioSource = null;
+    }
+
+    readyAudio() {
+        if (this.audioSamples == null) {
+            this.generateAudio();
+        }
+    }
+
+    readyAudioAndBuffer() {
+        this.readyAudio();
+
+        if (this.audioSamples == null) {
+            // failed to generate audio
+            return;
+        }
+
+        //aka setupAudioPlayback()
+
+        const sampleRate = this.getSampleRate(); // message.getOptions().sampleRate;
+        //const metadata = message.metadata;
+
+        this.audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: sampleRate });
+        this.audioBuffer = this.audioContext.createBuffer(1, this.audioSamples.length, sampleRate);
+        this.channelData = this.audioBuffer.getChannelData(0);
+        this.channelData.set(this.audioSamples);
+        
+
+    }
+
+    getSampleRate() {
+        return this.sampleRate ?? 12000;
+    }
+    getBaseFrequency() {
+        return this.baseFrequency ?? 1000;
+    }
+    getOptions() {
+        //TODO: cache this
+        return {
+            baseFrequency: this.getBaseFrequency(),
+            sampleRate: this.getSampleRate(),
             toneSpacing: this.toneSpacing ?? 6.25,
             customToneFrequencies: this.customToneFrequencies ?? null,
             symbolBT: this.symbolBT ?? 2.0,
             symbolPeriod: this.symbolPeriod ?? 0.160
         };
+    }
+
+    /*
+    updates this.audioSamples, this.dphiSamples, this.metadata
+    */
+    generateAudio() {
+        // was generateAudioFromSymbols(symbols, options = {}) 
+        const options = this.getOptions();
 
         const symbolsArray = symbolsToArray(this.symbolsText); // .split('').map(Number)
         console.log("symbols", this.symbolsText, symbolsArray);
@@ -189,7 +244,7 @@ class FT8Message {
         this.audioSamples = Array.from(audio);
 
         const dphiArray = Array.from(dphi);
-        this.dphiSamples = scaleToRange(dphiArray, 190, 10); // fit in 0 to 200 (and flip?)
+        this.dphiSamples = scaleToRange(dphiArray, 190, 10); // fit in 0 to 200 (and flip) for visualization
 
         const metadataLength = Module.HEAP32[metadataLengthPtr / 4];
         const metadataJsonPtr = Module.HEAP32[metadataJsonPtrPtr / 4];
@@ -202,7 +257,6 @@ class FT8Message {
             error = "(internal error) Failed to parse metadata: '" + metadataStr + "'";
             console.error(error);
         } finally {
-        
             // Free allocated memory
             Module._free(symbolsPtr);
             Module._free(audioPtr);

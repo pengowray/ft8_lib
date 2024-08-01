@@ -14,6 +14,7 @@
             --button-text: #ffffff;
 
             --error-text: #aa0000;
+            --warning-text: rgb(181, 112, 0);
 
             --costas-bg: #a9a9a9;
             --data-bg: #737373;
@@ -28,6 +29,7 @@
             --button-text: #ffffff;
 
             --error-text: #ff0000;
+            --warning-text: orange;
 
             --costas-bg: #545454;
             --data-bg: #1f1f1f;
@@ -227,7 +229,10 @@
             background-color: var(--input-bg);
             color: var(--error-text);
         }
-
+        
+        .warning {
+            color: var(--warning-text);
+        }
 
         #example-messages {
             margin-top: 20px;
@@ -365,23 +370,24 @@
         <h3>Example Messages:</h3>
     </div>
 
-        <div>
-            Created by Pengo Wray. <br>
-            Encoding library: FT8_lib. All processing is done on your device.
+    <div style="text-align: center;">
         <br>
-        <br>
-        <a href="https://github.com/pengowray/ft8play">
-          <img src="https://img.shields.io/badge/View%20on-GitHub-brightgreen" alt="View on GitHub">
-        </a>
-        </div>
 
-        <div style="display: none;">
-            <h2>Decoder</h2>
-            <input type="file" id="audio-input" accept=".wav">
-            <button id="decode-button">Decode</button>
-            <div id="decode-output"></div>
-        </div>
+        <a href="https://github.com/pengowray/ft8play">
+        <img src="https://img.shields.io/badge/View%20on-GitHub-brightgreen" alt="View on GitHub">
+        </a>
+        <br>
+        Created by Pengo Wray.
+
     </div>
+
+    <div style="display: none;">
+        <h2>Decoder</h2>
+        <input type="file" id="audio-input" accept=".wav">
+        <button id="decode-button">Decode</button>
+        <div id="decode-output"></div>
+    </div>
+</div>
 
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script src="ft8_wasm.js"></script>

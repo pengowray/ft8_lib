@@ -10,8 +10,8 @@ class FT8Message {
 
       this.reDecodedResult = null;
 
-      this.audioBuffer = null;
-      this.dphiBuffer = null;
+      this.audioSamples = null;
+      this.dphiSamples = null;
       this.metadata = null;
 
       this.baseFrequency = null; // 1000
@@ -117,7 +117,7 @@ class FT8Message {
     }
 
     /*
-    updates this.audioBuffer, this.dphiBuffer, this.metadata
+    updates this.audioSamples, this.dphiSamples, this.metadata
     */
     generateAudio() {
         // was generateAudioFromSymbols(symbols, options = {}) 
@@ -186,8 +186,10 @@ class FT8Message {
 
         const audio = new Float32Array(Module.HEAPF32.buffer, audioPtr, numSamples);
         const dphi = new Float32Array(Module.HEAPF32.buffer, dphiPtr, numSamples);
-        this.audioBuffer = Array.from(audio);
-        this.dphiBuffer = Array.from(dphi);
+        this.audioSamples = Array.from(audio);
+
+        const dphiArray = Array.from(dphi);
+        this.dphiSamples = scaleToRange(dphiArray, 190, 10); // fit in 0 to 200 (and flip?)
 
         const metadataLength = Module.HEAP32[metadataLengthPtr / 4];
         const metadataJsonPtr = Module.HEAP32[metadataJsonPtrPtr / 4];
@@ -226,6 +228,9 @@ class FT8Message {
       return message;
     }
   
+    /**
+     * @returns {FT8Message}
+     */
     getCurrentMessage() {
         if (this.currentMessageIndex === -1) {
             return null;
@@ -323,3 +328,28 @@ function doDetectInputType(inputOriginal) {
     return 'message';
 }
 
+/**
+ * @param {Array} numbers - array of numbers to scale
+ * @param {number} newMin - new minimum value of the scaled range
+ * @param {number} newMax - new maximum value of the scaled range
+ * @returns {Array} - The array of numbers scaled to the new range
+ */
+function scaleToRange(numbers, newMin, newMax) {
+    const { min: originalMin, max: originalMax } = findMinAndMax(numbers);
+    const scale = (newMax - newMin) / (originalMax - originalMin);
+    
+    return numbers.map(num => (num - originalMin) * scale + newMin);
+}
+
+
+function findMinAndMax(numbers) {
+    let min = Infinity;
+    let max = -Infinity;
+    
+    for (const num of numbers) {
+        if (num < min) min = num;
+        if (num > max) max = num;
+    }
+    
+    return { min, max };
+}

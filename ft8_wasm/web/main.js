@@ -1,13 +1,3 @@
-let audioData, dphiData, dphiSamples, currentTime = 0;
-let audioContext = null;
-let audioBuffer = null;
-let audioSource = null;
-let countdownInterval = null;
-let audioSamples;
-let metadata;
-let channelData;
-let baseFreq = 500;
-let sampleRate = 12000;
 
 const exampleMessages = [
     "CQ K1ABC FN42",
@@ -19,6 +9,15 @@ const exampleMessages = [
 ];
 
 function initializeUI() {
+    //let currentTime = 0;
+
+    let audioSource = null;
+    let audioContext = null;
+
+    let audioBuffer = null;
+    let countdownInterval = null;
+    let channelData;
+    
     const messageManager = new MessageManager(); // from ft8_msg.js
     //window.messageManager = new MessageManager();
 
@@ -49,6 +48,7 @@ function initializeUI() {
     waveformCanvas.width = waveformCanvas.clientWidth;
     waveformCanvas.height = 200;
     let waveformCtx = waveformCanvas.getContext('2d');
+    let showMode = 0;
 
     const parseFreq = (note) => {
         return parseNote(note) || parseFloat(note) || 500;
@@ -199,7 +199,8 @@ function initializeUI() {
     }
 
     function playAudio() {
-        if (audioBuffer && !audioSource) {
+        const currentMessage = messageManager.getCurrentMessage();
+        if (currentMessage != null && audioBuffer && !audioSource) {
             audioContext.resume().then(() => {
                 audioSource = audioContext.createBufferSource();
                 audioSource.buffer = audioBuffer;
@@ -235,7 +236,9 @@ function initializeUI() {
     }
 
     function playAudioTimed() {
-        if (audioBuffer && !audioSource) {
+        const currentMessage = messageManager.getCurrentMessage();
+
+        if (currentMessage != null && currentMessage.audioSamples != null && !audioSource) {
             const now = new Date();
             const secondsUntilNext15 = 15 - (now.getSeconds() % 15);
             let totalSeconds = secondsUntilNext15;
@@ -268,28 +271,37 @@ function initializeUI() {
     downloadAudioButton.addEventListener('click', downloadAudio);
 
     function downloadAudio() {
-        const message = messageManager.getCurrentMessage();
-        const audioBuffer = message.audioBuffer;
-        if (audioBuffer) {
-            const wavData = audioBufferToWav(message);
-            const blob = new Blob([wavData], { type: 'audio/wav' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = url;
-            const baseFreq = message.baseFreq || 1000;
-            const message = messageInput.value.replace(/\s+/g, '_');
-            a.download = `FT8-${Math.round(baseFreq)}Hz_${message}.wav`;
-            document.body.appendChild(a);
-            a.click();
-            setTimeout(() => {
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);
-            }, 100);
-        }
+        const msg = messageManager.getCurrentMessage();
+        if (msg == null) return;
+
+        if (msg.audioSamples == null) return;
+
+        const wavData = audioBufferToWav(msg);
+        const blob = new Blob([wavData], { type: 'audio/wav' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        const baseFreq = msg.baseFreq || 1000;
+        const message = messageInput.value.replace(/\s+/g, '_');
+        a.download = `FT8-${Math.round(baseFreq)}Hz_${msg}.wav`;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }, 100);
     }
-    function audioBufferToWav(message) {
-        const buffer = message.audioBuffer;
+
+    /**
+     * 
+     * @param {FT8Message} msg 
+     * @returns 
+     */
+    function audioBufferToWav(msg) {
+        if (msg == null || msg.audioSamples == null) return null;
+
+        const buffer = msg.audioSamples;
 
         const numChannels = buffer.numberOfChannels;
         const sampleRate = buffer.sampleRate;
@@ -344,25 +356,6 @@ function initializeUI() {
         }
     }
 
-    function findMinAndMax(numbers) {
-        let min = Infinity;
-        let max = -Infinity;
-        
-        for (const num of numbers) {
-            if (num < min) min = num;
-            if (num > max) max = num;
-        }
-        
-        return { min, max };
-    }
-
-    function scaleToRange(numbers, newMin, newMax) {
-        const { min: originalMin, max: originalMax } = findMinAndMax(numbers);
-        const scale = (newMax - newMin) / (originalMax - originalMin);
-        
-        return numbers.map(num => (num - originalMin) * scale + newMin);
-    }
-
     messageInput.addEventListener('keypress', function(event) {
         if (event.key === 'Enter') {
             encodeButton.click();
@@ -409,8 +402,8 @@ function initializeUI() {
         updateOutput(message);
         createPianoRoll(message);
 
-        if (message.audioBuffer.length > 0) {
-            setupAudioPlayback(message.audioBuffer, message.dphiBuffer, message.sampleRate, message.metadata);
+        if (message.audioSamples.length > 0) {
+            setupAudioPlayback(message);
 
         } else {
             console.error("No audio data generated");
@@ -570,9 +563,9 @@ function initializeUI() {
 
     function highlightCurrentSymbol(currentTime) {
         const message = messageManager.getCurrentMessage();
-        if (!message || !message.audioBuffer) return;
+        if (!message || !audioBuffer) return;
 
-        const symbolDuration = message.audioBuffer.duration / 79; // 79 symbols in FT8
+        const symbolDuration = audioBuffer.duration / 79; // 79 symbols in FT8
         currentSymbolIndex = Math.floor(currentTime / symbolDuration);
         
         const pianoRollDiv = document.getElementById('piano-roll');
@@ -597,15 +590,29 @@ function initializeUI() {
         return colors[symbol];
     }
 
-    function setupAudioPlayback(audioSamples, dphiSamples, sampleRate, metadata) {
+    /**
+     * 
+     * @param {FT8Message} message 
+     */
+    function setupAudioPlayback(message) {
+        //was:     function setupAudioPlayback(audioSamples, dphiSamples, sampleRate, metadata) {
+
+        const audioSamples = message.audioSamples;
+        const dphiSamples = message.dphiSamples;
+        const sampleRate = message.sampleRate;
+        const metadata = message.metadata;
+
         audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: sampleRate });
         audioBuffer = audioContext.createBuffer(1, audioSamples.length, sampleRate);
         channelData = audioBuffer.getChannelData(0);
         channelData.set(audioSamples);
 
-        dphiSamples = scaleToRange(dphiSamples, 190, 10); // fit in 0 to 200 (and flip?)
+        // Set canvas size
+        waveformCanvas.width = waveformCanvas.clientWidth;
+        waveformCanvas.height = 200;
 
-        createWaveformVisualization(audioSamples, dphiSamples, metadata);
+        // Initial draw
+        drawWaveform();
 
         audioControls.style.display = 'block';
         updateButtonState(false);
@@ -766,19 +773,6 @@ function initializeUI() {
         sampleRateSelect.appendChild(option);
     });
 
-    function createWaveformVisualization(audioSamples, dphiSamples, metadata) {
-        audioData = audioSamples;
-        dphiData = dphiSamples;
-        sampleRate = metadata?.sample_rate ?? 12000;
-
-        // Set canvas size
-        waveformCanvas.width = waveformCanvas.clientWidth;
-        waveformCanvas.height = 200;
-
-        // Initial draw
-        drawWaveform();
-    }
-
     function handleResize() {
         if (waveformCanvas) {
             waveformCanvas.width = waveformCanvas.clientWidth;
@@ -795,7 +789,7 @@ function initializeUI() {
         {name: "Waveform", "mode": "wave", "zoom": 256},
         {name: "Oscilloscope", "mode": "wave", "zoom": 2048},
     ];
-    let showMode = 0;
+
     const toggleVisualizationButton = document.getElementById('toggle-visualization');
     const VisualizationCaption = document.getElementById('visualization-caption');
     function toggleVisualization() { // todo: rename cycleVisualization
@@ -822,14 +816,19 @@ function initializeUI() {
 
         if (off) return;
 
+        const message = messageManager.getCurrentMessage();
+        if (message == null) return;
+
+        const sampleRate = message.sampleRate;
+
         waveformCtx.beginPath();
         waveformCtx.moveTo(0, middle);
 
         const zoomLevel = mode['zoom'];
 
-        const data = showDphi ? dphiData : audioData;
+        const data = showDphi ? message.dphiSamples : message.audioSamples;
         if (!data || data.length === 0) {
-            console.error(`No ${showDphi ? 'dphiData' : 'audioData'} to draw`);
+            console.error(`No ${showDphi ? 'dphi samples' : 'audio samples'} to draw`);
             return;
         }
 

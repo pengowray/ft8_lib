@@ -13,7 +13,10 @@ function initializeUI() {
 
     let countdownInterval = null;
     
-    const messageManager = new MessageManager(); // from ft8_msg.js
+    const viewManager = new ViewManager();
+    const messageManager = viewManager.messageManager;
+    ;
+    //const messageManager = new MessageManager(); // from ft8_msg.js
     //window.messageManager = new MessageManager();
 
     const encodeButton = document.getElementById('encode-button');
@@ -39,11 +42,6 @@ function initializeUI() {
     const themeToggle = document.getElementById('theme-toggle');
     const exampleMessagesDiv = document.getElementById('example-messages');
 
-    const waveformCanvas = document.getElementById('waveform-canvas');
-    waveformCanvas.width = waveformCanvas.clientWidth;
-    waveformCanvas.height = 200;
-    let waveformCtx = waveformCanvas.getContext('2d');
-    let showMode = 0;
 
     const parseFreq = (note) => {
         return parseNote(note) || parseFloat(note) || 500;
@@ -157,12 +155,11 @@ function initializeUI() {
     }
 
     function stopAudio() {
-        const msg = messageManager.getCurrentMessage();
+        //todo: do via ViaController
+        //const msg = messageManager.getCurrentMessage();
+        //msg?.resetAudioState();
+        viewManager.stopAllAudio();
 
-        if (msg != null && msg.audioSource) {
-            msg.audioSource.stop();
-            resetAudioState(msg);
-        }
         if (countdownInterval) {
             clearInterval(countdownInterval);
             countdownInterval = null;
@@ -176,7 +173,7 @@ function initializeUI() {
     }
 
     function resetAudioState(msg) {
-        msg.audioSource = null;
+        msg.resetAudioState();
 
         updateButtonState(false);
         if (pianoRollInterval) {
@@ -198,33 +195,26 @@ function initializeUI() {
 
     function playAudio() {
         const msg = messageManager.getCurrentMessage();
-        msg.readyAudioAndBuffer();
-        if (msg != null && msg.audioBuffer && !msg.audioSource) {
-            msg.audioContext.resume().then(() => {
-                msg.audioSource = msg.audioContext.createBufferSource();
-                msg.audioSource.buffer = msg.audioBuffer;
-                msg.audioSource.connect(msg.audioContext.destination);
-                msg.audioSource.start();
-                msg.audioSource.onended = () => resetAudioState(msg);
-                updateButtonState(true);
+        msg.playAudio();
 
-                // Show position line
-                const positionLine = document.getElementById('position-line');
-                positionLine.style.display = 'block';
-                positionLine.style.backgroundColor = document.body.classList.contains('dark-mode') ? 'white' : 'red';
+        //todo: move everything below to viz components
 
-                const startTime = msg.audioContext.currentTime;
-                pianoRollInterval = setInterval(() => {
-                    const currentTime = msg.audioContext.currentTime - startTime;
-                    drawWaveform(currentTime);
-                    highlightCurrentSymbol(currentTime);
-                    if (currentTime >= msg.audioBuffer.duration) {
-                        clearInterval(pianoRollInterval);
-                        resetAudioState(msg);
-                    }
-                }, 50); // Update every 50ms
-            });
-        }
+        updateButtonState(true);
+
+        // Show position line
+        const positionLine = document.getElementById('position-line');
+        positionLine.style.display = 'block';
+        positionLine.style.backgroundColor = document.body.classList.contains('dark-mode') ? 'white' : 'red';
+
+        pianoRollInterval = setInterval(() => {
+            const currentTime = msg.audioContext.currentTime - startTime;
+            drawWaveform(currentTime);
+            highlightCurrentSymbol(currentTime);
+            if (currentTime >= msg.audioBuffer.duration) {
+                clearInterval(pianoRollInterval);
+                resetAudioState(msg);
+            }
+        }, 50); // Update every 50ms
     }
 
     function updateButtonState(isPlaying) {
@@ -393,7 +383,8 @@ function initializeUI() {
     
     function handleEncode() {
         let inputText = messageInput.value;
-        const message = messageManager.createMessage(inputText);
+        const message = new FT8Message(inputText); //messageManager.createMessage(inputText);
+
         message.encode();
         if (message.error != null) {
             errorOutput.textContent = "Error: " + message.error;
@@ -401,7 +392,6 @@ function initializeUI() {
         } else {
             errorOutput.textContent = "";
         }
-
         // gather audio options
         const freqData = parseFrequencyInput(baseFreqInput.value);
         if (!freqData) {
@@ -416,6 +406,10 @@ function initializeUI() {
         //const audioResult = generateAudioFromSymbols(symbolsArray, options);
         message.generateAudio();
 
+        const index = viewManager.addMessage(message);
+        viewManager.switchToMessageIndex(index);
+
+        //todo: make Components for these 
         updateOutput(message);
         createPianoRoll(message);
 
@@ -621,14 +615,6 @@ function initializeUI() {
     function setupAudioPlayback(message) {
         //was:     function setupAudioPlayback(audioSamples, dphiSamples, sampleRate, metadata) {
 
-
-        // Set canvas size
-        waveformCanvas.width = waveformCanvas.clientWidth;
-        waveformCanvas.height = 200;
-
-        // Initial draw
-        drawWaveform();
-
         audioControls.style.display = 'block';
         updateButtonState(false);
         countdownDiv.style.display = 'none';
@@ -788,147 +774,12 @@ function initializeUI() {
         sampleRateSelect.appendChild(option);
     });
 
-    function handleResize() {
-        if (waveformCanvas) {
-            waveformCanvas.width = waveformCanvas.clientWidth;
-            drawWaveform();
-        }
-    }
-
-    window.addEventListener('resize', handleResize);
-
-    const showModes = [ 
-        {name: "Off", "mode": "off", "zoom": 1}, 
-        {name: "Frequency Deviation", "mode": "dphi", "zoom": 1},  // aka "Unmodulated", or "frequency deviation waveform generated using the Gaussian smoothed frequency deviation pulse"
-        {name: "Frequency Deviation (zoom)", "mode": "dphi", "zoom": 16}, 
-        {name: "Waveform", "mode": "wave", "zoom": 256},
-        {name: "Oscilloscope", "mode": "wave", "zoom": 2048},
-    ];
-
     const toggleVisualizationButton = document.getElementById('toggle-visualization');
     const VisualizationCaption = document.getElementById('visualization-caption');
-    function toggleVisualization() { // todo: rename cycleVisualization
-        showMode = (showMode + 1) % showModes.length;
-        //showDphi = !showDphi;
-        VisualizationCaption.innerHTML = showModes[showMode]['name'];
-        drawWaveform();
-    }
-    toggleVisualization(); // set name on button (and turn on viz)
 
-    toggleVisualizationButton.addEventListener('click', toggleVisualization);
+    //TODO XXX
+    //toggleVisualizationButton.addEventListener('click', toggleVisualization);
 
-    function drawWaveform(currentTime = 0) {
-        const mode = showModes[showMode];
-        const showDphi = (mode['mode'] === 'dphi');
-        const off = (mode['mode'] === 'off');
-
-        if (!waveformCanvas) return;
-
-        const width = waveformCanvas.width;
-        const height = waveformCanvas.height;
-        const middle = height / 2;
-        waveformCtx.clearRect(0, 0, width, height);
-
-        if (off) return;
-
-        const message = messageManager.getCurrentMessage();
-        if (message == null) return;
-
-        const sampleRate = message.sampleRate;
-
-        waveformCtx.beginPath();
-        waveformCtx.moveTo(0, middle);
-
-        const zoomLevel = mode['zoom'];
-
-        const data = showDphi ? message.dphiSamples : message.audioSamples;
-        if (!data || data.length === 0) {
-            console.error(`No ${showDphi ? 'dphi samples' : 'audio samples'} to draw`);
-            return;
-        }
-
-        const totalDuration = data.length / sampleRate;
-        const visibleDuration = totalDuration / zoomLevel;
-        const samplesPerPixel = (sampleRate * visibleDuration) / width;
-
-        let startTime = currentTime - visibleDuration / 2;
-        let endTime = currentTime + visibleDuration / 2;
-
-        // Adjust start and end times to prevent showing blank areas
-        if (startTime < 0) {
-            startTime = 0;
-            endTime = visibleDuration;
-        } else if (endTime > totalDuration) {
-            endTime = totalDuration;
-            startTime = endTime - visibleDuration;
-        }
-
-        let startSample = Math.floor(startTime * sampleRate);
-        let endSample = Math.floor(endTime * sampleRate);
-
-        // Implement trigger-like behavior for high zoom levels
-        if (!showDphi && zoomLevel > 2000) {
-            const triggerWindowSamples = Math.floor(sampleRate * 0.01); // 0.001 = 1ms window (todo: consider actual data)
-            //const triggerThreshold = 0.1;
-            
-            for (let i = startSample; i < startSample + triggerWindowSamples; i++) {
-                if (i + 1 < data.length) {
-                    if (data[i] <= 0 && data[i + 1] > 0) {
-                        // || (Math.abs(data[i]) < triggerThreshold && Math.abs(data[i + 1]) >= triggerThreshold)) {
-
-                        //todo: should probably do some of these calcs in samples instead of time, but matching earlier calcs
-                        let newStartSample = i;
-                        let newEndTime = (i / sampleRate) + visibleDuration;
-                        if (endTime > totalDuration) {
-                            break; // trigger is too late, ignore
-                            //endTime = totalDuration;
-                            //startTime = endTime - (visibleDuration / sampleRate);
-                            //startSample = Math.floor(startTime * sampleRate); 
-                        }
-
-                        startSample = newStartSample;
-                        endSample = Math.floor(newEndTime * sampleRate);
-                        break;
-                    }
-                }
-            }
-        }
-
-        waveformCtx.beginPath();
-        waveformCtx.moveTo(0, middle);
-
-        let lastX = -1;
-        for (let sample = startSample; sample <= endSample; sample++) {
-            if (sample >= 0 && sample < data.length) {
-                const x = Math.floor((sample - startSample) / samplesPerPixel);
-                if (x !== lastX) {
-                    let y;
-                    if (showDphi) {
-                        y = data[sample]; // pre-scaled
-                    } else {
-                        y = middle + (data[sample] * middle * 0.9);
-                    }
-                    waveformCtx.lineTo(x, y);
-                    lastX = x;
-                }
-            }
-        }
-
-        waveformCtx.strokeStyle = showDphi ? 'green' : 'steelblue';
-        waveformCtx.stroke();
-
-        // Draw playback position line
-        const playbackX = ((currentTime - startTime) / visibleDuration) * width;
-        waveformCtx.beginPath();
-        waveformCtx.moveTo(playbackX, 0);
-        waveformCtx.lineTo(playbackX, height);
-        waveformCtx.strokeStyle = 'red';
-        waveformCtx.stroke();
-
-        // Update time display
-        const timeDisplay = document.getElementById('time-display');
-        timeDisplay.textContent = `${currentTime.toFixed(2)} / ${totalDuration.toFixed(2)}`;
-    }
 }
 
 if (typeof Module !== 'undefined') {

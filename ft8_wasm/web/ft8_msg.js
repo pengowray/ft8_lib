@@ -1,7 +1,15 @@
-class FT8Message {
+class FT8Message extends EventTarget {
+    /**
+     * 
+     * @param {string} inputText 
+     */
     constructor(inputText) {
+      super();
+
       this.inputText = inputText;
-      this.inputType = null;
+      this.inputType = null; // can be manual set, otherwise auto-detected
+
+      // results of encoding
       this.encodeError = null;
       this.encodeError_ft8lib = null;
       //this.encodedData = null;
@@ -10,23 +18,36 @@ class FT8Message {
 
       this.reDecodedResult = null;
 
-      this.audioSamples = null;
-      this.dphiSamples = null;
-      this.metadata = null;
-
+      // overrides of defaults
       this.baseFrequency = null; // 1000
       this.sampleRate = null; // 12000
       this.toneSpacing = null; // 6.25
       this.customToneFrequencies = null;
       this.symbolBT = null; // 2.0
       this.symbolPeriod = null; // 0.160
+      //this.numOfSymbols = null; // 79 (todo)
 
       // for playing
+      this.isPlaying = false; // == (audioSource != null)
+      this.playStartTime = null;
+      this.queuingStartedAt = null; // if playing is queued for next 15s
+
       this.audioContext = null;
       this.audioBuffer = null;
       this.channelData = null;
       this.audioSource = null; // only not null while playing
 
+      // ViewManager for reporting audio stop/start/queued/etc
+      this.viewManager = null;
+      
+      // setup Event Listeners
+      //this.dispatchEvent(new Event('queue'));
+      //this.dispatchEvent(new Event('play'));
+      //this.dispatchEvent(new Event('pause'));
+      //this.audioSource.onended = () => this.dispatchEvent(new Event('stop'));
+
+      //usage example:
+      //msg.addEventListener('play', () => console.log('Audio started playing'));
     }
     detectInputType() {
         this.inputType = doDetectInputType(this.inputText);
@@ -156,8 +177,44 @@ class FT8Message {
         this.audioBuffer = this.audioContext.createBuffer(1, this.audioSamples.length, sampleRate);
         this.channelData = this.audioBuffer.getChannelData(0);
         this.channelData.set(this.audioSamples);
-        
+    }
 
+    queueAudio() {
+        if (viewManager) viewManager.onQueue(this);
+        this.dispatchEvent(new Event('queue'));
+        //TODO
+    }
+
+    playAudio() {
+        //if (this.audioSource) { return; /* already playing */ }
+        if (this.isPlaying) return;
+
+        this.readyAudioAndBuffer();
+        if (!this.audioBuffer) return;
+        
+        const msg = this;
+        msg.isPlaying = true;
+
+        this.audioContext.resume().then(() => {
+            msg.audioSource = msg.audioContext.createBufferSource();
+            msg.audioSource.buffer = msg.audioBuffer;
+            msg.audioSource.connect(msg.audioContext.destination);
+            msg.audioSource.start();
+            msg.audioSource.onended = () => this.resetAudioState();
+            if (this.viewManager) this.viewManager.onPlay(this);
+
+            msg.playStartTime = msg.audioContext.currentTime;
+        });
+    }
+    
+    resetAudioState() {
+        this.isPlaying = false;
+        if (this.audioSource) this.audioSource.onended = null;
+        if (this.audioSource) this.audioSource.stop();
+        this.queuingStartedAt = null;
+        //this.clearAudioAndBuffer();
+        if (this.viewManager) this.viewManager.onStop(this);
+        this.dispatchEvent(new Event('stop'));
     }
 
     getSampleRate() {
@@ -266,35 +323,9 @@ class FT8Message {
             Module._free(metadataJsonPtr);
         }
     }
-
   }
   
-  class MessageManager {
-    constructor() {
-      this.messages = [];
-      this.currentMessageIndex = -1;
-    }
-  
-    createMessage(inputText) {
-      const message = new FT8Message(inputText);
-      this.messages.push(message);
-      this.currentMessageIndex = this.messages.length - 1;
-      return message;
-    }
-  
-    /**
-     * @returns {FT8Message}
-     */
-    getCurrentMessage() {
-        if (this.currentMessageIndex === -1) {
-            return null;
-        } else {
-            return this.messages[this.currentMessageIndex];
-        }
-    }
-  }
-  
-  function detectTelemetry(str) {
+function detectTelemetry(str) {
     //exactly 18 hex digits, or start with T:
     //note: first digit must be 0-8 if 18 digits. (not checked here)
     const trimmed = str.trim().toUpperCase();

@@ -1,0 +1,175 @@
+
+const showModes = [ 
+    {name: "Off", "mode": "off", "zoom": 1}, 
+    {name: "Frequency Deviation", "mode": "dphi", "zoom": 1},  // aka "Unmodulated", or "frequency deviation waveform generated using the Gaussian smoothed frequency deviation pulse"
+    {name: "Frequency Deviation (zoom)", "mode": "dphi", "zoom": 16}, 
+    {name: "Waveform", "mode": "wave", "zoom": 256},
+    {name: "Oscilloscope", "mode": "wave", "zoom": 2048},
+];
+
+class VisualizationComponent extends Component {
+    create() {
+        //note: container must already contain a canvas element
+        
+        this.updateOn = 'frame';
+
+        this.showMode = 0;
+
+        this.canvas = this.container.getElementById('waveform-canvas');
+        this.ctx = this.canvas.getContext('2d');
+
+        // TODO: move to a separate component
+        this.timeDisplay = this.container.getElementById('time-display'); 
+
+        this.canvas.width = this.canvas.clientWidth;
+        this.canvas.height = 200;
+        
+        this.toggleVisualization();
+
+        window.addEventListener('resize', this.handleResize);
+    }
+
+    initialUpdate() {
+        if (!this.element || !this.ctx) return;
+        // Set up initial state, like canvas size
+    }
+
+    handleResize() {
+        if (waveformCanvas) {
+            waveformCanvas.width = waveformCanvas.clientWidth;
+            drawWaveform();
+        }
+    }
+
+    messageUpdate() {
+        // Update any cached data that depends on the message
+    }
+
+    frameUpdate(currentTime = 0) {
+        const canvas = this.canvas;
+        const ctx = this.ctx;
+
+        // Update time display
+        if (this.timeDisplay && this.timeDisplay.textContent) {
+            this.timeDisplay.textContent = `${currentTime.toFixed(2)} / ${totalDuration.toFixed(2)}`;
+        }
+        
+        const mode = showModes[this.showMode];
+        const showDphi = (mode['mode'] === 'dphi');
+        const off = (mode['mode'] === 'off');
+
+        if (!canvas) return;
+
+        const width = canvas.width;
+        const height = canvas.height;
+        const middle = height / 2;
+        ctx.clearRect(0, 0, width, height);
+
+        if (off) return;
+
+        const message = this.message; // messageManager.getCurrentMessage();
+        if (message == null) return;
+
+        const sampleRate = message.sampleRate;
+
+        ctx.beginPath();
+        ctx.moveTo(0, middle);
+
+        const zoomLevel = mode['zoom'];
+
+        const data = showDphi ? message.dphiSamples : message.audioSamples;
+        if (!data || data.length === 0) {
+            console.error(`No ${showDphi ? 'dphi samples' : 'audio samples'} to draw`);
+            return;
+        }
+
+        const totalDuration = data.length / sampleRate;
+        const visibleDuration = totalDuration / zoomLevel;
+        const samplesPerPixel = (sampleRate * visibleDuration) / width;
+
+        let startTime = currentTime - visibleDuration / 2;
+        let endTime = currentTime + visibleDuration / 2;
+
+        // Adjust start and end times to prevent showing blank areas
+        if (startTime < 0) {
+            startTime = 0;
+            endTime = visibleDuration;
+        } else if (endTime > totalDuration) {
+            endTime = totalDuration;
+            startTime = endTime - visibleDuration;
+        }
+
+        let startSample = Math.floor(startTime * sampleRate);
+        let endSample = Math.floor(endTime * sampleRate);
+
+        // Implement trigger-like behavior for high zoom levels
+        if (!showDphi && zoomLevel > 2000) {
+            const triggerWindowSamples = Math.floor(sampleRate * 0.01); // 0.001 = 1ms window (todo: consider actual data)
+            //const triggerThreshold = 0.1;
+            
+            for (let i = startSample; i < startSample + triggerWindowSamples; i++) {
+                if (i + 1 < data.length) {
+                    if (data[i] <= 0 && data[i + 1] > 0) {
+                        // || (Math.abs(data[i]) < triggerThreshold && Math.abs(data[i + 1]) >= triggerThreshold)) {
+
+                        //todo: should probably do some of these calcs in samples instead of time, but matching earlier calcs
+                        let newStartSample = i;
+                        let newEndTime = (i / sampleRate) + visibleDuration;
+                        if (endTime > totalDuration) {
+                            break; // trigger is too late, ignore
+                            //endTime = totalDuration;
+                            //startTime = endTime - (visibleDuration / sampleRate);
+                            //startSample = Math.floor(startTime * sampleRate); 
+                        }
+
+                        startSample = newStartSample;
+                        endSample = Math.floor(newEndTime * sampleRate);
+                        break;
+                    }
+                }
+            }
+        }
+
+        ctx.beginPath();
+        ctx.moveTo(0, middle);
+
+        let lastX = -1;
+        for (let sample = startSample; sample <= endSample; sample++) {
+            if (sample >= 0 && sample < data.length) {
+                const x = Math.floor((sample - startSample) / samplesPerPixel);
+                if (x !== lastX) {
+                    let y;
+                    if (showDphi) {
+                        y = data[sample]; // pre-scaled
+                    } else {
+                        y = middle + (data[sample] * middle * 0.9);
+                    }
+                    ctx.lineTo(x, y);
+                    lastX = x;
+                }
+            }
+        }
+
+        ctx.strokeStyle = showDphi ? 'green' : 'steelblue';
+        ctx.stroke();
+
+        // Draw playback position line
+        const playbackX = ((currentTime - startTime) / visibleDuration) * width;
+        ctx.beginPath();
+        ctx.moveTo(playbackX, 0);
+        ctx.lineTo(playbackX, height);
+        ctx.strokeStyle = 'red';
+        ctx.stroke();
+
+    }
+
+    toggleVisualization() { // todo: rename cycleVisualization
+        showMode = (showMode + 1) % showModes.length;
+        //showDphi = !showDphi;
+        if (this.VisualizationCaption) this.VisualizationCaption.innerHTML = showModes[showMode]['name'];
+        //drawWaveform();
+    }
+    //toggleVisualization(); // set name on button (and turn on viz)
+
+}
+

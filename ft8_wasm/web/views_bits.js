@@ -3,7 +3,7 @@ class TribbleComponent extends Component {
         super(index, container);
         this.gridContainer = null;
         this.currentSymbol = 0;
-        this.rows = ['bits', 'symbols', 'packed', 'annotations'];
+        this.rows = [ 'packed', 'symbols', 'bits', 'annotations'];
     }
 
     create() {
@@ -11,7 +11,7 @@ class TribbleComponent extends Component {
         this.gridContainer.className = 'bits-grid-container';
         this.container.appendChild(this.gridContainer);
 
-        this.createToggleButtons();
+        //this.createToggleButtons();
     }
 
     createToggleButtons() {
@@ -35,13 +35,31 @@ class TribbleComponent extends Component {
         }
     }
 
-    messageUpdate() {
-        this.gridContainer.innerHTML = '';
-        if (!this.message || !this.message.packedData) return;
+    messageUpdate() { 
+        //const output = this.container;
+        //output.innerHTML = "";
 
-        const symbols = this.message.symbolsText;
+        this.gridContainer.innerHTML = '';
+
+        if (!this.message || !this.message.packedData) return;
+        
+        const message = this.message;
+
+        // old: //function updateOutput(result, inputType, originalInput) {
+
+        //console.log(packedData);
+        const packedData = message.packedData;
+
+        const syncCheckResult = message.getSyncCheck();
+        const crcCheckResult = message.getCRCCheck();
+        const parityCheckResult = message.getParityCheck();
+
+        const symbols = message.symbolsText;
         const bits = symbolsToBitsStr(symbols);
-        const packed = packedToHexStrSp(this.message.packedData);
+        const packed = packedToHexStrSp(packedData);
+
+        const messageType = message.ft8MessageType; // e.g. "0.0" or "3"
+        const messageInfo = getFT8MessageTypeName(messageType); // 
 
         this.createGrid(symbols, bits, packed);
         this.addAnnotations();
@@ -98,11 +116,12 @@ class TribbleComponent extends Component {
     }
 
     createPackedElement(packedByte, index) {
+        let bitspan = (index === 9) ? 5 : 8; // last byte is 5 bits (77 bits total)
         const packedElement = document.createElement('div');
         packedElement.className = 'packed';
         packedElement.textContent = packedByte;
         packedElement.dataset.index = index;
-        packedElement.style.gridColumn = `${index * 8 + 22} / span 8`;
+        packedElement.style.gridColumn = `${index * 8 + 22} / span ${bitspan}`;
         return packedElement;
     }
 
@@ -112,18 +131,26 @@ class TribbleComponent extends Component {
         annotationsRow.style.display = 'contents';
         
         // Example annotations (adjust as needed for your message structure)
-        this.addAnnotation(annotationsRow, 'i3', 0, 3);
-        this.addAnnotation(annotationsRow, 'n3', 3, 6);
+        this.addAnnotation(annotationsRow, 'sync', 0, 21);
+        this.addAnnotation(annotationsRow, 'payload', 21, 77);
+        this.addAnnotation(annotationsRow, 'crc', 98, 10);
+        this.addAnnotation(annotationsRow, 'sync', 108, 21);
+        this.addAnnotation(annotationsRow, 'crc', 129, 4);
+        this.addAnnotation(annotationsRow, 'parity', 133, 83);
+        this.addAnnotation(annotationsRow, 'sync', 216, 21);
+
+        this.addAnnotation(annotationsRow, 'n3', 92, 3);
+        this.addAnnotation(annotationsRow, 'i3', 95, 3);
         // Add more annotations as needed
 
         this.gridContainer.appendChild(annotationsRow);
     }
 
-    addAnnotation(row, label, start, end) {
+    addAnnotation(row, label, start, len) {
         const annotation = document.createElement('div');
         annotation.className = 'annotation';
         annotation.textContent = label;
-        annotation.style.gridColumn = `${start * 3 + 1} / span ${(end - start) * 3}`;
+        annotation.style.gridColumn = `${start + 1} / span ${len}`;
         row.appendChild(annotation);
     }
 
@@ -176,4 +203,3 @@ class TribbleComponent extends Component {
     }
 
 }
-

@@ -304,69 +304,97 @@
         }
 
         /* bits visualization */
-        .bits-container {
+        .bits-grid-container {
+            display: grid;
+            gap: 1px;
             font-family: monospace;
-            white-space: nowrap;
             overflow-x: auto;
+            white-space: nowrap;
+            padding: 10px;
         }
         
-        .bits-row {
-            display: flex;
-            align-items: flex-start;
-            margin-bottom: 5px;
-        }
-        
-        .tribble {
-            display: inline-flex;
-            flex-direction: column;
-            align-items: center;
-            margin-right: 1px;
-        }
-        
-        .symbol-label {
-            width: 45px;
-            height: 20px;
+        .bit, .symbol, .packed, .annotation {
             display: flex;
             justify-content: center;
             align-items: center;
-            background-color: rgba(200, 200, 200, 0.5);
-            font-size: 12px;
+            height: 2em;
+            border: 1px solid var(--border-color);
         }
         
-        .bits {
-            display: flex;
+        .symbol {
+            font-weight: bold;
         }
         
-        .bit {
-            width: 15px;
-            height: 15px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            border: 1px solid #000;
-            font-size: 12px;
+        .symbol.costas {
+            background-color: var(--costas-bg);
         }
         
-        .bit-zero {
-            background-color: #ffcccc;
+        .symbol.data {
+            background-color: var(--data-bg);
         }
         
         .bit-one {
-            background-color: #ccffcc;
+            background-color: var(--bit-one-bg);
         }
         
-        .nibble-label {
-            width: 45px;
-            height: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background-color: rgba(150, 150, 250, 0.5);
-            font-size: 12px;
+        .bit-zero {
+            background-color: var(--bit-zero-bg);
+        }
+        
+        .packed {
+            background-color: var(--packed-bg);
+            color: var(--packed-color);
+        }
+        
+        .annotation {
+            background-color: var(--annotation-bg);
+            color: var(--annotation-color);
+            font-size: 0.8em;
         }
         
         .highlighted {
-            box-shadow: 0 0 5px 2px yellow;
+            outline: 2px solid var(--highlight-color);
+            z-index: 1;
+        }
+        
+        .toggle-container {
+            margin-bottom: 10px;
+        }
+        
+        .toggle-container button {
+            margin-right: 10px;
+        }
+        
+        /* Dark mode */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --border-color: #555;
+                --costas-bg: #2c3e50;
+                --data-bg: #34495e;
+                --bit-one-bg: #27ae60;
+                --bit-zero-bg: #c0392b;
+                --packed-bg: #7f8c8d;
+                --packed-color: #ecf0f1;
+                --annotation-bg: #8e44ad;
+                --annotation-color: #ecf0f1;
+                --highlight-color: #f39c12;
+            }
+        }
+        
+        /* Light mode */
+        @media (prefers-color-scheme: light) {
+            :root {
+                --border-color: #ccc;
+                --costas-bg: #bdc3c7;
+                --data-bg: #ecf0f1;
+                --bit-one-bg: #2ecc71;
+                --bit-zero-bg: #e74c3c;
+                --packed-bg: #95a5a6;
+                --packed-color: #2c3e50;
+                --annotation-bg: #9b59b6;
+                --annotation-color: #ffffff;
+                --highlight-color: #f39c12;
+            }
         }
         
         /* end of bits visualization */

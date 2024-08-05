@@ -70,8 +70,8 @@ class FT8Message extends EventTarget {
 
     getTiming() {
         const isPlaying = this.isPlaying;
-        const audioCurrentTime = (this.audioContext) ? this.audioContext.currentTime : null;
-        const startTime = this.playStartTime;
+        const audioCurrentTime = (this.audioContext) ? this.audioContext.currentTime : 0;
+        const startTime = this.playStartTime ?? 0;
         const currentTime =  audioCurrentTime - startTime;
         const duration = this.audioBuffer ? this.audioBuffer.duration : null;
 
@@ -85,7 +85,9 @@ class FT8Message extends EventTarget {
         //TODO: use metadata to get audio start/end/symbol durations
         let symbolDuration = 0.160; // default
         if (this.audioBuffer != null && this.audioBuffer.duration) symbolDuration = this.audioBuffer.duration / 79; // 79 symbols in FT8
-        const currentSymbolIndex = Math.floor(currentTime / symbolDuration);
+        //const currentSymbolIndex = Math.floor(currentTime / symbolDuration);
+        const currentSymbolIndex = Math.floor(audioCurrentTime / symbolDuration);
+        
         
         return { isPlaying, audioCurrentTime, startTime, currentTime, duration, remainingTime, progress, currentSymbolIndex };
     }

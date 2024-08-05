@@ -16,6 +16,7 @@
             --error-text: #aa0000;
             --warning-text: rgb(181, 112, 0);
 
+            --position-line-color: red;
             --costas-bg: #a9a9a9;
             --data-bg: #737373;
             --ramp-bg: #d0d0d0;
@@ -31,6 +32,7 @@
             --error-text: #ff0000;
             --warning-text: orange;
 
+            --position-line-color: white;
             --costas-bg: #545454;
             --data-bg: #1f1f1f;
             --ramp-bg: #333333;
@@ -395,11 +397,13 @@
 <script src="ft8_msg.js"></script>
 <script src="views.js"></script>
 <script src="views_viz.js"></script>
+<script src="views_piano.js"></script>
+<script src="views_output.js"></script>
 <script src="main.js" defer></script>
 <script>
     
 document.addEventListener('DOMContentLoaded', () => {
-    
+    initializeUI(); // main.js
 });
 </script>
 </body>

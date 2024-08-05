@@ -7,19 +7,28 @@ const showModes = [
     {name: "Oscilloscope", "mode": "wave", "zoom": 2048},
 ];
 
-class VisualizationComponent extends Component {
-    create() {
-        //note: container must already contain a canvas element
-        
-        this.updateOn = 'frame';
+class VizComponent extends Component {
 
+    constructor(index, container) {        
+        super(index, container);
+
+        this.canvas = null;
+        this.ctx = null;
+        this.timeDisplay = null;
+        this.interval = null;
+    }
+
+    create() {
+        this.updateOn = 'frame';
         this.showMode = 0;
 
-        this.canvas = this.container.getElementById('waveform-canvas');
+        //note: container must already contain a canvas element
+        this.canvas = this.container.querySelector('#waveform-canvas'); // document.getElementById('waveform-canvas');
         this.ctx = this.canvas.getContext('2d');
 
+        this.VisualizationCaption = this.container.querySelector('#visualization-caption') 
         // TODO: move to a separate component
-        this.timeDisplay = this.container.getElementById('time-display'); 
+        this.timeDisplay = this.container.querySelector('#time-display') // document.getElementById('time-display'); 
 
         this.canvas.width = this.canvas.clientWidth;
         this.canvas.height = 200;
@@ -29,23 +38,28 @@ class VisualizationComponent extends Component {
         window.addEventListener('resize', this.handleResize);
     }
 
-    initialUpdate() {
-        if (!this.element || !this.ctx) return;
-        // Set up initial state, like canvas size
-    }
-
     handleResize() {
-        if (waveformCanvas) {
-            waveformCanvas.width = waveformCanvas.clientWidth;
-            drawWaveform();
+        if (this.canvas) {
+            this.canvas.width = this.canvas.clientWidth;
+            //drawWaveform();
         }
     }
 
     messageUpdate() {
         // Update any cached data that depends on the message
+        console.log('VizComponent.messageUpdate()');
+        this.frameUpdate();
     }
 
-    frameUpdate(currentTime = 0) {
+    frameUpdate() {
+        if (this.message == null) return;
+
+        const timing = this.message.getTiming();
+        if (timing == null || !timing.isPlaying) return; // todo: or clear?
+
+        const currentTime = timing.currentTime ?? 0;
+        const totalDuration = timing.duration ?? 0;
+
         const canvas = this.canvas;
         const ctx = this.ctx;
 
@@ -83,7 +97,6 @@ class VisualizationComponent extends Component {
             return;
         }
 
-        const totalDuration = data.length / sampleRate;
         const visibleDuration = totalDuration / zoomLevel;
         const samplesPerPixel = (sampleRate * visibleDuration) / width;
 
@@ -101,6 +114,7 @@ class VisualizationComponent extends Component {
 
         let startSample = Math.floor(startTime * sampleRate);
         let endSample = Math.floor(endTime * sampleRate);
+        console.log('sample view range', startSample, endSample);
 
         // Implement trigger-like behavior for high zoom levels
         if (!showDphi && zoomLevel > 2000) {
@@ -164,12 +178,32 @@ class VisualizationComponent extends Component {
     }
 
     toggleVisualization() { // todo: rename cycleVisualization
-        showMode = (showMode + 1) % showModes.length;
+        this.showMode = (this.showMode + 1) % showModes.length;
         //showDphi = !showDphi;
-        if (this.VisualizationCaption) this.VisualizationCaption.innerHTML = showModes[showMode]['name'];
+        if (this.VisualizationCaption) this.VisualizationCaption.innerHTML = showModes[this.showMode]['name'];
+
         //drawWaveform();
     }
     //toggleVisualization(); // set name on button (and turn on viz)
 
+    onPlay() {
+        console.log('viz playing');
+
+        if (this.message == null) return;
+
+        this.message.readyAudioAndBuffer();
+
+        this.interval = setInterval(() => {
+            //const currentTime = this.message.audioContext.currentTime - this.message.startTime;
+
+            this.frameUpdate();
+
+        }, 23); // Update every 23ms
+    }
+
+
+    onStop() {
+        clearInterval(this.interval);
+    }
 }
 

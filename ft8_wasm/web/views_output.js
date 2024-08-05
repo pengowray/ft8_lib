@@ -229,7 +229,7 @@ class OutputComponent extends Component {
         } else if (typeInfo.type === '0.5') {
             explanation = `This is a telemetry message containing hexadecimal digits: ${message.replace(/^0*/g, '')}. The specific meaning depends on the implementation.`;
         } else if (/^[0-9A-F]{4,18}$/.test(message) && /[A-F]/.test(message)) { // all hex digits with at least one A-F 
-            explanation = `This message is made up of hexadecimal digits, but it is not a telemetry message type.`;
+            explanation = `This message is made up of hexadecimal digits, but it is not of the telemetry message type.`;
         } else {
             explanation = '';
             //explanation = `This appears to be a custom or non-standard message: "${message}". It doesn't match common FT8 message formats.`;

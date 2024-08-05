@@ -8,7 +8,6 @@ class ViewManager {
 
     registerComponent(component) {
         this.views.registerComponent(component);
-        component.setCurrentIndex(this.messageManager.currentMessageIndex);
     }
 
     addMessage(message) {
@@ -30,6 +29,9 @@ class ViewManager {
         this.playingMessages.add(message);
         this.queuedMessages.delete(message);
         const index = this.messageManager.getMessageIndex(message);
+        if (index === -1) return;
+
+        console.log("playing index", index, "input", message.inputText);
         this.views.getComponents(index).forEach((component) => {
             component.onPlay();
         });
@@ -73,8 +75,8 @@ class ViewManager {
     }
 
     playCurrentMessageAudio() {
-        const index = this.messageManager.getCurrentMessageIndex();
-        this.playAudioIndex(index);
+        //const index = this.messageManager.currentMessageIndex;
+        this.playAudioIndex(-1);
     }
 
     stopAllAudio() {
@@ -88,13 +90,17 @@ class ViewManager {
 
     playAudioIndex(index) {
         const message = this.messageManager.getMessage(index);
-        if (message) {
-            message.playAudio();
+        if (message == null) return false;
 
-            this.views.getComponents(index).forEach((component) => {
-                component.playAudio();
-            });
-        }
+        console.log('playing: ', message.inputText);
+
+        const success = message.playAudio();
+
+        // triggered by message.playAudio already: ? 
+        this.views.getComponents(index).forEach((component) => { component.onPlay(); });
+
+        return success;
+        
     }
 
     frameUpdate(currentTime) {
@@ -192,6 +198,7 @@ class Views {
 
     registerComponent(component) {
         this.components.push(component);
+        component.messageManager = this.messageManager;
         component.create();
         component.loadMessage(this.messageManager.getMessage(component.index));
     }
@@ -199,8 +206,7 @@ class Views {
     getComponents(messageIndex) {
         const currentIndex = this.messageManager.currentMessageIndex;
         return this.components.filter((component) =>
-            component !== null &&
-            component.index === messageIndex
+            (component !== null && component.index === messageIndex)
             || (messageIndex === -1 && component.index === currentIndex)
             || (component.index === -1 && messageIndex === currentIndex)
         );
@@ -230,30 +236,30 @@ class Component {
 
     loadMessage() {
         this.message = this.messageManager.getMessage(this.index);
-        this.messageUpdate(message);
+        this.messageUpdate();
     }
 
     loadMessage(message) {
         // called after creation or when message data changes
         this.message = message;
-        this.messageUpdate(message);
+        this.messageUpdate();
     }
 
     stopped() {
     }
 
-    messageUpdate(message) {
+    messageUpdate() {
     }
-    frameUpdate(currentTime) {
+    frameUpdate() {
     }
-    symbolUpdate(symbolIndex) {
+    symbolUpdate() {
     }
 
-    onPlay(message) {
+    onPlay() {
     }
-    onStop(message) {
+    onStop() {
     }
-    onQueue(message) {
+    onQueue() {
     }  
 
     setVisible(visible) {

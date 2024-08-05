@@ -49,6 +49,29 @@ class FT8Message extends EventTarget {
       //usage example:
       //msg.addEventListener('play', () => console.log('Audio started playing'));
     }
+
+    getTiming() {
+        const isPlaying = this.isPlaying;
+        const audioCurrentTime = (this.audioContext) ? this.audioContext.currentTime : null;
+        const startTime = this.playStartTime;
+        const currentTime =  audioCurrentTime - startTime;
+        const duration = this.audioBuffer ? this.audioBuffer.duration : null;
+
+        let remainingTime = duration - currentTime;
+        if (remainingTime < 0) remainingTime = 0;
+
+        let progress = currentTime / duration * 100;
+        if (progress < 0) progress = 0;
+        if (progress > 100) progress = 100;
+
+        //TODO: use metadata to get audio start/end/symbol durations
+        let symbolDuration = 0.160; // default
+        if (this.audioBuffer != null && this.audioBuffer.duration) symbolDuration = this.audioBuffer.duration / 79; // 79 symbols in FT8
+        const currentSymbolIndex = Math.floor(currentTime / symbolDuration);
+        
+        return { isPlaying, audioCurrentTime, startTime, currentTime, duration, remainingTime, progress, currentSymbolIndex };
+    }
+
     detectInputType() {
         this.inputType = doDetectInputType(this.inputText);
         return this.inputType;
@@ -187,10 +210,10 @@ class FT8Message extends EventTarget {
 
     playAudio() {
         //if (this.audioSource) { return; /* already playing */ }
-        if (this.isPlaying) return;
+        if (this.isPlaying) return false;
 
         this.readyAudioAndBuffer();
-        if (!this.audioBuffer) return;
+        if (!this.audioBuffer) return false;
         
         const msg = this;
         msg.isPlaying = true;
@@ -205,6 +228,7 @@ class FT8Message extends EventTarget {
 
             msg.playStartTime = msg.audioContext.currentTime;
         });
+        return true;
     }
     
     resetAudioState() {

@@ -9,20 +9,20 @@ class PianoRollComponent extends Component {
     }
     
     messageUpdate() {    
+        //console.log("piano roll: messageUpdate");
+        //const div = document.getElementById('piano-roll');
+        const div = this.container;
+        div.innerHTML = '';
 
-        //const pianoRollDiv = document.getElementById('piano-roll');
-        const pianoRollDiv = this.container;
-
-        pianoRollDiv.innerHTML = '';
-        this.positionLine = document.createElement('div');
-        this.positionLine.id = 'position-line';
-        this.positionLine.style.display = 'none'; // Initially hidden
-        pianoRollDiv.appendChild(this.positionLine);
-
-        if (this.message == null || this.message.symbols == null) return;
+        if (this.message == null || this.message.symbolsText == null) {
+            //console.log("piano roll: no message/symbols. Message:", this.message?.symbolsText);
+            return;
+        }
 
         const symbols = Array.from(this.message.symbolsText);
-        pianoRollDiv.style.gridTemplateColumns = `repeat(${symbols.length}, 1fr)`;
+        div.style.gridTemplateColumns = `repeat(${symbols.length}, 1fr)`;
+
+        //console.log('symbols', symbols);
 
         symbols.forEach((symbol, index) => {
             if (symbol === '-') return;
@@ -32,14 +32,25 @@ class PianoRollComponent extends Component {
             symbolDiv.style.gridColumn = `${index + 1} / span 1`;
             symbolDiv.dataset.index = index;
             symbolDiv.dataset.symbol = symbol;
-            pianoRollDiv.appendChild(symbolDiv);
+            div.appendChild(symbolDiv);
         });
+        
+        //position line
+        this.positionLine = document.createElement('div');
+        this.positionLine.id = 'position-line';
+        this.positionLine.style.backgroundColor = 'var(--position-line-color)'; //document.body.classList.contains('dark-mode') ? 'white' : 'red';
+        this.positionLine.style.display = 'none'; // Initially hidden
+        this.positionLine.dataset.index = -999;
+        this.positionLine.dataset.symbol = '|';
+        div.appendChild(this.positionLine);
 
+        //console.log("piano roll: done updating");
     }
 
     getSymbolBackgroundColor(index) {
         if (this.isCostasSymbol(index)) {
             return 'var(--costas-bg)';
+            //return 'var(--data-bg)';
         } else {
             return 'var(--data-bg)';
         }
@@ -50,19 +61,31 @@ class PianoRollComponent extends Component {
         return costasIndices.includes(index);
     }
 
-    onPlaying() {
+    onPlay() {
+        console.log('piano playing');
+
+        if (this.message == null) return;
+
+        this.message.readyAudioAndBuffer();
+
         // Show position line
         //const positionLine = document.getElementById('position-line');
-        const positionLine = this.positionLine;
-        positionLine.style.display = 'block';
-        positionLine.style.backgroundColor = 'var(--position-line-color)'; //document.body.classList.contains('dark-mode') ? 'white' : 'red';
+        if (this.positionLine != null) {
+            this.positionLine.style.display = 'block';
+            this.positionLine.style.backgroundColor = 'var(--position-line-color)';
+        }
 
         this.pianoRollInterval = setInterval(() => {
-            const currentTime = this.message.audioContext.currentTime - this.message.startTime;
-            this.highlightCurrentSymbol(currentTime);
-            
-            //todo: move to a separate component
-            //drawWaveform(currentTime);
+            //const currentTime = this.message.audioContext.currentTime - this.message.startTime;
+            if (this.message == null) return;
+
+            const timing = this.message?.getTiming();
+            const currentTime = timing?.currentTime;
+            //console.log('piano timing', timing);
+
+            if (currentTime == null || !timing.isPlaying) return; // todo: or clear?
+
+            this.highlightCurrentSymbol(timing);
 
             /*
             if (currentTime >= this.message.audioBuffer.duration) {
@@ -81,47 +104,64 @@ class PianoRollComponent extends Component {
         if (this.pianoRollDiv) {
             const symbols = this.pianoRollDiv.children;
             for (let i = 0; i < symbols.length; i++) {
-                symbols[i].style.backgroundColor = this.getSymbolBackgroundColor(i);
+                const symbolChar = symbols[i].dataset.symbol;
+                if (symbolChar === '|') {
+                    //continue;
+                } else if (symbolChar === '-') {
+                    symbols[i].style.display = 'none';
+                } else {
+                    symbols[i].style.backgroundColor = this.getSymbolBackgroundColor(i);
+                }
             }
         }
 
         // Hide position line
         //const positionLine = document.getElementById('position-line');
-        if (this.positionLine) {
+        if (this.positionLine != null) {
             this.positionLine.style.display = 'none';
         }
         
     }
 
-    
-    highlightCurrentSymbol(currentTime) {
+    highlightCurrentSymbol(timing) {
         const msg = this.message; //messageManager.getCurrentMessage();
-        if (!msg || !msg.audioBuffer) return;
+        if (msg == null) return;
 
-        const symbolDuration = msg.audioBuffer.duration / 79; // 79 symbols in FT8
-        currentSymbolIndex = Math.floor(currentTime / symbolDuration);
+        const currentSymbolIndex = timing.currentSymbolIndex;
         
-        const pianoRollDiv = this.pianoRollDiv; //document.getElementById('piano-roll');
-        const symbols = pianoRollDiv.children;
-        const positionLine = document.getElementById('position-line');
-        
+        const div = this.pianoRollDiv; //document.getElementById('piano-roll');
+        const symbols = div.children;
+        //const positionLine = this.positionLine; //document.getElementById('position-line');
+        //console.log('symbols.length', symbols.length, 'current symbol index', currentSymbolIndex);
+
         for (let i = 0; i < symbols.length; i++) {
-            //if (i === currentSymbolIndex) {
-            const v = symbols[i].dataset.index;
+            let v = symbols[i].dataset.index;
+            const symbol = symbols[i].dataset.symbol;
+
+            if (symbol == '|') continue; // position line, skip. (not a symbol block)
+
+            if (typeof v === 'string' && !isNaN(v)) {
+                v = parseInt(v);
+            }
+            //console.log('v', v, 'currentSymbolIndex', currentSymbolIndex);
             if (v === currentSymbolIndex) {
-                symbols[i].style.backgroundColor = this.getHighlightColor(symbols[i].dataset.symbol);
+                symbols[i].style.backgroundColor = this.getHighlightColor(symbol);
             } else {
                 symbols[i].style.backgroundColor = this.getSymbolBackgroundColor(i);
             }
         }
 
         // Update position line
-        const progress = currentTime / msg.audioBuffer.duration;
-        this.positionLine.style.left = `${progress * 100}%`;
+        if (this.positionLine != null) {
+            this.positionLine.style.left = `${timing.progress.toFixed(3)}%`;
+        }
     }
 
     getHighlightColor(symbol) {
         const colors = ['#ff6b6b', '#feca57', '#48dbfb', '#ff9ff3', '#54a0ff', '#5f27cd', '#ff6b6b', '#ff6b6b'];
+        if (typeof symbol === 'string' && !isNaN(symbol)) {
+            symbol = parseInt(symbol);
+        }
         return colors[symbol];
     }
 
@@ -131,7 +171,7 @@ class PianoRollComponent extends Component {
     handleResize() {
     }
 
-    frameUpdate(currentTime = 0) {
+    frameUpdate() {
 
     }
 

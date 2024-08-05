@@ -15,7 +15,7 @@ function initializeUI() {
     
     const viewManager = new ViewManager();
     const messageManager = viewManager.messageManager;
-    ;
+    
     //const messageManager = new MessageManager(); // from ft8_msg.js
     //window.messageManager = new MessageManager();
 
@@ -41,8 +41,13 @@ function initializeUI() {
     const countdownDiv = document.getElementById('countdown');
     const themeToggle = document.getElementById('theme-toggle');
     const exampleMessagesDiv = document.getElementById('example-messages');
+    const pianoRollDiv = document.getElementById('piano-roll');
+    const audioVisualization = document.getElementById('audio-visualization');
 
-
+    viewManager.registerComponent(new VizComponent(-1, audioVisualization));
+    viewManager.registerComponent(new PianoRollComponent(-1, pianoRollDiv));
+    viewManager.registerComponent(new OutputComponent(-1, output));
+    
     const parseFreq = (note) => {
         return parseNote(note) || parseFloat(note) || 500;
     }
@@ -160,15 +165,6 @@ function initializeUI() {
         //msg?.resetAudioState();
         viewManager.stopAllAudio();
 
-        if (countdownInterval) {
-            clearInterval(countdownInterval);
-            countdownInterval = null;
-            countdownDiv.style.display = 'none';
-        }
-        if (pianoRollInterval) {
-            clearInterval(pianoRollInterval);
-            pianoRollInterval = null;
-        }
         updateButtonState(false);
     }
 
@@ -176,45 +172,17 @@ function initializeUI() {
         msg.resetAudioState();
 
         updateButtonState(false);
-        if (pianoRollInterval) {
-            clearInterval(pianoRollInterval);
-            pianoRollInterval = null;
-        }
-        // Hide position line
-        const positionLine = document.getElementById('position-line');
-        if (positionLine) {
-            positionLine.style.display = 'none';
-        }
-        // Clear all highlights
-        const pianoRollDiv = document.getElementById('piano-roll');
-        const symbols = pianoRollDiv.children;
-        for (let i = 0; i < symbols.length; i++) {
-            symbols[i].style.backgroundColor = getSymbolBackgroundColor(i);
-        }
     }
 
     function playAudio() {
-        const msg = messageManager.getCurrentMessage();
-        msg.playAudio();
+        //const msg = messageManager.getCurrentMessage();
+        //msg.playAudio();
+        viewManager.playAudioIndex(-1);
 
         //todo: move everything below to viz components
 
         updateButtonState(true);
 
-        // Show position line
-        const positionLine = document.getElementById('position-line');
-        positionLine.style.display = 'block';
-        positionLine.style.backgroundColor = document.body.classList.contains('dark-mode') ? 'white' : 'red';
-
-        pianoRollInterval = setInterval(() => {
-            const currentTime = msg.audioContext.currentTime - startTime;
-            drawWaveform(currentTime);
-            highlightCurrentSymbol(currentTime);
-            if (currentTime >= msg.audioBuffer.duration) {
-                clearInterval(pianoRollInterval);
-                resetAudioState(msg);
-            }
-        }, 50); // Update every 50ms
     }
 
     function updateButtonState(isPlaying) {
@@ -409,12 +377,8 @@ function initializeUI() {
         const index = viewManager.addMessage(message);
         viewManager.switchToMessageIndex(index);
 
-        //todo: make Components for these 
-        updateOutput(message);
-        createPianoRoll(message);
-
         if (message.audioSamples.length > 0) {
-            setupAudioPlayback(message);
+            //setupAudioPlayback(message);
 
         } else {
             console.error("No audio data generated");
@@ -428,185 +392,6 @@ function initializeUI() {
         }
     }
 
-    /**
-     * Update the output based on the FT8Message object. 
-     * Message does not have an error.
-     * @param {FT8Message} message
-     */
-    function updateOutput(message) {
-
-        // old: //function updateOutput(result, inputType, originalInput) {
-
-        //console.log(packedData);
-        const packedData = message.packedData;
-        const symbolsText = message.symbolsText;
-        const originalInput = message.inputText;
-        const inputType = message.inputType;
-
-        console.log('symbolsText', symbolsText);
-
-        debugPrintMessageDetails(symbolsText);
-
-        //TODO: move to message object
-        const syncCheckResult = checkSync(symbolsText);
-        const crcCheckResult = checkCRC(symbolsText);
-        const parityCheckResult = checkParity(symbolsText); // LDPC
-
-        output.innerHTML = '';
-        if (inputType !== 'message') {
-            output.innerHTML += `Input type: ${message.inputType}<br>`;
-        }
-        output.innerHTML += `Symbols: ${message.symbolsText}<br>`;
-
-        output.innerHTML += `Packed: ${packedToHexStrSp(packedData)}<br>`;
-
-        // sync check (costas)
-        const syncSpan = document.createElement('span');
-        syncSpan.textContent = `Sync check: ${syncCheckResult.result}`;
-        if (syncCheckResult.result !== 'OK' ) {
-            syncSpan.style.color = 'red';
-            syncSpan.textContent += '. Unexpected symbol position(s): ' + syncCheckResult.errors.join(', ');
-            console.log('Sync', syncCheckResult);
-        }
-        output.appendChild(syncSpan);
-        output.innerHTML += "<br>";
-
-        // CRC (14-bits)
-        const crcSpan = document.createElement('span');
-        crcSpan.textContent = `CRC check: ${crcCheckResult.result}`; // "OK" or "FAILED"
-        if (crcCheckResult.result !== 'OK' ) {
-            crcSpan.style.color = 'red';
-            crcSpan.textContent += `. Expected: ${crcCheckResult.crc}, Actual: ${crcCheckResult.received}`; //TODO: only make wrong bits red 
-            //console.log('CRC', crcCheckResult);
-        }
-        output.appendChild(crcSpan);
-        output.innerHTML += "<br>";
-
-        // Parity (LDPC)
-        const paritySpan = document.createElement('span');
-        paritySpan.textContent = `Parity check: ${parityCheckResult.result}`;
-        if (parityCheckResult.result !== 'OK' ) {
-            paritySpan.style.color = 'red';
-            console.log('Parity', parityCheckResult);
-
-        }
-        output.appendChild(paritySpan);
-
-        output.innerHTML += '<br>'
-
-        // re-decoded
-        const decodedSpan = document.createElement('span');
-        let noMatchWarning;
-        if (message.reDecodedResult.success) {
-            //const decoded = result.decoded_result.decodedText
-            const decoded = message.reDecodedResult.decodedText;
-            decodedSpan.textContent = `Decoded: ${decoded}`;
-            if (inputType === 'message' && normalizeMessage(decoded) !== normalizeMessage(originalInput)) {
-                decodedSpan.className = 'warning';
-                noMatchWarning = "Decoded message does not appear to match input.";
-                if (normalizeBracketedFreeText(originalInput).toUpperCase().startsWith(decoded.toUpperCase())) {
-                    noMatchWarning = "Original message appears to be truncated.";
-                }
-            } else if (inputType === 'free text' && decoded.toUpperCase() !== normalizeBracketedFreeText(originalInput).toUpperCase()) {
-                decodedSpan.className = 'warning';
-                noMatchWarning = "Decoded message does not appear to match free text input.";
-                if (normalizeBracketedFreeText(originalInput).toUpperCase().startsWith(decoded.toUpperCase())) {
-                    noMatchWarning = "Original message has been truncated to fit 13 character limit of free text.";
-                }
-            }
-            if (noMatchWarning != null) {
-                decodedSpan.innerHTML += `<br>⚠ Decode warning: ${noMatchWarning}`;
-            }
-        } else {
-            decodedSpan.style.color = 'red';
-            decodedSpan.textContent = `Error Decoding: ${message.reDecodedResult.errorCode}: ${message.reDecodedResult.errorMessage}`;
-        }
-        output.appendChild(decodedSpan);
-
-        const messageInfo = FT8MessageTypeInfo(packedData);
-        output.innerHTML += `<br>Message Type: ${messageInfo.messageType} (${messageInfo.type})`;
-        if (message.reDecodedResult.success) {
-            output.innerHTML += `<br>Explanation: ${explainFT8Message(message.reDecodedResult.decodedText, messageInfo)}<br>`;
-        }
-
-        if (message.encodeError_ft8lib) {
-            console.log('FT8Lib error', message.encodeError_ft8lib);
-            output.innerHTML += `Fallback to free text reason: ${message.encodeError_ft8lib}<br>`;
-        }
-
-    }
-
-    function createPianoRoll(message) {
-        const symbols = Array.from(message.symbolsText);
-
-        const pianoRollDiv = document.getElementById('piano-roll');
-        pianoRollDiv.innerHTML = '';
-        pianoRollDiv.style.gridTemplateColumns = `repeat(${symbols.length}, 1fr)`;
-
-        symbols.forEach((symbol, index) => {
-            const symbolDiv = document.createElement('div');
-            symbolDiv.style.backgroundColor = getSymbolBackgroundColor(index);
-            symbolDiv.style.gridRow = `${8 - symbol} / span 1`;
-            symbolDiv.style.gridColumn = `${index + 1} / span 1`;
-            symbolDiv.dataset.index = index;
-            symbolDiv.dataset.symbol = symbol;
-            pianoRollDiv.appendChild(symbolDiv);
-        });
-
-        const positionLine = document.createElement('div');
-        positionLine.id = 'position-line';
-        positionLine.style.display = 'none'; // Initially hidden
-        pianoRollDiv.appendChild(positionLine);
-    }
-
-    function getSymbolBackgroundColor(index) {
-        if (isCostasSymbol(index)) {
-            return 'var(--costas-bg)';
-        //} else if (isRampSymbol(index)) {
-        //    return 'var(--ramp-bg)';
-        } else {
-            return 'var(--data-bg)';
-        }
-    }
-
-    function isCostasSymbol(index) {
-        const costasIndices = [0, 1, 2, 3, 4, 5, 6, 36, 37, 38, 39, 40, 41, 42, 72, 73, 74, 75, 76, 77, 78];
-        return costasIndices.includes(index);
-    }
-
-    function isRampSymbol(index) {
-        // FT8 doesn't have ramp symbols, but we'll keep this function in case of other modes
-        return false;
-    }
-
-    function highlightCurrentSymbol(currentTime) {
-        const msg = messageManager.getCurrentMessage();
-        if (!msg || !msg.audioBuffer) return;
-
-        const symbolDuration = msg.audioBuffer.duration / 79; // 79 symbols in FT8
-        currentSymbolIndex = Math.floor(currentTime / symbolDuration);
-        
-        const pianoRollDiv = document.getElementById('piano-roll');
-        const symbols = pianoRollDiv.children;
-        const positionLine = document.getElementById('position-line');
-        
-        for (let i = 0; i < symbols.length; i++) {
-            if (i === currentSymbolIndex) {
-                symbols[i].style.backgroundColor = getHighlightColor(symbols[i].dataset.symbol);
-            } else {
-                symbols[i].style.backgroundColor = getSymbolBackgroundColor(i);
-            }
-        }
-
-        // Update position line
-        const progress = currentTime / msg.audioBuffer.duration;
-        positionLine.style.left = `${progress * 100}%`;
-    }
-
-    function getHighlightColor(symbol) {
-        const colors = ['#ff6b6b', '#feca57', '#48dbfb', '#ff9ff3', '#54a0ff', '#5f27cd', '#ff6b6b', '#ff6b6b'];
-        return colors[symbol];
-    }
 
     /**
      * 
@@ -630,124 +415,6 @@ function initializeUI() {
         exampleMessagesDiv.appendChild(button);
     });
 
-    function FT8MessageTypeInfo(packedData) { 
-        //packedData : Uint8Array(10)
-        if (!packedData || packedData.length == 1 ) {
-            return { messageType: "None", type: "-" };
-        } else if ( packedData.length < 10) { 
-            return { messageType: "Unknown", type: "-" };
-        }
-
-        const bytes = packedData;
-
-        const i3 = (bytes[9] >> 3) & 0x07;
-
-        switch (i3) {
-            case 0:
-                const n3 = ((bytes[9] >> 6) & 0x03) | ((bytes[8] << 2) & 0x04); // bit[72] to bit[74] of end-padded 77-bit payload
-                switch (n3) {
-                    case 0: return { type: "0.0", messageType: "Free text message" };
-                    case 1: return { type: "0.1", messageType: "DXpedition mode" };
-                    case 2: return { type: "0.2", messageType: "Unknown / Reserved" }; // EU VHF Contest ?
-                    case 3: return { type: "0.3", messageType: "Field Day" };
-                    case 4: return { type: "0.4", messageType: "Field Day" };
-                    case 5: return { type: "0.5", messageType: "Telemetry" };
-                    case 6: return { type: "0.6", messageType: "Unknown / Reserved" }; // Contesting ?
-                    case 7: return { type: "0.7", messageType: "Unknown / Reserved" }; // Reserved for future use ?
-                }
-                break;
-            case 1: return { type: "1", messageType: "Standard message" };
-            case 2: return { type: "2", messageType: "EU VHF" };
-            case 3: return { type: "3", messageType: "ARRL RTTY Roundup" }; // ARRL RTTY Roundup exchange ?
-            case 4: return { type: "4", messageType: "Non-standard callsign" };
-            case 5: return { type: "5", messageType: "EU VHF with 6-digit grid locator" }; // EU VHF contest with 6-digit grid locator ?
-            case 6: return { type: "6", messageType: "Unknown / Reserved" };
-            case 7: return { type: "7", messageType: "Unknown / Reserved" };
-            default: return { type: `${i3}`, messageType: "Unknown" };
-        }
-
-        return { messageType: "Unknown", type: "-" };
-    }
-
-    function explainFT8Message(message, typeInfo) {
-        if (message === "Decoding failed") {
-            return '';
-        }
-
-        let typeExplanation = "";
-
-        const parts = message.trim().split(/\s+/);
-        let explanation = '';
-        console.log(parts);
-
-        function isSimpleCallsign(call) {
-            return /^[A-Z0-9]{1,6}$/.test(call);
-        }
-        function isValidCallsign(call) {
-            // at least one letter, one number, 3 to 15 characters, optional slash but not as first or last character
-            return /[A-Z]/.test(call) && /[0-9]/.test(call) && /^[A-Z0-9][A-Z0-9\/]{1,13}[A-Z0-9]$/.test(call);
-        }
-
-        function isGridLocator(grid) {
-            return /^[A-R]{2}[0-9]{2}([a-x]{2})?$/.test(grid);
-        }
-
-        function isReport(report) {
-            return /^[+-]?\d{2}$/.test(report);
-        }
-
-        if (parts.length === 2 && parts[0] === 'CQ') {
-            if (isValidCallsign(parts[1])) {
-                explanation = `This is a general call (CQ) message. Station ${parts[1]} is calling CQ, looking for any station to respond.`;
-            } else {
-                explanation = `This is an unrecognized CQ message.`;
-            }
-        } else if (parts.length === 3 && parts[0] === 'CQ') {
-            if (isValidCallsign(parts[1]) && isGridLocator(parts[2])) {
-                explanation = `This is a general call (CQ) message with location. Station ${parts[1]} is calling CQ from grid square ${parts[2]}, looking for any station to respond.`;
-            } else if (/^[A-Z]{2}$/.test(parts[1]) && isValidCallsign(parts[2])) {
-                explanation = `This is a directed CQ message. Station ${parts[2]} is calling CQ, specifically looking for stations in the ${parts[1]} region to respond.`;
-            } else {
-                explanation = `This is an unrecognized CQ message.`;
-            }
-        } else if (parts.length === 3 && isValidCallsign(parts[0]) && isValidCallsign(parts[1])) {
-            if (isReport(parts[2])) {
-                explanation = `This is a signal report message. Station ${parts[0]} is sending a signal report of ${parts[2]} dB to station ${parts[1]}.`;
-                if (parts[2] === '73') { 
-                    explanation += ' 73 is also shorthand for <i>best regards</i>.'
-                }
-            } else if (parts[2] === 'RRR') {
-                explanation = `This is an acknowledgment message. Station ${parts[0]} is confirming receipt of information from station ${parts[1]}.`;
-            } else if (parts[2] === 'RR73') {
-                explanation = `This is a combined acknowledgment and goodbye message. Station ${parts[0]} is confirming receipt and saying <i>best regards</i> to station ${parts[1]}.`;
-            } else if (parts[2] === '73') {
-                explanation = `This is a goodbye message. Station ${parts[0]} is saying goodbye to station ${parts[1]} with "73" (best regards).`;
-            } else if (isGridLocator(parts[2])) {
-                explanation = `Station ${parts[0]} is sending its grid locator ${parts[2]} to station ${parts[1]}.`;
-            } else if (parts[2].startsWith('R')) {
-                explanation = `Station ${parts[0]} is acknowledging receipt of a message from ${parts[1]} and sending a signal report of ${parts[2].slice(1)} dB.`;
-            } else {
-                explanation = `This is a message from ${parts[0]} to ${parts[1]}, but the content "${parts[2]}" is not recognized.`;
-            }
-        } else if (parts.length === 4 && isValidCallsign(parts[0]) && isValidCallsign(parts[1])) {
-            if (parts[2] === 'R' && isReport(parts[3])) {
-                explanation = `This is a signal report acknowledgment. Station ${parts[0]} is confirming receipt of a previous message and sending a signal report of ${parts[3]} dB to station ${parts[1]}.`;
-            } else {
-                explanation = `This is a message from ${parts[0]} to ${parts[1]}, but the content "${parts[2]} ${parts[3]}" is not recognized.`;
-            }
-        } else if (typeInfo.type === '0.0') { // || message.startsWith('<') && message.endsWith('>')) {
-            explanation = `This is a free-text message: "${message}".`; // Free-text messages in FT8 are limited to 13 characters.
-        } else if (typeInfo.type === '0.5') {
-            explanation = `This is a telemetry message containing hexadecimal digits: ${message.replace(/^0*/g, '')}. The specific meaning depends on the implementation.`;
-        } else if (/^[0-9A-F]{4,18}$/.test(message) && /[A-F]/.test(message)) { // all hex digits with at least one A-F 
-            explanation = `This message is made up of hexadecimal digits, but it is not a telemetry message type.`;
-        } else {
-            explanation = '';
-            //explanation = `This appears to be a custom or non-standard message: "${message}". It doesn't match common FT8 message formats.`;
-        }
-
-        return typeExplanation + explanation;
-    }
 
     themeToggle.addEventListener('click', () => {
         document.body.classList.toggle('dark-mode');
@@ -782,8 +449,10 @@ function initializeUI() {
 
 }
 
+/*
 if (typeof Module !== 'undefined') {
     Module.onRuntimeInitialized = initializeUI;
 } else {
     document.addEventListener('DOMContentLoaded', initializeUI);
 }
+*/

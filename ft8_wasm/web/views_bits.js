@@ -35,31 +35,13 @@ class TribbleComponent extends Component {
         }
     }
 
-    messageUpdate() { 
-        //const output = this.container;
-        //output.innerHTML = "";
-
+    messageUpdate() {
         this.gridContainer.innerHTML = '';
-
         if (!this.message || !this.message.packedData) return;
-        
-        const message = this.message;
 
-        // old: //function updateOutput(result, inputType, originalInput) {
-
-        //console.log(packedData);
-        const packedData = message.packedData;
-
-        const syncCheckResult = message.getSyncCheck();
-        const crcCheckResult = message.getCRCCheck();
-        const parityCheckResult = message.getParityCheck();
-
-        const symbols = message.symbolsText;
+        const symbols = this.message.symbolsText;
         const bits = symbolsToBitsStr(symbols);
-        const packed = packedToHexStr(packedData);
-
-        const messageType = message.ft8MessageType; // e.g. "0.0" or "3"
-        const messageInfo = getFT8MessageTypeName(messageType); // 
+        const packed = packedToHexStrSp(this.message.packedData);
 
         this.createGrid(symbols, bits, packed);
         this.addAnnotations();
@@ -69,41 +51,40 @@ class TribbleComponent extends Component {
         const totalColumns = symbols.length * 3;  // Each symbol corresponds to 3 bits
         this.gridContainer.style.gridTemplateColumns = `repeat(${totalColumns}, 1fr)`;
         
-        this.rows.forEach((rowType, rowIndex) => {
+        this.rows.forEach((rowType) => {
             const rowElement = document.createElement('div');
             rowElement.className = `${rowType}-row`;
-            rowElement.style.gridRow = rowIndex + 1;
-            rowElement.style.gridColumn = `1 / span ${totalColumns}`;
-            rowElement.style.display = 'grid';
-            rowElement.style.gridTemplateColumns = `repeat(${totalColumns}, 1fr)`;
+            rowElement.style.display = 'contents';
 
             if (rowType === 'bits') {
                 for (let i = 0; i < bits.length; i++) {
-                    const bitElement = this.createBitElement(bits[i], i);
-                    rowElement.appendChild(bitElement);
+                    rowElement.appendChild(this.createBitElement(bits[i], i));
                 }
             } else if (rowType === 'symbols') {
                 symbols.split('').forEach((symbol, index) => {
-                    const symbolElement = this.createSymbolElement(symbol, index);
-                    symbolElement.style.gridColumn = `${index * 3 + 1} / span 3`;
-                    rowElement.appendChild(symbolElement);
+                    rowElement.appendChild(this.createSymbolElement(symbol, index));
                 });
             } else if (rowType === 'packed') {
-                for (let i = 0; i < packed.length; i++) {
-                    const packedElement = this.createPackedElement(packed[i], i);
-                    packedElement.style.gridColumn = `${i * 8 + 22} / span 8`;  // Start from bit 22 (after sync)
-                    rowElement.appendChild(packedElement);
-                }
+                // Add spacer for sync bits
+                const spacer = document.createElement('div');
+                spacer.style.gridColumn = '1 / 22';
+                rowElement.appendChild(spacer);
+
+                packed.split(' ').forEach((byte, index) => {
+                    rowElement.appendChild(this.createPackedElement(byte, index));
+                });
             }
 
             this.gridContainer.appendChild(rowElement);
         });
     }
+
     createBitElement(bit, index) {
         const bitElement = document.createElement('div');
         bitElement.className = `bit ${bit === '1' ? 'bit-one' : 'bit-zero'}`;
         bitElement.textContent = bit;
         bitElement.dataset.index = index;
+        bitElement.style.gridColumn = index + 1;
         return bitElement;
     }
 
@@ -112,6 +93,7 @@ class TribbleComponent extends Component {
         symbolElement.className = `symbol ${this.isCostasSymbol(index) ? 'costas' : 'data'}`;
         symbolElement.textContent = symbol;
         symbolElement.dataset.index = index;
+        symbolElement.style.gridColumn = `${index * 3 + 1} / span 3`;
         return symbolElement;
     }
 
@@ -120,15 +102,21 @@ class TribbleComponent extends Component {
         packedElement.className = 'packed';
         packedElement.textContent = packedByte;
         packedElement.dataset.index = index;
+        packedElement.style.gridColumn = `${index * 8 + 22} / span 8`;
         return packedElement;
     }
 
     addAnnotations() {
-        const annotationsRow = this.gridContainer.querySelector('.annotations-row');
+        const annotationsRow = document.createElement('div');
+        annotationsRow.className = 'annotations-row';
+        annotationsRow.style.display = 'contents';
+        
         // Example annotations (adjust as needed for your message structure)
         this.addAnnotation(annotationsRow, 'i3', 0, 3);
         this.addAnnotation(annotationsRow, 'n3', 3, 6);
         // Add more annotations as needed
+
+        this.gridContainer.appendChild(annotationsRow);
     }
 
     addAnnotation(row, label, start, end) {
@@ -164,7 +152,7 @@ class TribbleComponent extends Component {
         
     onPlay() {
         this.currentSymbol = 0;
-        this.highlightCurrentTribble();
+        this.highlightCurrentSymbol();
     }
 
     onStop() {

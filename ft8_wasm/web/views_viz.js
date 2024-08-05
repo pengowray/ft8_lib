@@ -27,6 +27,9 @@ class VizComponent extends Component {
         this.ctx = this.canvas.getContext('2d');
 
         this.VisualizationCaption = this.container.querySelector('#visualization-caption') 
+        this.toggleVisualizationButton = this.container.querySelector('#toggle-visualization');
+        this.toggleVisualizationButton.onclick = () => this.toggleVisualization();
+
         // TODO: move to a separate component
         this.timeDisplay = this.container.querySelector('#time-display') // document.getElementById('time-display'); 
 
@@ -184,12 +187,13 @@ class VizComponent extends Component {
 
     toggleVisualization() { // todo: rename cycleVisualization
         this.showMode = (this.showMode + 1) % showModes.length;
-        //showDphi = !showDphi;
-        if (this.VisualizationCaption) this.VisualizationCaption.innerHTML = showModes[this.showMode]['name'];
 
-        //drawWaveform();
+        if (this.VisualizationCaption) {
+            this.VisualizationCaption.innerHTML = showModes[this.showMode]['name'];
+        }
+
+        this.frameUpdate();
     }
-    //toggleVisualization(); // set name on button (and turn on viz)
 
     onPlay() {
         console.log('viz playing');

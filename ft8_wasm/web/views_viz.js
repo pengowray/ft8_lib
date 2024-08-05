@@ -122,7 +122,6 @@ class VizComponent extends Component {
 
         let startSample = Math.floor(startTime * sampleRate);
         let endSample = Math.floor(endTime * sampleRate);
-        console.log('sample view range', startSample, endSample);
 
         // Implement trigger-like behavior for high zoom levels
         if (!showDphi && zoomLevel > 2000) {

@@ -203,6 +203,10 @@ function symbolsToBitsStr(symbols) {
     return symbols.split('').map(s => GRAY_INV[parseInt(s)].toString(2).padStart(3, '0')).join('');
 }
 
+function symbolsToBitsStrPreserveSpaces(symbols) {
+    return symbols.split('').map(s => (s === ' ') ? ' ' : GRAY_INV[parseInt(s)].toString(2).padStart(3, '0')).join('');
+}
+
 function symbolsToGrayBitsStr(symbols) {
     return symbols.split('').map(s => parseInt(s).toString(2).padStart(3, '0')).join('');
 }
@@ -226,8 +230,14 @@ function bitsToSymbols(binaryString) {
     return symbols;
 }
 
-function binary195ToSymbols(binaryString) {
 
+function grayBitsToSymbols(graybits) {
+    if (graybits.length % 3 !== 0) throw new Error("Bad input to grayBitsToSymbols");
+
+    return graybits.match(/.{3}/g).map(b => parseInt(b, 2)).join('');
+}
+
+function binary237ToSymbols(binaryString) {
     return bitsToSymbols(binaryString);
 }
 
@@ -290,10 +300,22 @@ function debugPrintMessageDetails(symbols) {
 
          + "Channel symbols (79 tones):\n"
          + "  Sync               Data               Sync               Data               Sync\n"
-         + `${symbols.slice(0, 7)} ${symbols.slice(7, 36)} ${symbols.slice(36, 43)} ${symbols.slice(43, 72)} ${symbols.slice(72)}\n`);
+         + symbolsPretty(symbols) + "\n\n");
+
+         //console.log(symbols.slice(0, 7));
+         console.log('graycode:', symbolsToGrayBitsStr(symbols));
+
     } else if (symbols && symbols.length > 0) {
         console.log(`Symbols (not 79): '${symbols}'`);
     }
+}
+
+function symbolsPretty(symbols) {
+    return `${symbols.slice(0, 7)} ${symbols.slice(7, 36)} ${symbols.slice(36, 43)} ${symbols.slice(43, 72)} ${symbols.slice(72)}`
+}
+
+function symbolsToPrettyBinary(symbols) {
+    return symbolsToBitsStrPreserveSpaces(symbolsPretty(symbols));
 }
 
 const FT8_CRC_WIDTH = 14;

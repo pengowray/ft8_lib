@@ -32,9 +32,12 @@ class OutputComponent extends Component {
         if (inputType !== 'message') {
             output.innerHTML += `Input type: ${message.inputType}<br>`;
         }
-        output.innerHTML += `Symbols: ${message.symbolsText}<br>`;
+        //output.innerHTML += `Symbols: ${message.symbolsText}<br>`;
+        output.innerHTML += `Symbols:<br>${symbolsPretty(message.symbolsText)}<br>`;
 
-        output.innerHTML += `Packed: ${packedToHexStrSp(packedData)}<br>`;
+        output.innerHTML += `Packed:<br>${packedToHexStrSp(packedData)}<br>`;
+
+        output.innerHTML += `Message (77 bits):<br>${(symbolsToBitsStrNoCosta(message.symbolsText).slice(0, 77))}<br>`;
 
         // sync check (costas)
         const syncSpan = document.createElement('span');

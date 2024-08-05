@@ -137,8 +137,11 @@ class FT8Message extends EventTarget {
             case '77 bits + CRC + LDPC':
                 this.symbolsText = binary174ToSymbols(normalizeBinary(input));
                 break;
-            case 'symbols (as binary)':
-                this.symbolsText = binary195ToSymbols(normalizeBinary(input));
+            case '237 bits (binary)': // symbols (as normal binary, including sync)
+                this.symbolsText = binary237ToSymbols(normalizeBinary(input));
+                break;
+            case '237 bits (graycode)': // symbols (as graycode bits, including sync)
+                this.symbolsText = grayBitsToSymbols(input);
                 break;
             default:
                 input = normalizeMessage(input);
@@ -458,13 +461,20 @@ function doDetectInputType(inputOriginal) {
     const normBinary = normalizeBinary(input);
     if (/^[0-1]+$/.test(normBinary)) {
         if (normBinary.length === 77) {
-        return '77 bits'; // Source-encoded message, 77 bits
+            return '77 bits'; // Source-encoded message, 77 bits
         } else if (normBinary.length === 91) { // 77 + 14 bits
-        return '77 bits + CRC';
+            return '77 bits + CRC';
         } else if (normBinary.length === 174) { // 77 + 14 + 83 bits
-        return '77 bits + CRC + LDPC'
-        } else if (normBinary.length === 77 + 14 + 83 + 21) { // costas as binary
-        return 'symbols (as binary)'
+            return '77 bits + CRC + LDPC'
+        } else if (normBinary.length === 237) { // 77 + 14 + 83 + 21*3
+            //const normBinary = '010001110000101100011';
+            const grayCosta = "011001100000110101010";
+            if (normBinary.startsWith(grayCosta) || normBinary.endsWith(grayCosta) || normBinary.slice(108, 129) == grayCosta) {
+                return '237 bits (graycode)';
+            }
+            return '237 bits (binary)'
+        } else {
+            //TODO: warning
         }
     } 
 

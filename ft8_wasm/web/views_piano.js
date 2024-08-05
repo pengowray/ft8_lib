@@ -1,11 +1,9 @@
 class PianoRollComponent extends Component {
     create() {
-        //this.pianoRollDiv = pianoRollDiv; // document.container.getElementById('piano-roll');
+        //this.container = document.container.getElementById('piano-roll');
         //window.addEventListener('resize', this.handleResize);
 
-        this.pianoRollInterval = null;
-
-        this.pianoRollDiv = this.container;
+        this.interval = null;
     }
     
     messageUpdate() {    
@@ -75,7 +73,7 @@ class PianoRollComponent extends Component {
             this.positionLine.style.backgroundColor = 'var(--position-line-color)';
         }
 
-        this.pianoRollInterval = setInterval(() => {
+        this.interval = setInterval(() => {
             //const currentTime = this.message.audioContext.currentTime - this.message.startTime;
             if (this.message == null) return;
 
@@ -87,22 +85,15 @@ class PianoRollComponent extends Component {
 
             this.highlightCurrentSymbol(timing);
 
-            /*
-            if (currentTime >= this.message.audioBuffer.duration) {
-                clearInterval(this.pianoRollInterval);
-                resetAudioState(msg);
-            }
-                */
-
         }, 50); // Update every 50ms
     }
 
     onStop() {
-        clearInterval(this.pianoRollInterval);
+        clearInterval(this.interval);
 
         // Clear all highlights
-        if (this.pianoRollDiv) {
-            const symbols = this.pianoRollDiv.children;
+        if (this.container) {
+            const symbols = this.container.children;
             for (let i = 0; i < symbols.length; i++) {
                 const symbolChar = symbols[i].dataset.symbol;
                 if (symbolChar === '|') {
@@ -129,10 +120,10 @@ class PianoRollComponent extends Component {
 
         const currentSymbolIndex = timing.currentSymbolIndex;
         
-        const div = this.pianoRollDiv; //document.getElementById('piano-roll');
+        const div = this.container; //document.getElementById('piano-roll');
         const symbols = div.children;
         //const positionLine = this.positionLine; //document.getElementById('position-line');
-        //console.log('symbols.length', symbols.length, 'current symbol index', currentSymbolIndex);
+        //console.log('symbols.length', symbols.length, 'current symbol index', currentSymbolIndex, timing);
 
         for (let i = 0; i < symbols.length; i++) {
             let v = symbols[i].dataset.index;

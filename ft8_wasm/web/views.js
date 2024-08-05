@@ -96,11 +96,10 @@ class ViewManager {
 
         const success = message.playAudio();
 
-        // triggered by message.playAudio already: ? 
-        this.views.getComponents(index).forEach((component) => { component.onPlay(); });
+        // triggered by message.playAudio already
+        //this.views.getComponents(index).forEach((component) => { component.onPlay(); });
 
         return success;
-        
     }
 
     frameUpdate(currentTime) {

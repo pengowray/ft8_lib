@@ -70,9 +70,11 @@ class FT8Message extends EventTarget {
 
     getTiming() {
         const isPlaying = this.isPlaying;
-        const audioCurrentTime = (this.audioContext) ? this.audioContext.currentTime : 0;
+        const audioCurrentTime = (this.audioContext) ? this.audioContext.currentTime : null;
+        //const startTime = this.playStartTime;
         const startTime = this.playStartTime ?? 0;
         const currentTime =  audioCurrentTime - startTime;
+        //const currentTime =  audioCurrentTime;
         const duration = this.audioBuffer ? this.audioBuffer.duration : null;
 
         let remainingTime = duration - currentTime;
@@ -85,11 +87,10 @@ class FT8Message extends EventTarget {
         //TODO: use metadata to get audio start/end/symbol durations
         let symbolDuration = 0.160; // default
         if (this.audioBuffer != null && this.audioBuffer.duration) symbolDuration = this.audioBuffer.duration / 79; // 79 symbols in FT8
-        //const currentSymbolIndex = Math.floor(currentTime / symbolDuration);
-        const currentSymbolIndex = Math.floor(audioCurrentTime / symbolDuration);
+        const currentSymbolIndex = Math.floor(currentTime / symbolDuration);
+        //const currentSymbolIndex = Math.floor(audioCurrentTime / symbolDuration);
         
-        
-        return { isPlaying, audioCurrentTime, startTime, currentTime, duration, remainingTime, progress, currentSymbolIndex };
+        return { isPlaying, audioCurrentTime, startTime,  currentTime, duration, remainingTime, progress, currentSymbolIndex };
     }
 
     detectInputType() {
@@ -194,7 +195,7 @@ class FT8Message extends EventTarget {
         //this.metadata = null;
         this.audioBuffer = null;
         this.channelData = null;
-        //this.audioContext = null; // stop audio first?
+        //this.audioContext = null; // reuse? stop audio first?
         this.audioSource = null;
     }
 
@@ -225,10 +226,13 @@ class FT8Message extends EventTarget {
         const sampleRate = this.getSampleRate(); // message.getOptions().sampleRate;
         //const metadata = message.metadata;
 
-        this.audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: sampleRate });
-        this.audioBuffer = this.audioContext.createBuffer(1, this.audioSamples.length, sampleRate);
-        this.channelData = this.audioBuffer.getChannelData(0);
-        this.channelData.set(this.audioSamples);
+        //this.audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: sampleRate });
+        this.audioContext = this.audioContext || new window.AudioContext({ sampleRate: sampleRate });
+        this.audioBuffer = this.audioBuffer || this.audioContext.createBuffer(1, this.audioSamples.length, sampleRate);
+        if (this.channelData == null) {
+            this.channelData = this.audioBuffer.getChannelData(0);
+            this.channelData.set(this.audioSamples);
+        }
     }
 
     queueAudio() {
@@ -248,6 +252,7 @@ class FT8Message extends EventTarget {
         msg.isPlaying = true;
 
         this.audioContext.resume().then(() => {
+            console.log("Audio context resumed");
             msg.audioSource = msg.audioContext.createBufferSource();
             msg.audioSource.buffer = msg.audioBuffer;
             msg.audioSource.connect(msg.audioContext.destination);
@@ -261,6 +266,7 @@ class FT8Message extends EventTarget {
     }
     
     resetAudioState() {
+        console.log("resetAudioState (stopping)");
         this.isPlaying = false;
         if (this.audioSource) this.audioSource.onended = null;
         if (this.audioSource) this.audioSource.stop();

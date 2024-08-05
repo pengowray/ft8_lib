@@ -4,6 +4,7 @@ class TribbleComponent extends Component {
         this.gridContainer = null;
         this.currentSymbol = 0;
         this.rows = [ 'packed', 'symbols', 'bits', 'annotations'];
+        this.interval = null;
     }
 
     create() {
@@ -165,6 +166,7 @@ class TribbleComponent extends Component {
         const bitsRow = this.gridContainer.querySelector('.bits-row');
         
         const currentSymbolElement = symbolsRow.children[this.currentSymbol];
+        console.log('currentSymbolElement', currentSymbolElement);
         if (currentSymbolElement) {
             currentSymbolElement.classList.add('highlighted');
             for (let i = this.currentSymbol * 3; i < this.currentSymbol * 3 + 3; i++) {
@@ -180,9 +182,15 @@ class TribbleComponent extends Component {
     onPlay() {
         this.currentSymbol = 0;
         this.highlightCurrentSymbol();
+
+        this.interval = setInterval(() => {
+            this.frameUpdate();
+        }, 50); // Update every 50ms
+
     }
 
     onStop() {
+        if (this.interval) clearInterval(this.interval);
         this.clearHighlights();
     }
 
@@ -199,7 +207,5 @@ class TribbleComponent extends Component {
     initialUpdate() {
     }
 
-    frameUpdate() {
-    }
 
 }

@@ -131,18 +131,25 @@ class TribbleComponent extends Component {
         annotationsRow.className = 'annotations-row';
         annotationsRow.style.display = 'contents';
         
-        // Example annotations (adjust as needed for your message structure)
         this.addAnnotation(annotationsRow, 'sync', 0, 21);
+        this.addAnnotation(annotationsRow, 'data', 21, 87);
+        this.addAnnotation(annotationsRow, 'sync', 108, 21);
+        this.addAnnotation(annotationsRow, 'data', 129, 87);
+        this.addAnnotation(annotationsRow, 'sync', 216, 21);
+
+        //this.addAnnotation(annotationsRow, 'sync', 0, 21);
         this.addAnnotation(annotationsRow, 'payload', 21, 77);
         this.addAnnotation(annotationsRow, 'crc', 98, 10);
-        this.addAnnotation(annotationsRow, 'sync', 108, 21);
+        //this.addAnnotation(annotationsRow, 'sync', 108, 21);
         this.addAnnotation(annotationsRow, 'crc', 129, 4);
         this.addAnnotation(annotationsRow, 'parity', 133, 83);
-        this.addAnnotation(annotationsRow, 'sync', 216, 21);
+        //this.addAnnotation(annotationsRow, 'sync', 216, 21);
 
         this.addAnnotation(annotationsRow, 'n3', 92, 3);
         this.addAnnotation(annotationsRow, 'i3', 95, 3);
-        // Add more annotations as needed
+
+        var message = this.message;
+        var msgType = message.ft8MessageType;
 
         this.gridContainer.appendChild(annotationsRow);
     }
@@ -151,6 +158,8 @@ class TribbleComponent extends Component {
         const annotation = document.createElement('div');
         annotation.className = 'annotation';
         annotation.textContent = label;
+        annotation.title = `start: ${(start * 0.160).toFixed(2)}s\nduration: ${(len * 0.160).toFixed(2)}s.`;
+
         annotation.style.gridColumn = `${start + 1} / span ${len}`;
         row.appendChild(annotation);
     }

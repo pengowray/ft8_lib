@@ -24,10 +24,9 @@ class OutputComponent extends Component {
 
         debugPrintMessageDetails(symbolsText);
 
-        //TODO: move to message object
-        const syncCheckResult = checkSync(symbolsText);
-        const crcCheckResult = checkCRC(symbolsText);
-        const parityCheckResult = checkParity(symbolsText); // LDPC
+        const syncCheckResult = message.getSyncCheck();
+        const crcCheckResult = message.getCRCCheck();
+        const parityCheckResult = message.getParityCheck();
 
         output.innerHTML = '';
         if (inputType !== 'message') {
@@ -100,8 +99,10 @@ class OutputComponent extends Component {
         }
         output.appendChild(decodedSpan);
 
-        const messageInfo = this.FT8MessageTypeInfo();
-        output.innerHTML += `<br>Message Type: ${messageInfo.messageType} (${messageInfo.type})`;
+        const messageType = message.ft8MessageType;
+        const messageInfo = getFT8MessageTypeName(messageType);
+
+        output.innerHTML += `<br>Message Type: ${messageInfo} (${messageType})`;
         if (message.reDecodedResult.success) {
             output.innerHTML += `<br>Explanation: ${this.explainFT8Message(message.reDecodedResult.decodedText, messageInfo)}<br>`;
         }

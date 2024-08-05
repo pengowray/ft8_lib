@@ -200,8 +200,11 @@ const GRAY_INV = [0, 1, 3, 2, 6, 4, 5, 7];
 const GRAY_OFF = [0, 1, 2, 3, 4, 5, 6, 7];
 
 function symbolsToBitsStr(symbols) {
-    console.log(symbols);
     return symbols.split('').map(s => GRAY_INV[parseInt(s)].toString(2).padStart(3, '0')).join('');
+}
+
+function symbolsToGrayBitsStr(symbols) {
+    return symbols.split('').map(s => parseInt(s).toString(2).padStart(3, '0')).join('');
 }
 
 function symbolsToBitsStrNoCosta(symbols) {
@@ -713,3 +716,54 @@ const decodeFT8PackedData = (packedData) => {
         errorMessage: result.errorMessage
     };
 };
+/**
+ * Extracts the FT8 message type from packed message data.
+ * 
+ * This function interprets the last 6 bits of a 77-bit FT8 message payload:
+ * - Bits 74-76 (i3) determine the primary message type (0-7)
+ * - For type 0, bits 71-73 (n3) determine the subtype (0.0 - 0.7)
+ * 
+ * The function returns the type as a string:
+ * - "0.0" to "0.7" for type 0 messages
+ * - "1" to "7" for other types
+ * - "-" for invalid or insufficient input data
+ * 
+ * @param {Uint8Array} packedData - The packed 77-bit message payload (10 bytes)
+ * @returns {string} The extracted message type
+ */
+function getFT8MessageType(packedData) {
+    if (!packedData || packedData.length < 10) {
+        return "-";
+    }
+    
+    const i3 = (packedData[9] >> 3) & 0x07;
+    
+    if (i3 === 0) {
+         // n3: bit[72] to bit[74] of end-padded 77-bit payload
+        const n3 = ((packedData[9] >> 6) & 0x03) | ((packedData[8] << 2) & 0x04);
+        return `0.${n3}`;
+    }
+    
+    return i3.toString();
+}
+
+function getFT8MessageTypeName(type) {
+    switch (type) {
+        case "0.0": return "Free text message";
+        case "0.1": return "DXpedition mode";
+        case "0.2": return "Unknown / Reserved";
+        case "0.3": return "Field Day";
+        case "0.4": return "Field Day";
+        case "0.5": return "Telemetry";
+        case "0.6": return "Unknown / Reserved";
+        case "0.7": return "Unknown / Reserved";
+        case "1": return "Standard message";
+        case "2": return "EU VHF";
+        case "3": return "ARRL RTTY Roundup";
+        case "4": return "Non-standard callsign";
+        case "5": return "EU VHF with 6-digit grid locator";
+        case "6": return "Unknown / Reserved";
+        case "7": return "Unknown / Reserved";
+        default: return "Unknown";
+    }
+}

@@ -3,6 +3,7 @@ class TribbleComponent extends Component {
         super(index, container);
         this.gridContainer = null;
         this.currentSymbol = 0;
+        this.rows = ['bits', 'symbols', 'packed', 'annotations'];
     }
 
     create() {
@@ -10,7 +11,6 @@ class TribbleComponent extends Component {
         this.gridContainer.className = 'bits-grid-container';
         this.container.appendChild(this.gridContainer);
 
-        // Add toggle buttons for different parts
         this.createToggleButtons();
     }
 
@@ -18,21 +18,21 @@ class TribbleComponent extends Component {
         const toggleContainer = document.createElement('div');
         toggleContainer.className = 'toggle-container';
         
-        const parts = ['Symbols', 'Bits', 'Packed Data'];
-        parts.forEach(part => {
+        this.rows.forEach(row => {
             const button = document.createElement('button');
-            button.textContent = `Toggle ${part}`;
-            button.onclick = () => this.togglePart(part.toLowerCase().replace(' ', '-'));
+            button.textContent = `Toggle ${row}`;
+            button.onclick = () => this.toggleRow(row);
             toggleContainer.appendChild(button);
         });
 
         this.container.insertBefore(toggleContainer, this.gridContainer);
     }
-    togglePart(part) {
-        const elements = this.gridContainer.querySelectorAll(`.${part}`);
-        elements.forEach(el => {
-            el.style.display = el.style.display === 'none' ? '' : 'none';
-        });
+
+    toggleRow(row) {
+        const rowElement = this.gridContainer.querySelector(`.${row}-row`);
+        if (rowElement) {
+            rowElement.style.display = rowElement.style.display === 'none' ? '' : 'none';
+        }
     }
 
     messageUpdate() { 
@@ -56,7 +56,7 @@ class TribbleComponent extends Component {
 
         const symbols = message.symbolsText;
         const bits = symbolsToBitsStr(symbols);
-        const packed = packedToHexStrSp(packedData);
+        const packed = packedToHexStr(packedData);
 
         const messageType = message.ft8MessageType; // e.g. "0.0" or "3"
         const messageInfo = getFT8MessageTypeName(messageType); // 
@@ -64,84 +64,79 @@ class TribbleComponent extends Component {
         this.createGrid(symbols, bits, packed);
         this.addAnnotations();
     }
+
     createGrid(symbols, bits, packed) {
-        const gridTemplate = [];
-        let bitIndex = 0;
-        let packedIndex = 0;
+        const totalColumns = symbols.length * 3;  // Each symbol corresponds to 3 bits
+        this.gridContainer.style.gridTemplateColumns = `repeat(${totalColumns}, 1fr)`;
+        
+        this.rows.forEach((rowType, rowIndex) => {
+            const rowElement = document.createElement('div');
+            rowElement.className = `${rowType}-row`;
+            rowElement.style.gridRow = rowIndex + 1;
+            rowElement.style.gridColumn = `1 / span ${totalColumns}`;
+            rowElement.style.display = 'grid';
+            rowElement.style.gridTemplateColumns = `repeat(${totalColumns}, 1fr)`;
 
-        symbols.split('').forEach((symbol, index) => {
-            if (index % 29 === 0 && index !== 0) {
-                gridTemplate.push('break');
-            }
-
-            gridTemplate.push('symbol');
-            gridTemplate.push('bit', 'bit', 'bit');
-
-            if (bitIndex >= 21 && bitIndex < 98) {
-                if (bitIndex % 8 === 5) {
-                    gridTemplate.push('packed');
+            if (rowType === 'bits') {
+                for (let i = 0; i < bits.length; i++) {
+                    const bitElement = this.createBitElement(bits[i], i);
+                    rowElement.appendChild(bitElement);
+                }
+            } else if (rowType === 'symbols') {
+                symbols.split('').forEach((symbol, index) => {
+                    const symbolElement = this.createSymbolElement(symbol, index);
+                    symbolElement.style.gridColumn = `${index * 3 + 1} / span 3`;
+                    rowElement.appendChild(symbolElement);
+                });
+            } else if (rowType === 'packed') {
+                for (let i = 0; i < packed.length; i++) {
+                    const packedElement = this.createPackedElement(packed[i], i);
+                    packedElement.style.gridColumn = `${i * 8 + 22} / span 8`;  // Start from bit 22 (after sync)
+                    rowElement.appendChild(packedElement);
                 }
             }
 
-            bitIndex += 3;
+            this.gridContainer.appendChild(rowElement);
         });
+    }
+    createBitElement(bit, index) {
+        const bitElement = document.createElement('div');
+        bitElement.className = `bit ${bit === '1' ? 'bit-one' : 'bit-zero'}`;
+        bitElement.textContent = bit;
+        bitElement.dataset.index = index;
+        return bitElement;
+    }
 
-        this.gridContainer.style.gridTemplateColumns = gridTemplate.map(item => 
-            item === 'break' ? '100%' : 
-            item === 'symbol' ? '3ch' :
-            item === 'packed' ? '2ch' : '1ch'
-        ).join(' ');
+    createSymbolElement(symbol, index) {
+        const symbolElement = document.createElement('div');
+        symbolElement.className = `symbol ${this.isCostasSymbol(index) ? 'costas' : 'data'}`;
+        symbolElement.textContent = symbol;
+        symbolElement.dataset.index = index;
+        return symbolElement;
+    }
 
-        let rowIndex = 0;
-        gridTemplate.forEach((item, index) => {
-            if (item === 'break') {
-                const breakDiv = document.createElement('div');
-                breakDiv.style.gridColumn = '1 / -1';
-                breakDiv.style.height = '1em';
-                this.gridContainer.appendChild(breakDiv);
-                rowIndex++;
-                return;
-            }
-
-            const itemDiv = document.createElement('div');
-            itemDiv.className = item;
-            itemDiv.style.gridRow = rowIndex + 1;
-            itemDiv.style.gridColumn = index + 1;
-
-            if (item === 'symbol') {
-                itemDiv.textContent = symbols[Math.floor(index / 4)];
-                itemDiv.classList.add(this.isCostasSymbol(Math.floor(index / 4)) ? 'costas' : 'data');
-            } else if (item === 'bit') {
-                const bitIndex = Math.floor(index / 4) * 3 + (index % 4) - 1;
-                itemDiv.textContent = bits[bitIndex] || '0';
-                itemDiv.classList.add(bits[bitIndex] === '1' ? 'bit-one' : 'bit-zero');
-            } else if (item === 'packed') {
-                itemDiv.textContent = packed[packedIndex++];
-            }
-
-            this.gridContainer.appendChild(itemDiv);
-        });
+    createPackedElement(packedByte, index) {
+        const packedElement = document.createElement('div');
+        packedElement.className = 'packed';
+        packedElement.textContent = packedByte;
+        packedElement.dataset.index = index;
+        return packedElement;
     }
 
     addAnnotations() {
-        // Example annotations (you'll need to adjust these based on your actual message structure)
-        this.addAnnotation('i3', 0, 3);
-        this.addAnnotation('n3', 3, 6);
+        const annotationsRow = this.gridContainer.querySelector('.annotations-row');
+        // Example annotations (adjust as needed for your message structure)
+        this.addAnnotation(annotationsRow, 'i3', 0, 3);
+        this.addAnnotation(annotationsRow, 'n3', 3, 6);
         // Add more annotations as needed
     }
 
-    addAnnotation(label, start, end) {
-        const startElement = this.gridContainer.children[start * 4 + 1];
-        const endElement = this.gridContainer.children[end * 4];
-        
+    addAnnotation(row, label, start, end) {
         const annotation = document.createElement('div');
         annotation.className = 'annotation';
         annotation.textContent = label;
-        annotation.style.gridColumnStart = startElement.style.gridColumnStart;
-        annotation.style.gridColumnEnd = `span ${(end - start) * 4}`;
-        annotation.style.gridRow = parseInt(startElement.style.gridRow) - 1;
-        
-        this.gridContainer.appendChild(annotation);
+        annotation.style.gridColumn = `${start * 3 + 1} / span ${(end - start) * 3}`;
+        row.appendChild(annotation);
     }
 
     isCostasSymbol(index) {
@@ -151,13 +146,14 @@ class TribbleComponent extends Component {
 
     highlightCurrentSymbol() {
         this.clearHighlights();
-        const symbolElements = this.gridContainer.querySelectorAll('.symbol');
-        const currentSymbolElement = symbolElements[this.currentSymbol];
+        const symbolsRow = this.gridContainer.querySelector('.symbols-row');
+        const bitsRow = this.gridContainer.querySelector('.bits-row');
+        
+        const currentSymbolElement = symbolsRow.children[this.currentSymbol];
         if (currentSymbolElement) {
             currentSymbolElement.classList.add('highlighted');
-            const bitElements = this.gridContainer.querySelectorAll('.bit');
             for (let i = this.currentSymbol * 3; i < this.currentSymbol * 3 + 3; i++) {
-                if (bitElements[i]) bitElements[i].classList.add('highlighted');
+                if (bitsRow.children[i]) bitsRow.children[i].classList.add('highlighted');
             }
         }
     }
@@ -167,7 +163,7 @@ class TribbleComponent extends Component {
     }
         
     onPlay() {
-        this.currentTribble = 0;
+        this.currentSymbol = 0;
         this.highlightCurrentTribble();
     }
 
@@ -178,13 +174,13 @@ class TribbleComponent extends Component {
     frameUpdate() {
         if (this.message && this.message.isPlaying) {
             const timing = this.message.getTiming();
-            if (timing && timing.currentSymbolIndex !== this.currentTribble) {
-                this.currentTribble = timing.currentSymbolIndex;
-                this.highlightCurrentTribble();
+            if (timing && timing.currentSymbolIndex !== this.currentSymbol) {
+                this.currentSymbol = timing.currentSymbolIndex;
+                this.highlightCurrentSymbol();
             }
         }
     }
-    
+        
     initialUpdate() {
     }
 

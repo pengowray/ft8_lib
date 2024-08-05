@@ -8,7 +8,10 @@ class TribbleComponent extends Component {
     create() {
         this.bitsContainer = document.createElement('div');
         this.bitsContainer.className = 'bits-container';
+        this.symbolsContainer = document.createElement('div');
+        this.symbolsContainer.className = 'symbols-container';
         this.container.appendChild(this.bitsContainer);
+        this.container.appendChild(this.symbolsContainer);
     }
     
     messageUpdate() { 
@@ -16,7 +19,8 @@ class TribbleComponent extends Component {
         //output.innerHTML = "";
 
         this.bitsContainer.innerHTML = '';
-
+        this.symbolsContainer.innerHTML = '';
+        
         if (!this.message || !this.message.packedData) return;
         
         const message = this.message;
@@ -39,24 +43,30 @@ class TribbleComponent extends Component {
 
         let rowDiv = document.createElement('div');
         rowDiv.className = 'bits-row';
+        let symbolRowDiv = document.createElement('div');
+        symbolRowDiv.className = 'symbols-row';
         
         bits.split('').forEach((bit, index) => {
             if (index % 29 === 0 && index !== 0) {
                 this.bitsContainer.appendChild(rowDiv);
+                this.symbolsContainer.appendChild(symbolRowDiv);
                 rowDiv = document.createElement('div');
                 rowDiv.className = 'bits-row';
+                symbolRowDiv = document.createElement('div');
+                symbolRowDiv.className = 'symbols-row';
             }
 
             const bitDiv = this.createBitElement(bit, index);
             rowDiv.appendChild(bitDiv);
 
-            if ((index + 1) % 3 === 0) {
-                const tribbleLabel = this.createTribbleLabel(Math.floor(index / 3));
-                rowDiv.appendChild(tribbleLabel);
+            if (index % 3 === 0) {
+                const symbolLabel = this.createSymbolLabel(this.message.symbolsText[index / 3]);
+                symbolRowDiv.appendChild(symbolLabel);
             }
         });
 
         this.bitsContainer.appendChild(rowDiv);
+        this.symbolsContainer.appendChild(symbolRowDiv);
         this.addDataLabels();
     }
 
@@ -66,6 +76,13 @@ class TribbleComponent extends Component {
         bitDiv.textContent = bit;
         bitDiv.dataset.index = index;
         return bitDiv;
+    }
+
+    createSymbolLabel(symbol) {
+        const label = document.createElement('div');
+        label.className = 'symbol-label';
+        label.textContent = symbol;
+        return label;
     }
 
     createTribbleLabel(tribbleIndex) {
@@ -113,14 +130,15 @@ class TribbleComponent extends Component {
             const bitElement = this.bitsContainer.querySelector(`.bit[data-index="${i}"]`);
             if (bitElement) bitElement.classList.add('highlighted');
         }
+        const symbolElement = this.symbolsContainer.children[Math.floor(this.currentTribble / 9)].children[this.currentTribble % 9];
+        if (symbolElement) symbolElement.classList.add('highlighted');
     }
 
     clearHighlights() {
-        this.bitsContainer.querySelectorAll('.bit.highlighted').forEach(el => 
-            el.classList.remove('highlighted')
-        );
+        this.bitsContainer.querySelectorAll('.bit.highlighted').forEach(el => el.classList.remove('highlighted'));
+        this.symbolsContainer.querySelectorAll('.symbol-label.highlighted').forEach(el => el.classList.remove('highlighted'));
     }
-
+    
     initialUpdate() {
     }
 

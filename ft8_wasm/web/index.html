@@ -302,17 +302,25 @@
         #time-display {
             margin-left: 10px;
         }
-
-        .bits-container {
+        .bits-container, .symbols-container {
             font-family: monospace;
             white-space: nowrap;
             overflow-x: auto;
+            position: relative;
         }
         
-        .bits-row {
+        .symbols-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+        
+        .bits-row, .symbols-row {
             display: flex;
             align-items: center;
             margin-bottom: 10px;
+            height: 40px;
         }
         
         .bit {
@@ -323,6 +331,7 @@
             align-items: center;
             border: 1px solid #000;
             margin-right: 1px;
+            user-select: all;
         }
         
         .bit-zero {
@@ -333,9 +342,16 @@
             background-color: #ccffcc;
         }
         
-        .tribble-label {
-            margin-left: 5px;
-            margin-right: 15px;
+        .symbol-label {
+            width: 60px;
+            height: 20px;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(200, 200, 200, 0.5);
+            margin-right: 3px;
+            user-select: all;
+            pointer-events: auto;
         }
         
         .highlighted {

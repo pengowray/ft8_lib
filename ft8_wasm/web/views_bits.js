@@ -1,32 +1,18 @@
 class TribbleComponent extends Component {
     constructor(index, container) {
         super(index, container);
-        this.bitsContainer = null;
-        this.symbolsContainer = null;
-        this.nibblesContainer = null;
-        this.currentTribble = 0;
-    }
+        this.messageContainer = null;    }
 
     create() {
-        this.nibblesContainer = document.createElement('div');
-        this.nibblesContainer.className = 'nibbles-container';
-        this.symbolsContainer = document.createElement('div');
-        this.symbolsContainer.className = 'symbols-container';
-        this.bitsContainer = document.createElement('div');
-        this.bitsContainer.className = 'bits-container';
-        
-        this.container.appendChild(this.nibblesContainer);
-        this.container.appendChild(this.symbolsContainer);
-        this.container.appendChild(this.bitsContainer);
-    }
+        this.messageContainer = document.createElement('div');
+        this.messageContainer.className = 'ft8-message-container';
+        this.container.appendChild(this.messageContainer);    }
     
     messageUpdate() { 
         //const output = this.container;
         //output.innerHTML = "";
 
-        this.nibblesContainer.innerHTML = '';
-        this.symbolsContainer.innerHTML = '';
-        this.bitsContainer.innerHTML = '';
+        this.messageContainer.innerHTML = '';
 
         if (!this.message || !this.message.packedData) return;
         
@@ -48,129 +34,112 @@ class TribbleComponent extends Component {
         const messageType = message.ft8MessageType; // e.g. "0.0" or "3"
         const messageInfo = getFT8MessageTypeName(messageType); // 
 
-        let rowDiv = document.createElement('div');
-        rowDiv.className = 'bits-row';
-        let symbolRowDiv = document.createElement('div');
-        symbolRowDiv.className = 'symbols-row';
-        let nibbleRowDiv = document.createElement('div');
-        nibbleRowDiv.className = 'nibbles-row';
+        this.createMessageStructure(symbols, bits, packed);
+        this.addMessageAnnotations();    }
 
-        bits.split('').forEach((bit, index) => {
-            if (index % 29 === 0 && index !== 0) {
-                this.bitsContainer.appendChild(rowDiv);
-                this.symbolsContainer.appendChild(symbolRowDiv);
-                this.nibblesContainer.appendChild(nibbleRowDiv);
-                rowDiv = document.createElement('div');
-                rowDiv.className = 'bits-row';
-                symbolRowDiv = document.createElement('div');
-                symbolRowDiv.className = 'symbols-row';
-                nibbleRowDiv = document.createElement('div');
-                nibbleRowDiv.className = 'nibbles-row';
-            }
-
-            const bitDiv = this.createBitElement(bit, index);
-            rowDiv.appendChild(bitDiv);
-
-            if (index % 3 === 0) {
-                const symbolLabel = this.createSymbolLabel(symbols[index / 3], index / 3);
-                symbolRowDiv.appendChild(symbolLabel);
-            }
-
-            if (index >= 21 && index < 98 && (index - 21) % 4 === 0) {
-                const nibbleLabel = this.createNibbleLabel(bits.substr(index, 4), (index - 21) / 4);
-                nibbleRowDiv.appendChild(nibbleLabel);
-            }
-        });
-
-        this.bitsContainer.appendChild(rowDiv);
-        this.symbolsContainer.appendChild(symbolRowDiv);
-        this.nibblesContainer.appendChild(nibbleRowDiv);
-    }
-
-    createBitElement(bit, index) {
-        const bitDiv = document.createElement('div');
-        bitDiv.className = `bit ${bit === '1' ? 'bit-one' : 'bit-zero'}`;
-        bitDiv.textContent = bit;
-        bitDiv.dataset.index = index;
-        return bitDiv;
-    }
-
-    createSymbolLabel(symbol, index) {
-        const label = document.createElement('div');
-        label.className = 'symbol-label';
-        label.textContent = symbol || '0';
-        label.dataset.index = index;
-        return label;
-    }
-
-    createNibbleLabel(nibbleBits, index) {
-        const label = document.createElement('div');
-        label.className = 'nibble-label';
-        label.textContent = parseInt(nibbleBits.padEnd(4, '0'), 2).toString(16).toUpperCase();
-        label.dataset.index = index;
-        return label;
-    }
-
-    highlightCurrentTribble() {
-        this.clearHighlights();
-        const startIndex = this.currentTribble * 3;
-        for (let i = startIndex; i < startIndex + 3; i++) {
-            const bitElement = this.bitsContainer.querySelector(`.bit[data-index="${i}"]`);
-            if (bitElement) bitElement.classList.add('highlighted');
+        createMessageStructure(symbols, bits, packed) {
+            const sections = [
+                { type: 'sync', length: 7 },
+                { type: 'data', length: 29 },
+                { type: 'sync', length: 7 },
+                { type: 'data', length: 29 },
+                { type: 'sync', length: 7 }
+            ];
+    
+            let bitIndex = 0;
+            let symbolIndex = 0;
+            let packedIndex = 0;
+    
+            sections.forEach((section, sectionIndex) => {
+                const sectionDiv = document.createElement('div');
+                sectionDiv.className = `ft8-section ${section.type}-section`;
+    
+                for (let i = 0; i < section.length; i++) {
+                    const groupDiv = document.createElement('div');
+                    groupDiv.className = 'ft8-group';
+    
+                    if (section.type === 'sync') {
+                        const symbolDiv = this.createSymbolElement(symbols[symbolIndex], symbolIndex);
+                        groupDiv.appendChild(symbolDiv);
+                        symbolIndex++;
+                    } else {
+                        const tribbleDiv = this.createTribbleElement(bits.substr(bitIndex, 3), symbolIndex);
+                        groupDiv.appendChild(tribbleDiv);
+    
+                        if (bitIndex >= 21 && bitIndex < 98 && (bitIndex - 21) % 4 === 0) {
+                            const nibbleDiv = this.createNibbleElement(packed[packedIndex], packedIndex);
+                            groupDiv.appendChild(nibbleDiv);
+                            packedIndex++;
+                        }
+    
+                        bitIndex += 3;
+                        symbolIndex++;
+                    }
+    
+                    sectionDiv.appendChild(groupDiv);
+                }
+    
+                this.messageContainer.appendChild(sectionDiv);
+            });
         }
-        const symbolElement = this.symbolsContainer.querySelector(`.symbol-label[data-index="${this.currentTribble}"]`);
-        if (symbolElement) symbolElement.classList.add('highlighted');
-    }
+    
+        createSymbolElement(symbol, index) {
+            const symbolDiv = document.createElement('div');
+            symbolDiv.className = 'ft8-symbol sync-symbol';
+            symbolDiv.textContent = symbol;
+            symbolDiv.dataset.index = index;
+            return symbolDiv;
+        }
+    
+        createTribbleElement(tribbleBits, symbolIndex) {
+            const tribbleDiv = document.createElement('div');
+            tribbleDiv.className = 'ft8-tribble';
+            
+            const symbolDiv = document.createElement('div');
+            symbolDiv.className = 'ft8-symbol';
+            symbolDiv.textContent = this.message.symbolsText[symbolIndex];
+            symbolDiv.dataset.index = symbolIndex;
+            tribbleDiv.appendChild(symbolDiv);
+    
+            const bitsDiv = document.createElement('div');
+            bitsDiv.className = 'ft8-bits';
+            tribbleBits.padEnd(3, '0').split('').forEach((bit, index) => {
+                const bitDiv = document.createElement('div');
+                bitDiv.className = `ft8-bit ${bit === '1' ? 'bit-one' : 'bit-zero'}`;
+                bitDiv.textContent = bit;
+                bitDiv.dataset.index = symbolIndex * 3 + index;
+                bitsDiv.appendChild(bitDiv);
+            });
+            tribbleDiv.appendChild(bitsDiv);
+    
+            return tribbleDiv;
+        }
+    
+        createNibbleElement(nibble, index) {
+            const nibbleDiv = document.createElement('div');
+            nibbleDiv.className = 'ft8-nibble';
+            nibbleDiv.textContent = nibble;
+            nibbleDiv.dataset.index = index;
+            return nibbleDiv;
+        }
+    
+        addMessageAnnotations() {
+            // Add annotations for different message parts (i3, n3, etc.)
+            // This will depend on the specific FT8 message structure
+            // You'll need to implement this based on your message format
+        }
+    
+        highlightCurrentTribble() {
+            this.clearHighlights();
+            const symbolElement = this.messageContainer.querySelector(`.ft8-symbol[data-index="${this.currentTribble}"]`);
+            if (symbolElement) symbolElement.classList.add('highlighted');
+        }
+    
+        clearHighlights() {
+            this.messageContainer.querySelectorAll('.highlighted').forEach(el => el.classList.remove('highlighted'));
+        }
 
-    clearHighlights() {
-        this.bitsContainer.querySelectorAll('.bit.highlighted').forEach(el => el.classList.remove('highlighted'));
-        this.symbolsContainer.querySelectorAll('.symbol-label.highlighted').forEach(el => el.classList.remove('highlighted'));
-    }
-
-    createTribbleLabel(tribbleIndex) {
-        const label = document.createElement('div');
-        label.className = 'tribble-label';
-        label.textContent = tribbleIndex % 8;
-        return label;
-    }
-
-    createTribbleElement(tribbleBits, symbolIndex) {
-        const tribbleDiv = document.createElement('div');
-        tribbleDiv.className = 'tribble';
-        
-        const symbolLabel = document.createElement('div');
-        symbolLabel.className = 'symbol-label';
-        symbolLabel.textContent = this.message.symbolsText[symbolIndex];
-        tribbleDiv.appendChild(symbolLabel);
-
-        const bitsDiv = document.createElement('div');
-        bitsDiv.className = 'bits';
-        tribbleBits.split('').forEach((bit, index) => {
-            const bitDiv = document.createElement('div');
-            bitDiv.className = `bit ${bit === '1' ? 'bit-one' : 'bit-zero'}`;
-            bitDiv.textContent = bit;
-            bitDiv.dataset.index = symbolIndex * 3 + index;
-            bitsDiv.appendChild(bitDiv);
-        });
-
-        tribbleDiv.appendChild(bitsDiv);
-
-        return tribbleDiv;
-    }
-
-    addDataLabels() {
-        // Add labels for different data fields (i3, n3, etc.)
-        // This will depend on the specific FT8 message structure
-    }
-
-    getBitsFromPackedData(packedData) {
-        // Convert packed data to array of individual bits
-        return packedData.flatMap(byte => 
-            byte.toString(2).padStart(8, '0').split('')
-        ).slice(0, 77); // FT8 uses 77 bits
-    }
-
-    onPlay() {
+        onPlay() {
         this.currentTribble = 0;
         this.highlightCurrentTribble();
     }

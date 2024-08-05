@@ -54,8 +54,13 @@ class VizComponent extends Component {
     frameUpdate() {
         if (this.message == null) return;
 
+        this.message.readyAudioAndBuffer(); // needed for viz
+
         const timing = this.message.getTiming();
-        if (timing == null || !timing.isPlaying) return; // todo: or clear?
+        if (timing == null) return; // todo: or clear?
+
+        // todo: keep track of if need to update when not playing
+        //if (!timing.isPlaying) return;
 
         const currentTime = timing.currentTime ?? 0;
         const totalDuration = timing.duration ?? 0;

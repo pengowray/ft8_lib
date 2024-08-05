@@ -2,21 +2,12 @@ class TribbleComponent extends Component {
     constructor(index, container) {
         super(index, container);
         this.bitsContainer = null;
-        this.symbolsContainer = null;
-        this.nibblesContainer = null;
         this.currentTribble = 0;
     }
 
     create() {
-        this.nibblesContainer = document.createElement('div');
-        this.nibblesContainer.className = 'nibbles-container';
-        this.symbolsContainer = document.createElement('div');
-        this.symbolsContainer.className = 'symbols-container';
         this.bitsContainer = document.createElement('div');
         this.bitsContainer.className = 'bits-container';
-        
-        this.container.appendChild(this.nibblesContainer);
-        this.container.appendChild(this.symbolsContainer);
         this.container.appendChild(this.bitsContainer);
     }
     
@@ -24,10 +15,8 @@ class TribbleComponent extends Component {
         //const output = this.container;
         //output.innerHTML = "";
 
-        this.nibblesContainer.innerHTML = '';
-        this.symbolsContainer.innerHTML = '';
         this.bitsContainer.innerHTML = '';
-
+        
         if (!this.message || !this.message.packedData) return;
         
         const message = this.message;
@@ -50,112 +39,62 @@ class TribbleComponent extends Component {
 
         let rowDiv = document.createElement('div');
         rowDiv.className = 'bits-row';
-        let symbolRowDiv = document.createElement('div');
-        symbolRowDiv.className = 'symbols-row';
-        let nibbleRowDiv = document.createElement('div');
-        nibbleRowDiv.className = 'nibbles-row';
-
+        
         bits.split('').forEach((bit, index) => {
             if (index % 29 === 0 && index !== 0) {
                 this.bitsContainer.appendChild(rowDiv);
-                this.symbolsContainer.appendChild(symbolRowDiv);
-                this.nibblesContainer.appendChild(nibbleRowDiv);
                 rowDiv = document.createElement('div');
                 rowDiv.className = 'bits-row';
-                symbolRowDiv = document.createElement('div');
-                symbolRowDiv.className = 'symbols-row';
-                nibbleRowDiv = document.createElement('div');
-                nibbleRowDiv.className = 'nibbles-row';
             }
-
-            const bitDiv = this.createBitElement(bit, index);
-            rowDiv.appendChild(bitDiv);
 
             if (index % 3 === 0) {
-                const symbolLabel = this.createSymbolLabel(symbols[index / 3], index / 3);
-                symbolRowDiv.appendChild(symbolLabel);
-            }
-
-            if (index >= 21 && index < 98 && (index - 21) % 4 === 0) {
-                const nibbleLabel = this.createNibbleLabel(bits.substr(index, 4), (index - 21) / 4);
-                nibbleRowDiv.appendChild(nibbleLabel);
+                const tribbleDiv = this.createTribbleElement(bits.substr(index, 3), symbols[index / 3], index);
+                rowDiv.appendChild(tribbleDiv);
             }
         });
 
         this.bitsContainer.appendChild(rowDiv);
-        this.symbolsContainer.appendChild(symbolRowDiv);
-        this.nibblesContainer.appendChild(nibbleRowDiv);
     }
 
-    createBitElement(bit, index) {
-        const bitDiv = document.createElement('div');
-        bitDiv.className = `bit ${bit === '1' ? 'bit-one' : 'bit-zero'}`;
-        bitDiv.textContent = bit;
-        bitDiv.dataset.index = index;
-        return bitDiv;
-    }
-
-    createSymbolLabel(symbol, index) {
-        const label = document.createElement('div');
-        label.className = 'symbol-label';
-        label.textContent = symbol || '0';
-        label.dataset.index = index;
-        return label;
-    }
-
-    createNibbleLabel(nibbleBits, index) {
-        const label = document.createElement('div');
-        label.className = 'nibble-label';
-        label.textContent = parseInt(nibbleBits.padEnd(4, '0'), 2).toString(16).toUpperCase();
-        label.dataset.index = index;
-        return label;
-    }
-
-    highlightCurrentTribble() {
-        this.clearHighlights();
-        const startIndex = this.currentTribble * 3;
-        for (let i = startIndex; i < startIndex + 3; i++) {
-            const bitElement = this.bitsContainer.querySelector(`.bit[data-index="${i}"]`);
-            if (bitElement) bitElement.classList.add('highlighted');
-        }
-        const symbolElement = this.symbolsContainer.querySelector(`.symbol-label[data-index="${this.currentTribble}"]`);
-        if (symbolElement) symbolElement.classList.add('highlighted');
-    }
-
-    clearHighlights() {
-        this.bitsContainer.querySelectorAll('.bit.highlighted').forEach(el => el.classList.remove('highlighted'));
-        this.symbolsContainer.querySelectorAll('.symbol-label.highlighted').forEach(el => el.classList.remove('highlighted'));
-    }
-
-    createTribbleLabel(tribbleIndex) {
-        const label = document.createElement('div');
-        label.className = 'tribble-label';
-        label.textContent = tribbleIndex % 8;
-        return label;
-    }
-
-    createTribbleElement(tribbleBits, symbolIndex) {
+    createTribbleElement(tribbleBits, symbol, index) {
         const tribbleDiv = document.createElement('div');
         tribbleDiv.className = 'tribble';
         
         const symbolLabel = document.createElement('div');
         symbolLabel.className = 'symbol-label';
-        symbolLabel.textContent = this.message.symbolsText[symbolIndex];
+        symbolLabel.textContent = symbol || '0';
         tribbleDiv.appendChild(symbolLabel);
 
         const bitsDiv = document.createElement('div');
         bitsDiv.className = 'bits';
-        tribbleBits.split('').forEach((bit, index) => {
+        tribbleBits.split('').forEach((bit, bitIndex) => {
             const bitDiv = document.createElement('div');
             bitDiv.className = `bit ${bit === '1' ? 'bit-one' : 'bit-zero'}`;
             bitDiv.textContent = bit;
-            bitDiv.dataset.index = symbolIndex * 3 + index;
+            bitDiv.dataset.index = index + bitIndex;
             bitsDiv.appendChild(bitDiv);
         });
-
         tribbleDiv.appendChild(bitsDiv);
 
+        if (index >= 21 && index < 98 && index % 4 === 0) {
+            const nibbleLabel = document.createElement('div');
+            nibbleLabel.className = 'nibble-label';
+            const nibbleBits = tribbleBits + (index + 3 < 98 ? tribbleBits[0] : '0');
+            nibbleLabel.textContent = parseInt(nibbleBits, 2).toString(16).toUpperCase();
+            tribbleDiv.appendChild(nibbleLabel);
+        }
+
         return tribbleDiv;
+    }
+
+    highlightCurrentTribble() {
+        this.clearHighlights();
+        const tribble = this.bitsContainer.querySelector(`.tribble:nth-child(${this.currentTribble + 1})`);
+        if (tribble) tribble.classList.add('highlighted');
+    }
+
+    clearHighlights() {
+        this.bitsContainer.querySelectorAll('.tribble.highlighted').forEach(el => el.classList.remove('highlighted'));
     }
 
     addDataLabels() {
@@ -188,7 +127,7 @@ class TribbleComponent extends Component {
             }
         }
     }
-    
+
     initialUpdate() {
     }
 

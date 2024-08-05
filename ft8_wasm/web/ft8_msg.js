@@ -63,8 +63,8 @@ class FT8Message extends EventTarget {
         if (this.CRCCheck == null) this.CRCCheck = checkCRC(this.symbolsText);
         return this.CRCCheck;
     }
-    getParityCheck() {
-        if (this.ParityCheck == null) this.ParityCheck = checkLDPC(this.symbolsText);
+    getParityCheck() { // LDPC check
+        if (this.ParityCheck == null) this.ParityCheck = checkParity(this.symbolsText);
         return this.ParityCheck;
     }
 

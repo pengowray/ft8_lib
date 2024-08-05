@@ -43,10 +43,13 @@ function initializeUI() {
     const exampleMessagesDiv = document.getElementById('example-messages');
     const pianoRollDiv = document.getElementById('piano-roll');
     const audioVisualization = document.getElementById('audio-visualization');
+    const tribbleViz = document.getElementById('tribble-visualization');
 
     viewManager.registerComponent(new VizComponent(-1, audioVisualization));
     viewManager.registerComponent(new PianoRollComponent(-1, pianoRollDiv));
     viewManager.registerComponent(new OutputComponent(-1, output));
+    viewManager.registerComponent(new TribbleComponent(-1, tribbleViz));
+
     
     const parseFreq = (note) => {
         return parseNote(note) || parseFloat(note) || 500;

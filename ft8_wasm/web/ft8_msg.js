@@ -8,6 +8,7 @@ class FT8Message extends EventTarget {
 
       this.inputText = inputText;
       this.inputType = null; // can be manual set, otherwise auto-detected
+      this.expectedResults = null; // if running test against known input. 
 
       // results of encoding
       this.encodeError = null;

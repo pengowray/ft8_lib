@@ -114,6 +114,53 @@ class OutputComponent extends Component {
             console.log('FT8Lib error', message.encodeError_ft8lib);
             output.innerHTML += `<span title="Tried using FT8_Lib to encode input but got this error, so as a fallback treated input as free text">Fallback to free text reason: ${message.encodeError_ft8lib}</span><br>`;
         }
+
+        /*=== Tests (expected vs actual) ===*/
+
+        if (message.expectedResults) {
+            output.innerHTML += `<hr><br>Tests (comparison to known results): `;
+            const expected = message.expectedResults;
+            console.log('expectedResults', expected);
+            let expectedType = expected.type;
+            if (expectedType) {
+                if (expectedType.endsWith('.')) expectedType = expectedType.slice(0, -1);
+                if (expectedType === message.ft8MessageType) {
+                    output.innerHTML += `<br> ✅ Message type: OK (match; ${expectedType})`;
+                } else {
+                    output.innerHTML += `<br> ❌ Message type: Expected: ${expectedType}, Decoded: ${message.ft8MessageType}`;
+                }
+            }
+
+            // check .decoded exists
+            const expectedMessage = expected.decoded ?? expected.message;
+            const actualMessage = message.reDecodedResult.decodedText;
+
+            if (expectedMessage) {
+                if (expectedMessage.trim() === actualMessage.trim()) {
+                    
+                    if (expected.error) {
+                        output.innerHTML += `<br> ✅ Decoded: OK* (expected error or truncated result)`;
+                    } else {
+                        output.innerHTML += `<br> ✅ Decoded: OK (match)`;
+                    }
+                } else {
+                    output.innerHTML += `<br> ❌ Decoded: Expected: "${expectedMessage}", Decoded: "${actualMessage}"`;
+                }
+            }
+
+            let expectedSymbols = expected.symbols;
+            const actualSymbols = message.symbolsText;
+            if (expectedSymbols) {
+                expectedSymbols = expectedSymbols.replace(/\s/g, '');
+                if (expectedSymbols === actualSymbols) {
+                    output.innerHTML += `<br> ✅ Symbols: OK (match)`;
+                } else {
+                    output.innerHTML += `<br> ❌ Symbols: Expected: "${expectedSymbols}", Decoded: "${actualSymbols}"`;
+                }
+            }
+            
+        }
+
     }
 
     FT8MessageTypeInfo() { 
@@ -166,7 +213,7 @@ class OutputComponent extends Component {
             return '';
         }
 
-        let typeExplanation = "";
+        let typeExplanation = ""; //TODO?
 
         const parts = message.trim().split(/\s+/);
         let explanation = '';

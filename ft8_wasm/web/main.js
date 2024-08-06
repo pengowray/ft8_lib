@@ -65,7 +65,7 @@ function initializeUI() {
             if (selectedIndex !== "") {
                 const selectedTest = testInputs[selectedIndex];
                 messageInput.value = selectedTest.value;
-                encodeButton.click();
+                doEncode();
             }
         });
     }
@@ -92,10 +92,13 @@ function initializeUI() {
                 const selectedTest = testInputs_ft8code[selectedIndex];
                 if (selectedType === 'msg') {
                     messageInput.value = selectedTest.message;
+                    const expectedResults = selectedTest;
+                    doEncode(expectedResults);
                 } else if (selectedType === 'symbols') {
                     messageInput.value = selectedTest.symbols;
+                    const expectedResults = {...selectedTest, ...{symbols:null}}; // { messageType: selectedTest.type, text: selectedTest.message, decoded: selectedTest.decoded ?? null, error: selectedTest.error  ?? null };
+                    doEncode(expectedResults);
                 }
-                encodeButton.click();
             }
         });
     }
@@ -392,19 +395,24 @@ function initializeUI() {
 
 
     encodeButton.addEventListener('click', () => {
+        doEncode();
+    });
+
+    function doEncode(testData = null) {
         try {
-            handleEncode();
+            handleEncode(testData);
          
         } catch (error) {
             //output.innerHTML = "Error: " + error.message;
             errorOutput.innerHTML = "Error: " + error;
             console.error("handle encode error", error);
         }
-    });
+    }
     
     function handleEncode(testData = null) {
         let inputText = messageInput.value;
         const message = new FT8Message(inputText); //messageManager.createMessage(inputText);
+        message.expectedResults = testData;
 
         message.encode();
         if (message.error != null) {
@@ -463,7 +471,7 @@ function initializeUI() {
         button.textContent = message;
         button.addEventListener('click', () => {
             messageInput.value = message;
-            encodeButton.click();
+            doEncode();
         });
         exampleMessagesDiv.appendChild(button);
     });

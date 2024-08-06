@@ -318,6 +318,45 @@ function symbolsToPrettyBinary(symbols) {
     return symbolsToBitsStrPreserveSpaces(symbolsPretty(symbols));
 }
 
+function hashBitsPretty(bits) {
+    // 10, 12, or 22 bits
+
+    // 0000000000 11 0000000000
+    const len = bits.length;
+    if (len == 22) {
+        return `${bits.slice(0, 10)} ${bits.slice(10, 12)} ${bits.slice(12, 22)}`;
+    } else if (len == 12) {
+        return `xxxxxxxxxx ${bits.slice(0, 2)} ${bits.slice(2, 12)}`;
+    } else if (len == 10) {
+        return `xxxxxxxxxx xx ${bits}`;
+    }
+
+    // other length/error
+    return bits;
+}
+
+function hashBitsPrettyHex(bits) {
+    console.log('hashBitsPrettyHex', bits);
+    
+    if (bits.match(/[^01]/)) {
+        throw new Error("Invalid characters");
+    }
+
+    // 22 bit: aaa-b-ccc
+    // 12 bit: xxx-b-ccc
+    // 10 bit: xxx-x-ccc
+    const len = bits.length;
+    if (len == 22) {
+        return `<${bitsToHex(bits.slice(0, 10).padStart(12, '0'))}-${bitsToHex(bits.slice(10, 12).padStart(4, '0'))}-${bitsToHex(bits.slice(12, 22).padStart(12, '0'))}>`;
+    } else if (len == 12) {
+        return `<xx-${bitsToHex(bits.slice(0, 2).padStart(4, '0'))}-${bitsToHex(bits.slice(2, 10).padStart(12, '0'))}>`;
+    } else if (len == 10) {
+        return `<xxx-x-${bitsToHex(bits)}>`;
+    } else {
+        throw new Error("Invalid length: " + len + " in '" + bits + "'");
+    }
+}
+
 const FT8_CRC_WIDTH = 14;
 const FT8_CRC_POLYNOMIAL = 0x2757;  // 14-bit CRC polynomial without the leading 1
 const TOPBIT = 1 << (FT8_CRC_WIDTH - 1);
@@ -541,7 +580,7 @@ function encodeFT8Telemetry(telemetryHex) {
 
   //console.log('telemetry', binaryString);
   // Convert binary string back to hex string
-  return { "result": binaryToHex(binaryString) };
+  return { "result": bitsToHexForTelemetry(binaryString, true) };
 }
 
 // Decode 71-bit telemetry data (untested; done by ft8_lib already)
@@ -560,11 +599,26 @@ function decodeFT8Telemetry(payload) {
   binaryString = binaryString.slice(0, -6);
 
   // Convert binary to hex
-  const telemetryHex = binaryToHex(binaryString);
+  const telemetryHex = bitsToHexForTelemetry(binaryString);
 
   return telemetryHex;
 }
 
+function telemetryToText(binaryStr) {
+    if (binaryStr.length !== 71) throw new Error("Telemetry must be 71 bits");
+
+    // pad the start
+    binaryStr = binaryStr.padStart(Math.ceil(binaryStr.length / 4) * 4, '0');
+    
+    let hexString = '';
+    for (let i = 0; i < binaryStr.length; i += 4) {
+        let fourBits = binaryStr.slice(i, i + 4);
+        let hexDigit = parseInt(fourBits, 2).toString(16);
+        hexString += hexDigit;
+    }
+
+    return hexString;
+}
 
 function packedToHexStr(packedData) {
     return `${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join('')}`;
@@ -574,13 +628,15 @@ function packedToHexStrSp(packedData) {
     return `${Array.from(packedData).map(b => b.toString(16).padStart(2, '0')).join(' ')}`;
 }
 
-function binaryToHex(binaryStr) {
+function bitsToHexForTelemetry(binaryStr) {
+
     // Pad the binary string to ensure its length is a multiple of 4
-    let paddedBinaryStr = binaryStr.padEnd(Math.ceil(binaryStr.length / 4) * 4, '0');
+    // not sure if it should be start or end?
+    binaryStr = binaryStr.padEnd(Math.ceil(binaryStr.length / 4) * 4, '0');
     
     let hexString = '';
-    for (let i = 0; i < paddedBinaryStr.length; i += 4) {
-        let fourBits = paddedBinaryStr.slice(i, i + 4);
+    for (let i = 0; i < binaryStr.length; i += 4) {
+        let fourBits = binaryStr.slice(i, i + 4);
         let hexDigit = parseInt(fourBits, 2).toString(16);
         hexString += hexDigit;
     }
@@ -588,6 +644,19 @@ function binaryToHex(binaryStr) {
     return hexString;
 }
 
+function bitsToHex(binaryStr) {
+    // Pad the binary string to ensure its length is a multiple of 4
+    binaryStr = binaryStr.padStart(Math.ceil(binaryStr.length / 4) * 4, '0');
+    
+    let hexString = '';
+    for (let i = 0; i < binaryStr.length; i += 4) {
+        let fourBits = binaryStr.slice(i, i + 4);
+        let hexDigit = parseInt(fourBits, 2).toString(16);
+        hexString += hexDigit;
+    }
+    
+    return hexString;
+}
 
 // Helper function to convert hex string to binary string
 function hexToBinary(hex) {
@@ -813,7 +882,9 @@ function binaryToInt(binary) {
 }
 
 function bitsToCall(bits) {
-    return bitsToCallDetails(bits).callsign;
+    //return bitsToCallDetails(bits).callsign;
+    const details = bitsToCallDetails(bits);
+    return `${details.callsign} (${details.type})`;
 }
 // Convert 28 bits to a callsign
 function bitsToCallDetails(bits) {
@@ -861,8 +932,10 @@ function bitsToCallDetails(bits) {
     // Check for 22-bit hash
     else if (n < NTOKENS + MAX22) {
         result.type = 'hash';
-        result.callsign = "<...>";
-        result.details.hashValue = n - NTOKENS;
+        const hashValue = n - NTOKENS;
+        result.details.hashValue = hashValue
+        //result.callsign = "<...>";
+        result.callsign = hashBitsPrettyHex(hashValue.toString(2).padStart(22, '0'));
     }
     // Standard callsign
     else {

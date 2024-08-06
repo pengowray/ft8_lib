@@ -22,6 +22,12 @@ const testInputs = [
 // ft8code.exe
 const testInputs_ft8code = [
     {
+      "message": "<TNX BOB 73 GL>",
+      "decoded": "TNX BOB 73 GL",
+      "type": "0.0",
+      "symbols": "3140652 20744714706333640177350001770 3140652 64642730654607244050367013053 3140652"
+    },
+    {
       "message": "TNX BOB 73 GL",
       "type": "0.0",
       "symbols": "3140652 20744714706333640177350001770 3140652 64642730654607244050367013053 3140652"

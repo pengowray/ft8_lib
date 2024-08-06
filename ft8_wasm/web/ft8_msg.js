@@ -129,7 +129,7 @@ class FT8Message extends EventTarget {
                 this.packedData = new Uint8Array(result.result.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
                 break;
             case '77 bits':
-                this.packedData = new Uint8Array(binaryToHex(normalizeBinary(input)).match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+                this.packedData = new Uint8Array(bitsToHexForTelemetry(normalizeBinary(input)).match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
                 break;
             case '77 bits + CRC':
                 this.symbolsText = binary91ToSymbols(normalizeBinary(input));

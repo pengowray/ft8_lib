@@ -75,12 +75,12 @@ function initializeUI() {
         testInputs_ft8code.forEach((test, index) => {
             const option = document.createElement('option');
             option.value = `msg ${index}`;
-            option.textContent = `${test.message}`;
+            option.textContent = `(${test.type}) ${test.message}`;
             testSelect.appendChild(option);
 
             const option2 = document.createElement('option');
             option2.value = `symbols ${index}`;
-            option2.textContent = `${test.message} (symbols)`;
+            option2.textContent = `(${test.type}) ${test.message} (symbols)`;
             testSelect.appendChild(option2);
         });
 
@@ -402,7 +402,7 @@ function initializeUI() {
         }
     });
     
-    function handleEncode() {
+    function handleEncode(testData = null) {
         let inputText = messageInput.value;
         const message = new FT8Message(inputText); //messageManager.createMessage(inputText);
 

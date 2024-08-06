@@ -107,7 +107,7 @@ class OutputComponent extends Component {
 
         output.innerHTML += `<br>Message Type: ${messageInfo} (${messageType})`;
         if (message.reDecodedResult.success) {
-            output.innerHTML += `<br>Explanation: ${this.explainFT8Message(message.reDecodedResult.decodedText, messageInfo)}<br>`;
+            output.innerHTML += `<br>Explanation: ${this.explainFT8Message(message.reDecodedResult.decodedText, messageType)}<br>`;
         }
 
         if (message.encodeError_ft8lib) {
@@ -162,7 +162,7 @@ class OutputComponent extends Component {
         return { messageType: "Unknown", type: "-" };
     }
 
-    explainFT8Message(message, typeInfo) {
+    explainFT8Message(message, msgType) {
         if (message === "Decoding failed") {
             return '';
         }
@@ -228,9 +228,12 @@ class OutputComponent extends Component {
             } else {
                 explanation = `This is a message from ${parts[0]} to ${parts[1]}, but the content "${parts[2]} ${parts[3]}" is not recognized.`;
             }
-        } else if (typeInfo.type === '0.0') { // || message.startsWith('<') && message.endsWith('>')) {
+        } else if (msgType === '0.0') { // || message.startsWith('<') && message.endsWith('>')) {
             explanation = `This is a free-text message: "${message}".`; // Free-text messages in FT8 are limited to 13 characters.
-        } else if (typeInfo.type === '0.5') {
+            if (message.length == 13) {
+                explanation += ' The message is the maximum length of 13 characters.';
+            }
+        } else if (msgType === '0.5') {
             explanation = `This is a telemetry message containing hexadecimal digits: ${message.replace(/^0*/g, '')}. The specific meaning depends on the implementation.`;
         } else if (/^[0-9A-F]{4,18}$/.test(message) && /[A-F]/.test(message)) { // all hex digits with at least one A-F 
             explanation = `This message is made up of hexadecimal digits, but it is not of the telemetry message type.`;

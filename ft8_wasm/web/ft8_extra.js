@@ -441,7 +441,7 @@ function calculateParity(binaryString) {
 }
 
 // not used / tested
-function decodeFT8FreeText(payload) {
+function decodeFT8FreeTextPayload(payload) {
     if (!(payload instanceof Uint8Array) || payload.length !== 10) {
         throw new Error("Invalid payload: must be a Uint8Array of length 10");
     }
@@ -464,6 +464,23 @@ function decodeFT8FreeText(payload) {
     text = text.trimEnd();
 
     return text;
+}
+
+// Convert 71 bits of free text to a string
+function bitsToText(bits) {
+    if (bits.length !== 71) throw new Error("Free text must be 71 bits");
+    
+    let text = "";
+    let n = BigInt("0b" + bits);
+    const charTable = FT8_CHAR_TABLE_FULL;
+    
+    for (let i = 0; i < 13; i++) {
+        let charIndex = Number(n % 42n);
+        text = charTable[charIndex] + text;
+        n = n / 42n;
+    }
+    
+    return text.trim();
 }
 
 
@@ -788,4 +805,220 @@ function getFT8MessageTypeName(type) {
         case "7": return "Unknown / Reserved";
         default: return "Unknown";
     }
+}
+
+
+function binaryToInt(binary) {
+    return parseInt(binary, 2);
+}
+
+function bitsToCall(bits) {
+    return bitsToCallDetails(bits).callsign;
+}
+// Convert 28 bits to a callsign
+function bitsToCallDetails(bits) {
+    if (bits.length !== 28) throw new Error("Callsign must be 28 bits");
+    
+    const n = binaryToInt(bits);
+    
+    const NTOKENS = 2063592;  // Number of special tokens
+    const MAX22 = 4194304;    // 2^22, maximum 22-bit hash value
+
+    let result = {
+        rawBits: bits,
+        decodedValue: n,
+        type: null,
+        callsign: null,
+        details: {}
+    };
+
+    // Check for special tokens
+    if (n < NTOKENS) {
+        result.type = 'special';
+        if (n === 0) {
+            result.callsign = "DE";
+        } else if (n === 1) {
+            result.callsign = "QRZ";
+        } else if (n === 2) {
+            result.callsign = "CQ";
+        } else if (n < 1003) {
+            result.callsign = `CQ ${(n - 3).toString().padStart(3, '0')}`;
+            result.details.number = n - 3;
+        } else if (n < 532444) {
+            let code = n - 1003;
+            let call = "";
+            for (let i = 0; i < 4; i++) {
+                const charIndex = code % 27;
+                call = (charIndex === 0 ? ' ' : String.fromCharCode(charIndex + 64)) + call;
+                code = Math.floor(code / 27);
+            }
+            result.callsign = `CQ ${call.trim()}`;
+            result.details.alphabeticCode = call.trim();
+        } else {
+            result.callsign = "<undefined special token>";
+        }
+    }
+    // Check for 22-bit hash
+    else if (n < NTOKENS + MAX22) {
+        result.type = 'hash';
+        result.callsign = "<...>";
+        result.details.hashValue = n - NTOKENS;
+    }
+    // Standard callsign
+    else {
+        result.type = 'standard';
+        let c = n - NTOKENS - MAX22;
+
+        // Decode last 3 characters (from right to left)
+        let suffix = '';
+        for (let i = 0; i < 3; i++) {
+            const charCode = c % 27;
+            suffix = (charCode === 0 ? '' : String.fromCharCode(charCode + 64)) + suffix;
+            c = Math.floor(c / 27);
+        }
+        result.details.suffix = suffix;
+
+        // Decode digit (always present)
+        const digit = c % 10;
+        result.details.digit = digit;
+        c = Math.floor(c / 10);
+
+        // Decode second character
+        const secondChar = c % 36;
+        result.details.secondChar = secondChar < 10 ? secondChar.toString() : String.fromCharCode(secondChar - 10 + 65);
+        c = Math.floor(c / 36);
+
+        // Decode first character (may be empty)
+        const firstChar = c % 37;
+        result.details.firstChar = firstChar === 0 ? '' : 
+                                   (firstChar <= 10 ? (firstChar - 1).toString() : 
+                                   String.fromCharCode(firstChar - 11 + 65));
+
+        // Construct full callsign
+        result.callsign = result.details.firstChar + result.details.secondChar + 
+                          result.details.digit + result.details.suffix;
+
+        // Handle special prefixes
+        if (result.callsign.startsWith('3D0') && result.callsign.length > 4) {
+            result.callsign = '3DA0' + result.callsign.slice(3);
+            result.details.specialPrefix = '3DA0';
+        } else if (result.callsign.startsWith('3X0') && result.callsign.length > 4) {
+            result.callsign = 'Q' + result.callsign.slice(1);
+            result.details.specialPrefix = 'Q';
+        }
+    }
+
+    return result;
+}
+
+function bitsToGrid4(bits) {
+    return bitsToGrid4Details(bits).text;
+}
+function bitsToGrid4Details(bits) {
+    if (bits.length !== 15) throw new Error("Grid must be 15 bits");
+    
+    const n = binaryToInt(bits);
+    
+    let result = {
+        raw: bits,
+        value: n,
+        type: 'grid',
+        text: '',
+        details: {}
+    };
+
+    if (n === 32768) {
+        result.text = '';
+        result.details.isBlank = true;
+        return result;
+    }
+
+    const longitude = -180 + (n % 180);
+    const latitude = -90 + Math.floor(n / 180);
+
+    const lonIndex = Math.floor((longitude + 180) / 20);
+    const latIndex = Math.floor((latitude + 90) / 10);
+
+    const subLonIndex = Math.floor((longitude + 180) % 20 / 2);
+    const subLatIndex = Math.floor((latitude + 90) % 10);
+
+    const gridChars = "ABCDEFGHIJKLMNOPQR";
+
+    result.text = gridChars[lonIndex] +
+                  gridChars[latIndex] +
+                  subLonIndex.toString() +
+                  subLatIndex.toString();
+
+    result.details = {
+        longitude,
+        latitude,
+        fieldLon: gridChars[lonIndex],
+        fieldLat: gridChars[latIndex],
+        squareLon: subLonIndex,
+        squareLat: subLatIndex
+    };
+
+    return result;
+}
+function bitsToReport(bits) {
+    return bitsToReportDetails(bits).text;
+}
+function bitsToReportDetails(bits) {
+    if (bits.length !== 5) throw new Error("Report must be 5 bits");
+    
+    const n = binaryToInt(bits);
+    
+    return {
+        raw: bits,
+        value: n,
+        type: 'report',
+        text: (n - 31).toString(),
+        details: {
+            snr: n - 31
+        }
+    };
+}
+function bitsToGrid4OrReport(bits) {
+    return bitsToGrid4OrReportDetails(bits).text;
+}
+function bitsToGrid4OrReportDetails(bits) {
+    if (bits.length !== 15) throw new Error("Grid/Report must be 15 bits");
+    
+    const n = binaryToInt(bits);
+    
+    let result = {
+        raw: bits,
+        value: n,
+        type: null,
+        text: '',
+        details: {}
+    };
+
+    if (n < 32768) {
+        // This is a grid locator
+        const gridResult = bitsToGrid4Details(bits);
+        result = {...result, ...gridResult};
+    } else {
+        // This is a signal report or special message
+        result.type = 'special';
+        if (n === 32768) {
+            result.text = 'RRR';
+            result.details.meaning = 'Roger, Roger, Roger';
+        } else if (n === 32769) {
+            result.text = 'RR73';
+            result.details.meaning = 'Roger, Roger, Best regards';
+        } else if (n === 32770) {
+            result.text = '73';
+            result.details.meaning = 'Best regards';
+        } else {
+            result.type = 'report';
+            const reportValue = (n - 32768 - 1) * 2 - 30;
+            result.text = reportValue.toString();
+            result.details = {
+                snr: reportValue
+            };
+        }
+    }
+
+    return result;
 }

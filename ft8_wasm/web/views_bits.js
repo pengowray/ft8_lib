@@ -1,3 +1,82 @@
+const annotationDefinitions = {
+    "0.0": [ // Free text
+        { label: "Free text", start: 0, length: 71, getValue: (bits) => bitsToText(bits.slice(0, 71)) },
+        { label: "i3.n3", start: 71, length: 6, getValue: (bits) => `0.0 (${bits.slice(71, 77)})` }
+    ],
+    "0.1": [ // DXpedition mode
+        { label: "Call1", start: 0, length: 28, getValue: (bits) => bitsToCall(bits.slice(0, 28)) },
+        { label: "Call2", start: 28, length: 28, getValue: (bits) => bitsToCall(bits.slice(28, 56)) },
+        { label: "Grid", start: 56, length: 10, getValue: (bits) => bitsToGrid4(bits.slice(56, 66)) },
+        { label: "Report", start: 66, length: 5, getValue: (bits) => bitsToReport(bits.slice(66, 71)) },
+        { label: "i3.n3", start: 71, length: 6, getValue: (bits) => `0.1 (${bits.slice(71, 77)})` }
+    ],
+    "0.2": [ // EU VHF Contest
+        { label: "Call1", start: 0, length: 28, getValue: (bits) => bitsToCall(bits.slice(0, 28)).callsign },
+        { label: "Call2", start: 28, length: 28, getValue: (bits) => bitsToCall(bits.slice(28, 56)).callsign },
+        { label: "R", start: 56, length: 1, getValue: (bits) => bits[56] === '1' ? 'R' : '' },
+        { label: "Serial", start: 57, length: 13, getValue: (bits) => binaryToInt(bits.slice(57, 70)).toString() },
+        { label: "i3.n3", start: 71, length: 6, getValue: (bits) => `0.2 (${bits.slice(71, 77)})` }
+    ],
+    "0.3": [ // ARRL Field Day
+        { label: "Call1", start: 0, length: 28, getValue: (bits) => bitsToCall(bits.slice(0, 28)).callsign },
+        { label: "Call2", start: 28, length: 28, getValue: (bits) => bitsToCall(bits.slice(28, 56)).callsign },
+        { label: "Class", start: 56, length: 4, getValue: (bits) => bitsToFieldDayClass(bits.slice(56, 60)) },
+        { label: "Section", start: 60, length: 8, getValue: (bits) => bitsToARRLSection(bits.slice(60, 68)) },
+        { label: "R", start: 68, length: 1, getValue: (bits) => bits[68] === '1' ? 'R' : '' },
+        { label: "N Tx", start: 69, length: 2, getValue: (bits) => (binaryToInt(bits.slice(69, 71)) + 1).toString() },
+        { label: "i3.n3", start: 71, length: 6, getValue: (bits) => `0.3 (${bits.slice(71, 77)})` }
+    ],
+    "0.4": [ // ARRL Field Day (alternate format)
+        { label: "Call1", start: 0, length: 28, getValue: (bits) => bitsToCall(bits.slice(0, 28)).callsign },
+        { label: "Call2", start: 28, length: 28, getValue: (bits) => bitsToCall(bits.slice(28, 56)).callsign },
+        { label: "Class", start: 56, length: 4, getValue: (bits) => bitsToFieldDayClass(bits.slice(56, 60)) },
+        { label: "Section", start: 60, length: 8, getValue: (bits) => bitsToARRLSection(bits.slice(60, 68)) },
+        { label: "R", start: 68, length: 1, getValue: (bits) => bits[68] === '1' ? 'R' : '' },
+        { label: "N Tx", start: 69, length: 2, getValue: (bits) => (binaryToInt(bits.slice(69, 71)) + 17).toString() },
+        { label: "i3.n3", start: 71, length: 6, getValue: (bits) => `0.4 (${bits.slice(71, 77)})` }
+    ],
+    "0.5": [ // Telemetry
+        { label: "Telemetry", start: 0, length: 71, getValue: (bits) => bitsToTelemetry(bits.slice(0, 71)) },
+        { label: "i3.n3", start: 71, length: 6, getValue: (bits) => `0.5 (${bits.slice(71, 77)})` }
+    ],
+    "1": [ // Standard message
+        { label: "Call1", start: 0, length: 28, getValue: (bits) => bitsToCall(bits.slice(0, 28)) },
+        { label: "Call2", start: 29, length: 28, getValue: (bits) => bitsToCall(bits.slice(29, 57)) },
+        { label: "Grid/Report", start: 58, length: 15, getValue: (bits) => bitsToGrid4OrReport(bits.slice(58, 73)) },
+        { label: "i3", start: 74, length: 3, getValue: (bits) => `1 (${bits.slice(74, 77)})` }
+    ],
+    "2": [ // EU VHF Contest
+        { label: "Call1", start: 0, length: 28, getValue: (bits) => bitsToCall(bits.slice(0, 28)).callsign },
+        { label: "Call2", start: 29, length: 28, getValue: (bits) => bitsToCall(bits.slice(29, 57)).callsign },
+        { label: "R", start: 58, length: 1, getValue: (bits) => bits[58] === '1' ? 'R' : '' },
+        { label: "Grid4", start: 59, length: 15, getValue: (bits) => bitsToGrid4(bits.slice(59, 74)) },
+        { label: "i3", start: 74, length: 3, getValue: (bits) => `2 (${bits.slice(74, 77)})` }
+    ],
+    "3": [ // ARRL RTTY Roundup
+        { label: "Call1", start: 0, length: 28, getValue: (bits) => bitsToCall(bits.slice(0, 28)).callsign },
+        { label: "Call2", start: 28, length: 28, getValue: (bits) => bitsToCall(bits.slice(28, 56)).callsign },
+        { label: "R", start: 56, length: 1, getValue: (bits) => bits[56] === '1' ? 'R' : '' },
+        { label: "RST", start: 57, length: 3, getValue: (bits) => bitsToRST(bits.slice(57, 60)) },
+        { label: "Serial/State", start: 60, length: 14, getValue: (bits) => bitsToSerialOrState(bits.slice(60, 74)) },
+        { label: "i3", start: 74, length: 3, getValue: (bits) => `3 (${bits.slice(74, 77)})` }
+    ],
+    "4": [ // Non-standard call
+        { label: "Hash", start: 0, length: 12, getValue: (bits) => `<${binaryToInt(bits.slice(0, 12)).toString(16).padStart(3, '0')}>` },
+        { label: "Call", start: 12, length: 58, getValue: (bits) => bitsToNonstandardCall(bits.slice(12, 70)) },
+        { label: "R", start: 70, length: 1, getValue: (bits) => bits[70] === '1' ? 'R' : '' },
+        { label: "RR73", start: 71, length: 3, getValue: (bits) => bitsToRR73(bits.slice(71, 74)) },
+        { label: "i3", start: 74, length: 3, getValue: (bits) => `4 (${bits.slice(74, 77)})` }
+    ],
+    "5": [ // EU VHF Contest with 6-digit grid locator
+        { label: "Call1", start: 0, length: 28, getValue: (bits) => bitsToCall(bits.slice(0, 28)).callsign },
+        { label: "Call2", start: 28, length: 28, getValue: (bits) => bitsToCall(bits.slice(28, 56)).callsign },
+        { label: "R", start: 56, length: 1, getValue: (bits) => bits[56] === '1' ? 'R' : '' },
+        { label: "Grid6", start: 57, length: 17, getValue: (bits) => bitsToGrid6(bits.slice(57, 74)) },
+        { label: "i3", start: 74, length: 3, getValue: (bits) => `5 (${bits.slice(74, 77)})` }
+    ]
+};
+
+
 class TribbleComponent extends Component {
     constructor(index, container) {
         super(index, container);
@@ -145,20 +224,36 @@ class TribbleComponent extends Component {
         this.addAnnotation(annotationsRow, 'parity', 133, 83);
         //this.addAnnotation(annotationsRow, 'sync', 216, 21);
 
-        this.addAnnotation(annotationsRow, 'n3', 92, 3);
-        this.addAnnotation(annotationsRow, 'i3', 95, 3);
+        //this.addAnnotation(annotationsRow, 'n3', 92, 3);
+        //this.addAnnotation(annotationsRow, 'i3', 95, 3);
 
-        var message = this.message;
-        var msgType = message.ft8MessageType;
+        const message = this.message;
+        const messageType = message.ft8MessageType;
+        const payloadBits = symbolsToBitsStr(this.message.symbolsText).slice(21, 108); //  + symbolsToBitsStr(this.message.symbolsText).slice(129, 216);
 
-        this.gridContainer.appendChild(annotationsRow);
+        // payload-specific annotations
+        if (annotationDefinitions[messageType]) {
+            annotationDefinitions[messageType].forEach(annotation => {
+                const value = annotation.getValue(payloadBits);
+                this.addAnnotation(
+                    annotationsRow, 
+                    `${annotation.label}:\n${value}`, 
+                    21 + annotation.start, 
+                    annotation.length
+                );
+            });
+        } else {
+            console.warn(`No annotation definition for message type: ${messageType}`);
+        }
+
+    this.gridContainer.appendChild(annotationsRow);
     }
 
     addAnnotation(row, label, start, len) {
         const annotation = document.createElement('div');
         annotation.className = 'annotation';
         annotation.textContent = label;
-        annotation.title = `start: ${(start * 0.160).toFixed(2)}s\nduration: ${(len * 0.160).toFixed(2)}s.`;
+        annotation.title = `${label}\nstart: ${(start * 0.160).toFixed(2)}s\nduration: ${(len * 0.160).toFixed(2)}s`;
 
         annotation.style.gridColumn = `${start + 1} / span ${len}`;
         row.appendChild(annotation);

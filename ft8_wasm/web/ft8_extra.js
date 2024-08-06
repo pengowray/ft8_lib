@@ -9,6 +9,8 @@ const CRC_POLYNOMIAL = 0x2757;  // 14-bit CRC polynomial without the leading 1
 const FTX_PAYLOAD_LENGTH_BYTES = 10;
 const FT8_NN = 79; // Total channel symbols
 
+const MAXGRID4 = 32400;
+
 // Parity generator matrix for (174,91) LDPC code, stored in bitpacked format (MSB first)
 // const uint8_t kFTX_LDPC_generator[FTX_LDPC_M][FTX_LDPC_K_BYTES] = [
 kFTX_LDPC_generator = [
@@ -337,7 +339,7 @@ function hashBitsPretty(bits) {
 
 function hashBitsPrettyHex(bits) {
     console.log('hashBitsPrettyHex', bits);
-    
+
     if (bits.match(/[^01]/)) {
         throw new Error("Invalid characters");
     }
@@ -886,10 +888,14 @@ function bitsToCall(bits) {
     const details = bitsToCallDetails(bits);
     return `${details.callsign} (${details.type})`;
 }
+
 // Convert 28 bits to a callsign
-function bitsToCallDetails(bits) {
-    if (bits.length !== 28) throw new Error("Callsign must be 28 bits");
-    
+function bitsToCallDetails(bits, extraBit = "") {
+    if (bits.length !== 28 && bits.length !== 29) throw new Error("Callsign must be 28 or 29 bits");
+
+    extraOn = (bits.length === 29 && bits[28] === '1');
+    bits = bits.slice(0, 28);
+
     const n = binaryToInt(bits);
     
     const NTOKENS = 2063592;  // Number of special tokens
@@ -902,6 +908,8 @@ function bitsToCallDetails(bits) {
         callsign: null,
         details: {}
     };
+
+    if (extraOn) result.extra = extraBit; // TODO: add "/R" or "/P" etc to call if using 29 bits.
 
     // Check for special tokens
     if (n < NTOKENS) {
@@ -983,11 +991,116 @@ function bitsToCallDetails(bits) {
 
     return result;
 }
-
-function bitsToGrid4(bits) {
-    return bitsToGrid4Details(bits).text;
+function isGrid4(grid) {
+    return grid.length === 4 &&
+           grid[0] >= 'A' && grid[0] <= 'R' &&
+           grid[1] >= 'A' && grid[1] <= 'R' &&
+           grid[2] >= '0' && grid[2] <= '9' &&
+           grid[3] >= '0' && grid[3] <= '9';
 }
-function bitsToGrid4Details(bits) {
+
+function grid4ToG15(input) {
+    if (isGrid4(input) && input !== 'RR73') {
+        let j1 = (input.charCodeAt(0) - 'A'.charCodeAt(0)) * 18 * 10 * 10;
+        let j2 = (input.charCodeAt(1) - 'A'.charCodeAt(0)) * 10 * 10;
+        let j3 = (input.charCodeAt(2) - '0'.charCodeAt(0)) * 10;
+        let j4 = (input.charCodeAt(3) - '0'.charCodeAt(0));
+        return j1 + j2 + j3 + j4;
+    } else {
+        let c1 = input[0];
+        if (c1 !== '+' && c1 !== '-' && input !== 'RRR' && input !== 'RR73' && 
+            input !== '73' && input.trim().length !== 0) {
+            throw new Error('Invalid input');
+        }
+        
+        let irpt;
+        if (c1 === '+' || c1 === '-') {
+            irpt = parseInt(input) + 35;
+        } else if (input.trim().length === 0) {
+            irpt = 1;
+        } else if (input === 'RRR') {
+            irpt = 2;
+        } else if (input === 'RR73') {
+            irpt = 3;
+        } else if (input === '73') {
+            irpt = 4;
+        } else {
+            throw new Error('Invalid input');
+        }
+        return MAXGRID4 + irpt;
+    }
+}
+
+function bitsToGrid4OrReport(bits) {
+    if (bits.length !== 15) throw new Error("Grid/Report must be 15 bits");
+    
+    const g15 = binaryToInt(bits);
+    
+    if (g15 < MAXGRID4) {
+        // This is a grid locator
+        let j1 = Math.floor(g15 / (18 * 10 * 10));
+        let remainder = g15 % (18 * 10 * 10);
+        let j2 = Math.floor(remainder / (10 * 10));
+        remainder = remainder % (10 * 10);
+        let j3 = Math.floor(remainder / 10);
+        let j4 = remainder % 10;
+
+        return String.fromCharCode('A'.charCodeAt(0) + j1) +
+               String.fromCharCode('A'.charCodeAt(0) + j2) +
+               j3.toString() +
+               j4.toString();
+    } else {
+        // This is a signal report or special message
+        const irpt = g15 - MAXGRID4;
+        if (irpt === 1) return '';
+        if (irpt === 2) return 'RRR';
+        if (irpt === 3) return 'RR73';
+        if (irpt === 4) return '73';
+        return (irpt - 35).toString();  // Signal report
+    }
+}
+
+function bitsToReport(bits) {
+    // r5 Report: -30 to +32, even numbers only
+
+    if (bits.length !== 5) throw new Error("Report must be 5 bits");
+    const n = binaryToInt(bits); // 0 to 31
+    return ((n * 2) - 30).toString();
+}
+
+function bitsToR2(bits) { // aka bitsToRR73
+    // 2 bits, 0 to 3
+    if (bits.length !== 2) throw new Error("R2 must be 2 bits");
+    //RRR, RR73, 73, or blank (but not in that order)
+    
+    if (bits === '00') return '';
+    if (bits === '01') return 'RRR';
+    if (bits === '10') return 'RR73';
+    if (bits === '11') return '73';
+
+    throw new Error("Invalid R2 bits");
+}
+
+function bitsToNonstandardCall(binary) {
+    const c = ' 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/';
+    let n58 = BigInt('0b' + binary);
+    let callsign = '';
+  
+    for (let i = 0; i < 11; i++) {
+      let index = Number(n58 % 38n);
+      callsign = c[index] + callsign;
+      n58 = n58 / 38n;
+    }
+  
+    return callsign.trim();
+}
+
+
+function bitsToGrid4_old(bits) {
+    return bitsToGrid4Details_old(bits).text;
+}
+
+function bitsToGrid4Details_old(bits) {
     if (bits.length !== 15) throw new Error("Grid must be 15 bits");
     
     const n = binaryToInt(bits);
@@ -1033,28 +1146,11 @@ function bitsToGrid4Details(bits) {
 
     return result;
 }
-function bitsToReport(bits) {
-    return bitsToReportDetails(bits).text;
+
+function bitsToGrid4OrReport_old(bits) {
+    return bitsToGrid4OrReportDetails_old(bits).text;
 }
-function bitsToReportDetails(bits) {
-    if (bits.length !== 5) throw new Error("Report must be 5 bits");
-    
-    const n = binaryToInt(bits);
-    
-    return {
-        raw: bits,
-        value: n,
-        type: 'report',
-        text: (n - 31).toString(),
-        details: {
-            snr: n - 31
-        }
-    };
-}
-function bitsToGrid4OrReport(bits) {
-    return bitsToGrid4OrReportDetails(bits).text;
-}
-function bitsToGrid4OrReportDetails(bits) {
+function bitsToGrid4OrReportDetails_old(bits) {
     if (bits.length !== 15) throw new Error("Grid/Report must be 15 bits");
     
     const n = binaryToInt(bits);
@@ -1069,7 +1165,7 @@ function bitsToGrid4OrReportDetails(bits) {
 
     if (n < 32768) {
         // This is a grid locator
-        const gridResult = bitsToGrid4Details(bits);
+        const gridResult = bitsToGrid4Details_old(bits);
         result = {...result, ...gridResult};
     } else {
         // This is a signal report or special message

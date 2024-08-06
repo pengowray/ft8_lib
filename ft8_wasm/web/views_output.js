@@ -19,6 +19,8 @@ class OutputComponent extends Component {
         const symbolsText = message.symbolsText;
         const originalInput = message.inputText;
         const inputType = message.inputType;
+        const messageType = message.ft8MessageType;
+        const messageInfo = getFT8MessageTypeName(messageType);
 
         console.log('symbolsText', symbolsText);
 
@@ -29,15 +31,24 @@ class OutputComponent extends Component {
         const parityCheckResult = message.getParityCheck();
 
         output.innerHTML = '';
+
+        if (message.inputText != null) {
+            output.innerHTML += `Input text: ${message.inputText}<br>`;
+        }
+
         if (inputType !== 'message') {
             output.innerHTML += `Input type: ${message.inputType}<br>`;
         }
+        output.innerHTML += `Message Type: ${messageInfo} (${messageType})<br>`;
+        output.innerHTML += '<hr>';
+
         //output.innerHTML += `Symbols: ${message.symbolsText}<br>`;
         output.innerHTML += `Symbols:<br>${symbolsPretty(message.symbolsText)}<br>`;
 
         output.innerHTML += `Packed:<br>${packedToHexStrSp(packedData)}<br>`;
 
         output.innerHTML += `Message (77 bits):<br>${(symbolsToBitsStrNoCosta(message.symbolsText).slice(0, 77))}<br>`;
+        output.innerHTML += '<hr>';
 
         // sync check (costas)
         const syncSpan = document.createElement('span');
@@ -72,6 +83,7 @@ class OutputComponent extends Component {
         output.appendChild(paritySpan);
 
         output.innerHTML += '<br>'
+        output.innerHTML += '<hr>';
 
         // re-decoded
         const decodedSpan = document.createElement('span');
@@ -102,10 +114,6 @@ class OutputComponent extends Component {
         }
         output.appendChild(decodedSpan);
 
-        const messageType = message.ft8MessageType;
-        const messageInfo = getFT8MessageTypeName(messageType);
-
-        output.innerHTML += `<br>Message Type: ${messageInfo} (${messageType})`;
         if (message.reDecodedResult.success) {
             output.innerHTML += `<br>Explanation: ${this.explainFT8Message(message.reDecodedResult.decodedText, messageType)}<br>`;
         }
@@ -118,7 +126,7 @@ class OutputComponent extends Component {
         /*=== Tests (expected vs actual) ===*/
 
         if (message.expectedResults) {
-            output.innerHTML += `<hr><br>Tests (comparison to known results): `;
+            output.innerHTML += `<hr>Tests (comparison to known results): `;
             const expected = message.expectedResults;
             console.log('expectedResults', expected);
             let expectedType = expected.type;
@@ -250,7 +258,7 @@ class OutputComponent extends Component {
                 explanation = `This is an unrecognized CQ message.`;
             }
         } else if (parts.length === 3 && isValidCallsign(parts[0]) && isValidCallsign(parts[1])) {
-            if (isReport(parts[2])) {
+            if (isReport(parts[2]) && parts[2] !== '73') {
                 explanation = `This is a signal report message. Station ${parts[0]} is sending a signal report of ${parts[2]} dB to station ${parts[1]}.`;
                 if (parts[2] === '73') { 
                     explanation += ' 73 is also shorthand for <i>best regards</i>.'

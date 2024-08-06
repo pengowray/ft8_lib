@@ -96,7 +96,7 @@ function initializeUI() {
                     doEncode(expectedResults);
                 } else if (selectedType === 'symbols') {
                     messageInput.value = selectedTest.symbols;
-                    const expectedResults = {...selectedTest, ...{symbols:null}}; // { messageType: selectedTest.type, text: selectedTest.message, decoded: selectedTest.decoded ?? null, error: selectedTest.error  ?? null };
+                    const expectedResults = {...selectedTest, ...{symbols:null}}; // don't bother testing symbols when it's supplied
                     doEncode(expectedResults);
                 }
             }

@@ -41,15 +41,21 @@ const annotationDefinitions = {
     ],
     "1": [ // Standard message
         { label: "Call1", start: 0, length: 28, getValue: (bits) => bitsToCall(bits.slice(0, 28)) },
+        //{ label: "r1", start: 28, length: 1, getValue: (bits) => placeholder(bits.slice(28, 29)) },
+        { label: "r", start: 28, length: 1, getValue: (bits) => bits[28] === '1' ? '/R' : '' },
         { label: "Call2", start: 29, length: 28, getValue: (bits) => bitsToCall(bits.slice(29, 57)) },
-        { label: "Grid/Report", start: 58, length: 15, getValue: (bits) => bitsToGrid4OrReport(bits.slice(58, 73)) },
+        //{ label: "r1", start: 57, length: 1, getValue: (bits) => placeholder(bits.slice(57, 58)) },
+        { label: "r", start: 57, length: 1, getValue: (bits) => bits[57] === '1' ? '/R' : '' },
+        //{ label: "R", start: 58, length: 1, getValue: (bits) => placeholder(bits.slice(58, 59)) },
+        { label: "R", start: 58, length: 1, getValue: (bits) => bits[58] === '1' ? 'R' : '' },
+        { label: "Grid/Report", start: 59, length: 15, getValue: (bits) => bitsToGrid4OrReport(bits.slice(59, 74)) },
         { label: "i3", start: 74, length: 3, getValue: (bits) => `1` }
     ],
     "2": [ // EU VHF Contest
         { label: "Call1", start: 0, length: 28, getValue: (bits) => bitsToCall(bits.slice(0, 28)) },
         { label: "Call2", start: 29, length: 28, getValue: (bits) => bitsToCall(bits.slice(29, 57)) },
         { label: "R", start: 58, length: 1, getValue: (bits) => bits[58] === '1' ? 'R' : '' },
-        { label: "Grid4", start: 59, length: 15, getValue: (bits) => bitsToGrid4(bits.slice(59, 74)) },
+        { label: "Grid4", start: 59, length: 15, getValue: (bits) => bitsToGrid4OrReport(bits.slice(59, 74)) },
         { label: "i3", start: 74, length: 3, getValue: (bits) => `2` }
     ],
     "3": [ // ARRL RTTY Roundup
@@ -60,11 +66,12 @@ const annotationDefinitions = {
         { label: "Serial/State", start: 60, length: 14, getValue: (bits) => bitsToSerialOrState(bits.slice(60, 74)) },
         { label: "i3", start: 74, length: 3, getValue: (bits) => `3` }
     ],
-    "4": [ // Non-standard call
+    "4": [ // Non-standard call: h12 c58 h1 r2 c1
         { label: "Hash", start: 0, length: 12, getValue: (bits) => bitsToHash(bits.slice(0, 12)) },
-        { label: "Call", start: 12, length: 58, getValue: (bits) => bitsToNonstandardCall(bits.slice(12, 70)) },
-        { label: "R", start: 70, length: 1, getValue: (bits) => bits[70] === '1' ? 'R' : '' },
-        { label: "RR73", start: 71, length: 3, getValue: (bits) => bitsToRR73(bits.slice(71, 74)) },
+        { label: "Nonstandard Call", start: 12, length: 58, getValue: (bits) => bitsToNonstandardCall(bits.slice(12, 70)) },
+        { label: "h", start: 70, length: 1, getValue: (bits) => bits[70] === '1' ? '1 (Hash is second callsign)' : '0 (Hash is first callsign)' },
+        { label: "r2", start: 71, length: 2, getValue: (bits) => bitsToR2(bits.slice(71, 73)) },
+        { label: "c", start: 73, length: 1, getValue: (bits) => bits[70] === '1' ? '1 (First callsign is CQ. Ignore hash)' : '0' },
         { label: "i3", start: 74, length: 3, getValue: (bits) => `4` }
     ],
     "5": [ // EU VHF Contest with 6-digit grid locator
@@ -77,13 +84,6 @@ const annotationDefinitions = {
 };
 
 //TODO
-function bitsToNonstandardCall(bits) {
-    return placeholder(bits);
-}
-
-function bitsToRR73(bits) {
-    return placeholder(bits);
-}
 
 function bitsToTelemetry(bits) {
     return telemetryToText(bits);
@@ -106,9 +106,6 @@ function bitsToRST(bits) {
     return placeholder(bits);
 }
 
-function bitsToReport(bits) {
-    return placeholder(bits);
-}
 function bitsToSerialOrState(bits) {
     return placeholder(bits);
 }
@@ -371,6 +368,4 @@ class TribbleComponent extends Component {
         
     initialUpdate() {
     }
-
-
 }

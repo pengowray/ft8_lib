@@ -20,19 +20,21 @@ const annotationDefinitions = {
     "0.3": [ // ARRL Field Day
         { label: "Call1", start: 0, length: 28, getValue: (bits) => bitsToCall(bits.slice(0, 28)) },
         { label: "Call2", start: 28, length: 28, getValue: (bits) => bitsToCall(bits.slice(28, 56)) },
-        { label: "Class", start: 56, length: 4, getValue: (bits) => bitsToFieldDayClass(bits.slice(56, 60)) },
-        { label: "Section", start: 60, length: 8, getValue: (bits) => bitsToARRLSection(bits.slice(60, 68)) },
-        { label: "R", start: 68, length: 1, getValue: (bits) => bits[68] === '1' ? 'R' : '' },
-        { label: "N Tx", start: 69, length: 2, getValue: (bits) => (binaryToInt(bits.slice(69, 71)) + 1).toString() },
-        { label: "i3.n3", start: 71, length: 6, getValue: (bits) => `0.3` }
+        { label: "R", start: 56, length: 1, getValue: (bits) => bits[56] === '1' ? 'R' : '' },
+        { label: "nTx", start: 57, length: 4, getValue: (bits) => bitsToTxNumber(bits.slice(57, 61)) },
+        { label: "Class", start: 61, length: 3, getValue: (bits) => bitsToFieldDayClass(bits.slice(61, 64)) },
+        { label: "Section", start: 64, length: 7, getValue: (bits) => bitsToARRLSection(bits.slice(64, 71)) },
+        { label: "i3.n3", start: 71, length: 6, getValue: (bits) => `0.4` }
     ],
-    "0.4": [ // ARRL Field Day (alternate format)
+    "0.4": [ // ARRL Field Day (alternate format) c28 c28 R1 n4 k3 S7
+        //n4 Number of transmitters: 1-16, 17-32
+        //S7 ARRL/RAC Section
         { label: "Call1", start: 0, length: 28, getValue: (bits) => bitsToCall(bits.slice(0, 28)) },
         { label: "Call2", start: 28, length: 28, getValue: (bits) => bitsToCall(bits.slice(28, 56)) },
-        { label: "Class", start: 56, length: 4, getValue: (bits) => bitsToFieldDayClass(bits.slice(56, 60)) },
-        { label: "Section", start: 60, length: 8, getValue: (bits) => bitsToARRLSection(bits.slice(60, 68)) },
-        { label: "R", start: 68, length: 1, getValue: (bits) => bits[68] === '1' ? 'R' : '' },
-        { label: "N Tx", start: 69, length: 2, getValue: (bits) => (binaryToInt(bits.slice(69, 71)) + 17).toString() },
+        { label: "R", start: 56, length: 1, getValue: (bits) => bits[56] === '1' ? 'R' : '' },
+        { label: "nTx", start: 57, length: 4, getValue: (bits) => bitsToTxNumber(bits.slice(57, 61)) },
+        { label: "Class", start: 61, length: 3, getValue: (bits) => bitsToFieldDayClass(bits.slice(61, 64)) },
+        { label: "Section", start: 64, length: 7, getValue: (bits) => bitsToARRLSection(bits.slice(64, 71)) },
         { label: "i3.n3", start: 71, length: 6, getValue: (bits) => `0.4` }
     ],
     "0.5": [ // Telemetry
@@ -93,19 +95,11 @@ function bitsToGrid6(bits) {
     return placeholder(bits);
 }
 
-function bitsToFieldDayClass(bits) {
-    return placeholder(bits);
-}
-function bitsToARRLSection(bits) {
-    return placeholder(bits);
-}
 function bitsToHash(bits) {
+    // if (bits.length == 22) return hashBits22styleBase10(bits); // 
     return hashBitsPrettyHex(bits);
+    
 }
-function bitsToRST(bits) {
-    return placeholder(bits);
-}
-
 function bitsToSerialOrState(bits) {
     return placeholder(bits);
 }
@@ -229,6 +223,7 @@ class TribbleComponent extends Component {
         symbolElement.textContent = symbol;
         symbolElement.dataset.index = index;
         symbolElement.style.gridColumn = `${index * 3 + 1} / span 3`;
+        symbolElement.title = `${symbol}\nSymbol #${index + 1}\nGraycode: ${symbolsToGrayBitsStr(symbol)}\nMaps to binary: ${symbolsToBitsStr(symbol)} (=${parseInt(symbolsToBitsStr(symbol),2)})\nStart: ${(index * 0.160).toFixed(2)}s, duration: ${(0.160).toFixed(2)}s`;
         return symbolElement;
     }
 
@@ -312,7 +307,7 @@ class TribbleComponent extends Component {
         const annotation = document.createElement('div');
         annotation.className = 'annotation';
         annotation.textContent = label;
-        annotation.title = `${tooltip ?? label}\nstart: ${(start * 0.160).toFixed(2)}s\nduration: ${(len * 0.160).toFixed(2)}s`;
+        annotation.title = `${tooltip ?? label}\nBits: ${len}`;
 
         annotation.style.gridColumn = `${start + 1} / span ${len}`;
         row.appendChild(annotation);

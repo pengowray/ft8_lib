@@ -29,12 +29,12 @@
             --button-bg: #45a049;
             --button-text: #ffffff;
 
-            --error-text: #ff0000;
+            --error-text: #ff4400;
             --warning-text: orange;
 
             --position-line-color: white;
-            --costas-bg: #545454;
-            --data-bg: #1f1f1f;
+            --costas-bg: rgb(33, 59, 125);
+            --data-bg: #837e94;
             --ramp-bg: #333333;
 
             --link-color: #61dafb;
@@ -321,10 +321,14 @@
             border: 1px solid var(--border-color);
             overflow: hidden;
             padding: 2px;
-            font-size: 0.8em;
+            font-size: 0.9em;
             text-align: center;
             text-overflow: ellipsis;
             white-space: nowrap;
+        }
+
+        .bit {
+            font-size: 0.6em;
         }
 
         .annotations-row3 .annotation {
@@ -347,7 +351,6 @@
         .symbol.costas {
             background-color: var(--costas-bg);
             color: var(--packed-color);
-
         }
         
         .symbol.data {
@@ -394,13 +397,13 @@
         @media (prefers-color-scheme: dark) {
             :root {
                 --border-color: #555;
-                --costas-bg: #2c3e50;
-                --data-bg: #34495e;
-                --bit-one-bg: #27ae60;
-                --bit-zero-bg: #c0392b;
+                --data-bg: #2c3e50;
+                --costas-bg: #34495e;
+                --bit-one-bg: #b36954;
+                --bit-zero-bg: #4da8ed;
                 --packed-bg: #7f8c8d;
                 --packed-color: #ecf0f1;
-                --annotation-bg: #8e44ad;
+                --annotation-bg: #6e577d;
                 --annotation-color: #ecf0f1;
                 --highlight-color: #f39c12;
             }
@@ -410,10 +413,10 @@
         @media (prefers-color-scheme: light) {
             :root {
                 --border-color: #ccc;
-                --costas-bg: #bdc3c7;
-                --data-bg: #ecf0f1;
-                --bit-one-bg: #2ecc71;
-                --bit-zero-bg: #e74c3c;
+                --data-bg: #bdc3c7;
+                --costas-bg: #ecf0f1;
+                --bit-one-bg: #87c5a1;
+                --bit-zero-bg: #87c5c0;
                 --packed-bg: #95a5a6;
                 --packed-color: #2c3e50;
                 --annotation-bg: #9b59b6;

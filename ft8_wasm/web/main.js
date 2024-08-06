@@ -80,7 +80,7 @@ function initializeUI() {
 
             const option2 = document.createElement('option');
             option2.value = `symbols ${index}`;
-            option2.textContent = `(${test.type}) ${test.message} (symbols)`;
+            option2.textContent = `(${test.type}) ${test.message} (from symbols)`;
             testSelect.appendChild(option2);
         });
 

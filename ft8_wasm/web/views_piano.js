@@ -46,12 +46,26 @@ class PianoRollComponent extends Component {
     }
 
     getSymbolBackgroundColor(index) {
+        return 'var(--data-bg)';
         if (this.isCostasSymbol(index)) {
             return 'var(--costas-bg)';
-            //return 'var(--data-bg)';
         } else {
             return 'var(--data-bg)';
         }
+    }
+
+    getHighlightColor(index, symbol) {
+        if (this.isCostasSymbol(index)) {
+            return 'var(--costas-bg)';
+        }
+
+        const colors = ['#ff6b6b', '#feca57', '#48dbfb', '#ff9ff3', '#54a0ff', '#5f27cd', '#ff6b6b', '#ff6b6b'];
+        const colors2 = ['#d0e11b', '#ffaa33'];
+        if (typeof symbol === 'string' && !isNaN(symbol)) {
+            symbol = parseInt(symbol);
+        }
+        return colors2[symbol % colors2.length];
+        //return colors[symbol];
     }
 
     isCostasSymbol(index) {
@@ -136,7 +150,7 @@ class PianoRollComponent extends Component {
             }
             //console.log('v', v, 'currentSymbolIndex', currentSymbolIndex);
             if (v === currentSymbolIndex) {
-                symbols[i].style.backgroundColor = this.getHighlightColor(symbol);
+                symbols[i].style.backgroundColor = this.getHighlightColor(i, symbol);
             } else {
                 symbols[i].style.backgroundColor = this.getSymbolBackgroundColor(i);
             }
@@ -146,14 +160,6 @@ class PianoRollComponent extends Component {
         if (this.positionLine != null) {
             this.positionLine.style.left = `${timing.progress.toFixed(3)}%`;
         }
-    }
-
-    getHighlightColor(symbol) {
-        const colors = ['#ff6b6b', '#feca57', '#48dbfb', '#ff9ff3', '#54a0ff', '#5f27cd', '#ff6b6b', '#ff6b6b'];
-        if (typeof symbol === 'string' && !isNaN(symbol)) {
-            symbol = parseInt(symbol);
-        }
-        return colors[symbol];
     }
 
     initialUpdate() {

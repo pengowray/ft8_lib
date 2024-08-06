@@ -196,10 +196,13 @@ const LDPC_NUM_ROWS = [
     6, 6, 6
 ];
 
+const ARRL_SEC = "AB AK AL AR AZ BC CO CT DE EB EMA ENY EPA EWA GA GTA IA ID IL IN KS KY LA LAX MAR MB MDC ME MI MN MO MS MT NC ND NE NFL NH NL NLI NM NNJ NNY NT NTX NV OH OK ONE ONN ONS OR ORG PAC PR QC RI SB SC SCV SD SDG SF SFL SJV SK SNJ STX SV TN UT VA VI VT WCF WI WMA WNY WPA WTX WV WWA WY".split(' ');
+
 // Gray code map (FTx bits -> channel symbols)
 const GRAY_MAP = [0, 1, 3, 2, 5, 6, 4, 7];
 const GRAY_INV = [0, 1, 3, 2, 6, 4, 5, 7];
 const GRAY_OFF = [0, 1, 2, 3, 4, 5, 6, 7];
+
 
 function symbolsToBitsStr(symbols) {
     return symbols.split('').map(s => GRAY_INV[parseInt(s)].toString(2).padStart(3, '0')).join('');
@@ -320,22 +323,6 @@ function symbolsToPrettyBinary(symbols) {
     return symbolsToBitsStrPreserveSpaces(symbolsPretty(symbols));
 }
 
-function hashBitsPretty(bits) {
-    // 10, 12, or 22 bits
-
-    // 0000000000 11 0000000000
-    const len = bits.length;
-    if (len == 22) {
-        return `${bits.slice(0, 10)} ${bits.slice(10, 12)} ${bits.slice(12, 22)}`;
-    } else if (len == 12) {
-        return `xxxxxxxxxx ${bits.slice(0, 2)} ${bits.slice(2, 12)}`;
-    } else if (len == 10) {
-        return `xxxxxxxxxx xx ${bits}`;
-    }
-
-    // other length/error
-    return bits;
-}
 
 function hashBitsPrettyHex(bits) {
     console.log('hashBitsPrettyHex', bits);
@@ -357,6 +344,38 @@ function hashBitsPrettyHex(bits) {
     } else {
         throw new Error("Invalid length: " + len + " in '" + bits + "'");
     }
+}
+
+function hashBitsPretty(bits) {
+    // 10, 12, or 22 bits
+
+    // 0000000000-11-0000000000
+
+    const len = bits.length;
+    if (len == 22) {
+        return `${bits.slice(0, 10)}-${bits.slice(10, 12)}-${bits.slice(12, 22)}`;
+    } else if (len == 12) {
+        return `xxxxxxxxxx-${bits.slice(0, 2)}-${bits.slice(2, 12)}`;
+    } else if (len == 10) {
+        return `xxxxxxxxxx-xx-${bits}`;
+    }
+
+    // other length/error
+    return bits;
+}
+
+function hashBits22styleBase10(bits) {
+    // 22-bit hash in the style of hash22calc.exe (WSJT-X)
+    // decimal value of the 22-bit hash, padded to 7 digits
+
+    if (bits.match(/[^01]/)) {
+        throw new Error("Invalid characters");
+    }
+    if (bits.length != 22) {
+        throw new Error("Invalid length: " + len + " in '" + bits + "'");
+    }
+
+    return binaryToInt(bits).toString().padStart(7, '0');
 }
 
 const FT8_CRC_WIDTH = 14;
@@ -1190,4 +1209,37 @@ function bitsToGrid4OrReportDetails_old(bits) {
     }
 
     return result;
+}
+
+
+function bitsToFieldDayClass(bits) {
+    //k3 Field Day Class: A, B, ... F
+    return String.fromCharCode('A'.charCodeAt(0) + binaryToInt(bits));
+}
+
+function bitsToARRLSection(bits) {
+    if (bits.length !== 7) throw new Error("ARRL Section must be 7 bits");
+    let n = binaryToInt(bits);
+    if (n == 0) return ''
+    
+    n--;
+    if (n < 0 || n >= ARRL_SEC.length) {
+        //return "Invalid ARRL Section";
+        return `Section ${n}`;
+    }
+    return ARRL_SEC[n];
+}
+
+function bitsToTxNumber(bits) {
+    // n4 Number of transmitters: 1-16, 17-32
+    if (bits.length !== 4) throw new Error("Tx Number must be 4 bits");
+    const n = binaryToInt(bits);
+    return `${n + 1} or ${n + 17}`;
+}
+
+function bitsToRST(bits) {
+    //r3 Report: 2-9, displayed as 529 – 599 or 52 - 59
+    if (bits.length !== 3) throw new Error("RST must be 3 bits");
+    const n = binaryToInt(bits) + 2;
+    return `5${n} or 5${n}9`;
 }

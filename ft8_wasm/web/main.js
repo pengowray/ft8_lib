@@ -1,4 +1,3 @@
-
 const exampleMessages = [
     "CQ K1ABC FN42",
     "K1ABC W9XYZ -15",
@@ -7,6 +6,8 @@ const exampleMessages = [
     "W9XYZ K1ABC 73",
     "<TNX BOB 73 GL>"
 ];
+
+
 
 function initializeUI() {
     //let currentTime = 0;
@@ -44,13 +45,62 @@ function initializeUI() {
     const pianoRollDiv = document.getElementById('piano-roll');
     const audioVisualization = document.getElementById('audio-visualization');
     const tribbleViz = document.getElementById('tribble-visualization');
+    const testSelect = document.getElementById('test-select');
 
     viewManager.registerComponent(new VizComponent(-1, audioVisualization));
     viewManager.registerComponent(new PianoRollComponent(-1, pianoRollDiv));
     viewManager.registerComponent(new OutputComponent(-1, output));
     viewManager.registerComponent(new TribbleComponent(-1, tribbleViz));
 
-    
+    const initializeTestInputs = () => {;
+        testInputs.forEach((test, index) => {
+            const option = document.createElement('option');
+            option.value = index;
+            option.textContent = test.name || test.value;
+            testSelect.appendChild(option);
+        });
+
+        testSelect.addEventListener('change', (event) => {
+            const selectedIndex = event.target.value;
+            if (selectedIndex !== "") {
+                const selectedTest = testInputs[selectedIndex];
+                messageInput.value = selectedTest.value;
+                encodeButton.click();
+            }
+        });
+    }
+    //initializeTestInputs();
+
+    const initializeTestInputs_ft8code = () => {;
+        testInputs_ft8code.forEach((test, index) => {
+            const option = document.createElement('option');
+            option.value = `msg ${index}`;
+            option.textContent = `${test.message}`;
+            testSelect.appendChild(option);
+
+            const option2 = document.createElement('option');
+            option2.value = `symbols ${index}`;
+            option2.textContent = `${test.message} (symbols)`;
+            testSelect.appendChild(option2);
+        });
+
+        testSelect.addEventListener('change', (event) => {
+            const selected = event.target.value.split(' ');
+            selectedType = selected[0];
+            selectedIndex = parseInt(selected[1]);
+            if (selectedIndex !== "") {
+                const selectedTest = testInputs_ft8code[selectedIndex];
+                if (selectedType === 'msg') {
+                    messageInput.value = selectedTest.message;
+                } else if (selectedType === 'symbols') {
+                    messageInput.value = selectedTest.symbols;
+                }
+                encodeButton.click();
+            }
+        });
+    }
+    initializeTestInputs_ft8code();
+
     const parseFreq = (note) => {
         return parseNote(note) || parseFloat(note) || 500;
     }

@@ -113,7 +113,7 @@ function bitsToSerialOrState(bits) {
     return placeholder(bits);
 }
 function placeholder(bits) {
-    return `undecoded value: ${binaryToInt(bits).toString()}`;
+    return `${binaryToInt(bits).toString()} (undecoded value)`;
 }
 
 
@@ -246,38 +246,55 @@ class TribbleComponent extends Component {
     }
 
     addAnnotations() {
-        const annotationsRow = document.createElement('div');
-        annotationsRow.className = 'annotations-row';
-        annotationsRow.style.display = 'contents';
+        const annotationsRow1 = document.createElement('div');
+        annotationsRow1.className = 'annotations-row1';
+        annotationsRow1.style.display = 'contents';
+
+        const annotationsRow2 = document.createElement('div');
+        annotationsRow2.className = 'annotations-row2';
+        annotationsRow2.style.display = 'contents';
         
-        this.addAnnotation(annotationsRow, 'sync', null, 0, 21);
-        this.addAnnotation(annotationsRow, 'data', null, 21, 87);
-        this.addAnnotation(annotationsRow, 'sync', null, 108, 21);
-        this.addAnnotation(annotationsRow, 'data', null, 129, 87);
-        this.addAnnotation(annotationsRow, 'sync', null, 216, 21);
+        const annotationsRow3 = document.createElement('div');
+        annotationsRow3.className = 'annotations-row3';
+        annotationsRow3.style.display = 'contents';
 
-        //this.addAnnotation(annotationsRow, 'sync', null, 0, 21);
-        this.addAnnotation(annotationsRow, 'payload', null, 21, 77);
-        this.addAnnotation(annotationsRow, 'crc', null, 98, 10);
-        //this.addAnnotation(annotationsRow, 'sync', null, 108, 21);
-        this.addAnnotation(annotationsRow, 'crc', null, 129, 4);
-        this.addAnnotation(annotationsRow, 'parity', null, 133, 83);
-        //this.addAnnotation(annotationsRow, 'sync', null, 216, 21);
+        const annotationsRow4 = document.createElement('div');
+        annotationsRow4.className = 'annotations-row4';
+        annotationsRow4.style.display = 'contents';
 
-        //this.addAnnotation(annotationsRow, 'n3', null, 92, 3);
-        //this.addAnnotation(annotationsRow, 'i3', null, 95, 3);
+        this.addAnnotation(annotationsRow1, 'sync', null, 0, 21);
+        this.addAnnotation(annotationsRow1, 'data', null, 21, 87);
+        this.addAnnotation(annotationsRow1, 'sync', null, 108, 21);
+        this.addAnnotation(annotationsRow1, 'data', null, 129, 87);
+        this.addAnnotation(annotationsRow1, 'sync', null, 216, 21);
+
+        this.addAnnotation(annotationsRow2, 'payload', null, 21, 77);
+        this.addAnnotation(annotationsRow2, 'crc', null, 98, 10);
+        this.addAnnotation(annotationsRow2, 'crc', null, 129, 4);
+        this.addAnnotation(annotationsRow2, 'parity', null, 133, 83);
 
         const message = this.message;
         const messageType = message.ft8MessageType;
-        const payloadBits = symbolsToBitsStr(this.message.symbolsText).slice(21, 108); //  + symbolsToBitsStr(this.message.symbolsText).slice(129, 216);
+        const payloadBits = symbolsToBitsStr(this.message.symbolsText).slice(21, 108);
 
-        // payload-specific annotations
         if (annotationDefinitions[messageType]) {
             annotationDefinitions[messageType].forEach(annotation => {
                 const value = annotation.getValue(payloadBits);
+                let shortValue = value;
+                if (value.endsWith(' (undecoded value)')) {
+                    shortValue = value.split(' ')[0] + "*";
+                }
+
                 this.addAnnotation(
-                    annotationsRow, 
+                    annotationsRow3, 
                     `${annotation.label}`, 
+                    `${annotation.label}`, 
+                    21 + annotation.start, 
+                    annotation.length
+                );
+                this.addAnnotation(
+                    annotationsRow4, 
+                    shortValue, 
                     `${annotation.label}:\n${value}`, 
                     21 + annotation.start, 
                     annotation.length
@@ -287,7 +304,11 @@ class TribbleComponent extends Component {
             console.warn(`No annotation definition for message type: ${messageType}`);
         }
 
-    this.gridContainer.appendChild(annotationsRow);
+        this.gridContainer.appendChild(annotationsRow1);
+        this.gridContainer.appendChild(annotationsRow2);
+        this.gridContainer.appendChild(annotationsRow3);
+        this.gridContainer.appendChild(annotationsRow4);
+
     }
 
     addAnnotation(row, label, tooltip, start, len) {

@@ -319,26 +319,51 @@
             align-items: center;
             height: 2em;
             border: 1px solid var(--border-color);
+            overflow: hidden;
+            padding: 2px;
+            font-size: 0.8em;
+            text-align: center;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
-        
+
+        .annotations-row3 .annotation {
+            border-bottom: none;
+            margin-bottom: 0;
+            /* border-radius: 4px 4px 0 0; */
+        }
+
+        .annotations-row4 .annotation {
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            padding-top: 0;
+            margin-top: 0;
+        }
+
         .symbol {
             font-weight: bold;
         }
         
         .symbol.costas {
             background-color: var(--costas-bg);
+            color: var(--packed-color);
+
         }
         
         .symbol.data {
             background-color: var(--data-bg);
+            color: var(--packed-color);
         }
         
         .bit-one {
             background-color: var(--bit-one-bg);
+            color: var(--packed-color);
+
         }
         
         .bit-zero {
             background-color: var(--bit-zero-bg);
+            color: var(--packed-color);
         }
         
         .packed {

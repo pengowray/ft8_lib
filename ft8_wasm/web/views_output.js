@@ -112,9 +112,8 @@ class OutputComponent extends Component {
 
         if (message.encodeError_ft8lib) {
             console.log('FT8Lib error', message.encodeError_ft8lib);
-            output.innerHTML += `Fallback to free text reason: ${message.encodeError_ft8lib}<br>`;
+            output.innerHTML += `<span title="Tried using FT8_Lib to encode input but got this error, so as a fallback treated input as free text">Fallback to free text reason: ${message.encodeError_ft8lib}</span><br>`;
         }
-
     }
 
     FT8MessageTypeInfo() { 

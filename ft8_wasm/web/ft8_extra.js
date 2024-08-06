@@ -336,11 +336,11 @@ function hashBitsPrettyHex(bits) {
     // 10 bit: xxx-x-ccc
     const len = bits.length;
     if (len == 22) {
-        return `<${bitsToHex(bits.slice(0, 10).padStart(12, '0'))}-${bitsToHex(bits.slice(10, 12).padStart(4, '0'))}-${bitsToHex(bits.slice(12, 22).padStart(12, '0'))}>`;
+        return `${bitsToHex(bits.slice(0, 10).padStart(12, '0'))}-${bitsToHex(bits.slice(10, 12).padStart(4, '0'))}-${bitsToHex(bits.slice(12, 22).padStart(12, '0'))}`;
     } else if (len == 12) {
-        return `<xx-${bitsToHex(bits.slice(0, 2).padStart(4, '0'))}-${bitsToHex(bits.slice(2, 10).padStart(12, '0'))}>`;
+        return `xxx-${bitsToHex(bits.slice(0, 2).padStart(4, '0'))}-${bitsToHex(bits.slice(2, 10).padStart(12, '0'))}`;
     } else if (len == 10) {
-        return `<xxx-x-${bitsToHex(bits)}>`;
+        return `xxx-x-${bitsToHex(bits)}`;
     } else {
         throw new Error("Invalid length: " + len + " in '" + bits + "'");
     }

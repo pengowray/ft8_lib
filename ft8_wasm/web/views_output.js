@@ -33,7 +33,9 @@ class OutputComponent extends Component {
         output.innerHTML = '';
 
         if (message.inputText != null) {
-            output.innerHTML += `Input text: ${message.inputText}<br>`;
+            output.innerHTML += `Input text: `;
+            output.appendChild(document.createTextNode(message.inputText));
+            output.innerHTML += '<br>';
         }
 
         if (inputType !== 'message') {
@@ -152,7 +154,9 @@ class OutputComponent extends Component {
                         output.innerHTML += `<br> ✅ Decoded: OK (match)`;
                     }
                 } else {
-                    output.innerHTML += `<br> ❌ Decoded: Expected: "${expectedMessage}", Decoded: "${actualMessage}"`;
+                    output.innerHTML += `<br> ❌ Decoded: Expected: `;
+                    // escape <>'s
+                    output.appendChild(document.createTextNode(`"${expectedMessage}", Decoded: "${actualMessage}"`));
                 }
             }
 

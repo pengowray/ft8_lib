@@ -453,19 +453,6 @@ function initializeUI() {
         }
     }
 
-
-    /**
-     * 
-     * @param {FT8Message} message 
-     */
-    function setupAudioPlayback(message) {
-        //was:     function setupAudioPlayback(audioSamples, dphiSamples, sampleRate, metadata) {
-
-        audioControls.style.display = 'block';
-        updateButtonState(false);
-        countdownDiv.style.display = 'none';
-    }
-
     exampleMessages.forEach(message => {
         const button = document.createElement('button');
         button.textContent = message;
@@ -479,10 +466,6 @@ function initializeUI() {
 
     themeToggle.addEventListener('click', () => {
         document.body.classList.toggle('dark-mode');
-        const positionLine = document.getElementById('position-line');
-        if (positionLine) {
-            positionLine.style.backgroundColor = document.body.classList.contains('dark-mode') ? 'white' : 'red';
-        }
     });
 
     toggleSettingsButton.addEventListener('click', () => {

@@ -40,12 +40,7 @@ body {
     color: var(--text-color);
     background-color: var(--bg-color);
     padding: 20px;
-    transition: all 0.3s ease;
-}
-
-.container {
-    max-width: 800px;
-    margin: 0 auto;
+    transition: background-color 0.3s, color 0.3s;
 }
 
 h1, h2 {
@@ -462,4 +457,129 @@ body:not(.dark-mode) #piano-roll {
         display: block;
         margin-bottom: 20px;
     }
+}
+
+/***** output boxes *****/
+
+:root {
+/*    --bg-color: #f4f4f4; */
+/*    --text-color: #333; */
+    --box-bg: #fff;
+    --box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    --header-bg: #4a4a4a;
+    --header-color: #fff;
+    --value-bg: #f9f9f9;
+    --check-ok-bg: #d4edda;
+    --check-ok-color: #155724;
+    --check-error-bg: #f8d7da;
+    --check-error-color: #721c24;
+}
+
+.dark-mode {
+/*    --bg-color: #1a1a1a; */
+/*    --text-color: #e0e0e0; */
+    --box-bg: #2c2c2c;
+    --box-shadow: 0 2px 4px rgba(255,255,255,0.1);
+    --header-bg: #3a3a3a;
+    --header-color: #fff;
+    --value-bg: #383838;
+    --check-ok-bg: #1e4620;
+    --check-ok-color: #9be9a8;
+    --check-error-bg: #4c1d1d;
+    --check-error-color: #f8d7da;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.output-box {
+    background-color: var(--box-bg);
+    border-radius: 8px;
+    box-shadow: var(--box-shadow);
+    margin-bottom: 20px;
+    overflow: hidden;
+}
+
+.output-box h2 {
+    background-color: var(--header-bg);
+    color: var(--header-color);
+    margin: 0;
+    padding: 10px 15px;
+    font-size: 18px;
+}
+
+.output-content {
+    padding: 10px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.output-row {
+    margin-bottom: 5px;
+}
+
+.full-width {
+    grid-column: 1 / -1;
+}
+
+.output-label {
+    font-weight: bold;
+    margin-bottom: 2px;
+}
+
+.output-value {
+    background-color: var(--value-bg);
+    padding: 5px;
+    border-radius: 4px;
+    font-family: monospace;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.checks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.check-result {
+    display: inline-block;
+    padding: 3px 6px;
+    border-radius: 3px;
+    font-weight: bold;
+    font-size: 0.9em;
+}
+
+.check-ok {
+    background-color: var(--check-ok-bg);
+    color: var(--check-ok-color);
+}
+
+.check-error {
+    background-color: var(--check-error-bg);
+    color: var(--check-error-color);
+}
+
+.check-neutral {
+    background-color: #f0f0f0;
+    color: #666;
+}
+
+.check-disabled {
+    background-color: #e0e0e0;
+    color: #999;
+    opacity: 0.7;
+}
+
+.dark-mode .check-neutral {
+    background-color: #4a4a4a;
+    color: #bbb;
+}
+
+.dark-mode .check-disabled {
+    background-color: #3a3a3a;
+    color: #888;
 }

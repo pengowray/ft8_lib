@@ -1,0 +1,84 @@
+function explainFT8Message(text, msgType) {
+    if (text === "Decoding failed") {
+        return '';
+    }
+
+    //todo: take better advantage of message format, not just the text
+
+    let typeExplanation = ""; //TODO?
+
+    const parts = text.trim().split(/\s+/);
+    let explanation = '';
+    console.log(parts);
+
+    function isSimpleCallsign(call) {
+        return /^[A-Z0-9]{1,6}$/.test(call);
+    }
+    function isValidCallsign(call) {
+        // at least one letter, one number, 3 to 15 characters, optional slash but not as first or last character
+        return /[A-Z]/.test(call) && /[0-9]/.test(call) && /^[A-Z0-9][A-Z0-9\/]{1,13}[A-Z0-9]$/.test(call);
+    }
+
+    function isGridLocator(grid) {
+        return /^[A-R]{2}[0-9]{2}([a-x]{2})?$/.test(grid);
+    }
+
+    function isReport(report) {
+        return /^[+-]?\d{2}$/.test(report);
+    }
+
+    if (parts.length === 2 && parts[0] === 'CQ') {
+        if (isValidCallsign(parts[1])) {
+            explanation = `This is a general call (CQ) message. Station ${parts[1]} is calling CQ, looking for any station to respond.`;
+        } else {
+            explanation = `This is an unrecognized CQ message.`;
+        }
+    } else if (parts.length === 3 && parts[0] === 'CQ') {
+        if (isValidCallsign(parts[1]) && isGridLocator(parts[2])) {
+            explanation = `This is a general call (CQ) message with location. Station ${parts[1]} is calling CQ from grid square ${parts[2]}, looking for any station to respond.`;
+        } else if (/^[A-Z]{2}$/.test(parts[1]) && isValidCallsign(parts[2])) {
+            explanation = `This is a directed CQ message. Station ${parts[2]} is calling CQ, specifically looking for stations in the ${parts[1]} region to respond.`;
+        } else {
+            explanation = `This is an unrecognized CQ message.`;
+        }
+    } else if (parts.length === 3 && isValidCallsign(parts[0]) && isValidCallsign(parts[1])) {
+        if (isReport(parts[2]) && parts[2] !== '73') {
+            explanation = `This is a signal report message. Station ${parts[0]} is sending a signal report of ${parts[2]} dB to station ${parts[1]}.`;
+            if (parts[2] === '73') { 
+                explanation += ' 73 is also shorthand for <i>best regards</i>.'
+            }
+        } else if (parts[2] === 'RRR') {
+            explanation = `This is an acknowledgment message. Station ${parts[0]} is confirming receipt of information from station ${parts[1]}.`;
+        } else if (parts[2] === 'RR73') {
+            explanation = `This is a combined acknowledgment and goodbye message. Station ${parts[0]} is confirming receipt and saying <i>best regards</i> to station ${parts[1]}.`;
+        } else if (parts[2] === '73') {
+            explanation = `This is a goodbye message. Station ${parts[0]} is saying goodbye to station ${parts[1]} with "73" (best regards).`;
+        } else if (isGridLocator(parts[2])) {
+            explanation = `Station ${parts[0]} is sending its grid locator ${parts[2]} to station ${parts[1]}.`;
+        } else if (parts[2].startsWith('R')) {
+            explanation = `Station ${parts[0]} is acknowledging receipt of a message from ${parts[1]} and sending a signal report of ${parts[2].slice(1)} dB.`;
+        } else {
+            explanation = `This is a message from ${parts[0]} to ${parts[1]}, but the content "${parts[2]}" is not recognized.`;
+        }
+    } else if (parts.length === 4 && isValidCallsign(parts[0]) && isValidCallsign(parts[1])) {
+        if (parts[2] === 'R' && isReport(parts[3])) {
+            explanation = `This is a signal report acknowledgment. Station ${parts[0]} is confirming receipt of a previous message and sending a signal report of ${parts[3]} dB to station ${parts[1]}.`;
+        } else {
+            explanation = `This is a message from ${parts[0]} to ${parts[1]}, but the content "${parts[2]} ${parts[3]}" is not recognized.`;
+        }
+    } else if (msgType === '0.0') { // || message.startsWith('<') && message.endsWith('>')) {
+        explanation = `This is a free-text message: "${text}".`; // Free-text messages in FT8 are limited to 13 characters.
+        if (text.length == 13) {
+            explanation += ' The message is the maximum length of 13 characters.';
+        }
+    } else if (msgType === '0.5') {
+        explanation = `This is a telemetry message containing hexadecimal digits: ${text.replace(/^0*/g, '')}. The specific meaning depends on the implementation.`;
+    } else if (/^[0-9A-F]{4,18}$/.test(text) && /[A-F]/.test(text)) { // all hex digits with at least one A-F 
+        explanation = `This message is made up of hexadecimal digits, but it is not of the telemetry message type.`;
+    } else {
+        explanation = '';
+        //explanation = `This appears to be a custom or non-standard message: "${message}". It doesn't match common FT8 message formats.`;
+    }
+
+    return typeExplanation + explanation;
+}

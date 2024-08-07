@@ -126,28 +126,28 @@ class PlayComponent extends Component {
             let totalSecondsTilNext = secondsUntilNext15;
             let nextCycleTime = new Date().getTime() + totalSecondsTilNext * 1000;
 
-            this.updateButtonState(true);
+            this.updateButtonState();
             this.countdownDiv.style.display = 'block';
 
-            function updateCountdown() {
+            function updateCountdown(playview) { // playview = this
                 const timeRemaining = (nextCycleTime - new Date().getTime()) / 1000;
 
                 //const minutes = Math.floor(timeRemaining / 60);
                 const seconds = timeRemaining % 60;
-                this.countdownDiv.textContent = `Playing in ${seconds.toFixed(1).toString().padStart(2, '0')}`;
+                playview.countdownDiv.textContent = `Playing in ${seconds.toFixed(1).toString().padStart(2, '0')}`;
                 
                 if (timeRemaining <= 0) {
-                    clearInterval(this.countdownInterval);
-                    this.countdownInterval = null;
-                    this.countdownDiv.style.display = 'none';
+                    clearInterval(playview.countdownInterval);
+                    playview.countdownInterval = null;
+                    playview.countdownDiv.style.display = 'none';
                     //this.playAudio(msg);
                     msg.playAudio();
                 }
                 //totalSeconds--;
             }
 
-            updateCountdown(); // Call immediately to show correct time
-            this.countdownInterval = setInterval(updateCountdown, 12); // 12ms update interval
+            updateCountdown(this); // Call immediately to show correct time
+            this.countdownInterval = setInterval(() => updateCountdown(this), 12); // 12ms update interval
         }
     }
 

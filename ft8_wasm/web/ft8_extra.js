@@ -1219,15 +1219,17 @@ function bitsToFieldDayClass(bits) {
 
 function bitsToARRLSection(bits) {
     if (bits.length !== 7) throw new Error("ARRL Section must be 7 bits");
-    let n = binaryToInt(bits);
-    if (n == 0) return ''
+    const n = binaryToInt(bits);
+    if (n == 0) {
+        return '';
+    }
     
-    n--;
-    if (n < 0 || n >= ARRL_SEC.length) {
+    const i = n-1;
+    if (i < 0 || i >= ARRL_SEC.length) {
         //return "Invalid ARRL Section";
         return `Section ${n}`;
     }
-    return ARRL_SEC[n];
+    return ARRL_SEC[i];
 }
 
 function bitsToTxNumber(bits) {

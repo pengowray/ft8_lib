@@ -1,13 +1,39 @@
 class ViewManager {
     constructor() {
         this.messageManager = new MessageManager();
-        this.views = new Views(this.messageManager);
+        this.components = [];
         this.playingMessages = new Set();
         this.queuedMessages = new Set();
     }
 
+    /**
+     * 
+     * @param {Component} component 
+     */
     registerComponent(component) {
-        this.views.registerComponent(component);
+        this.components.push(component);
+        component.messageManager = this.messageManager;
+        component.viewManager = this;
+        component.create();
+        component.loadMessage(this.messageManager.getMessage(component.index));
+    }
+
+    getComponents(messageIndex) {
+        const currentIndex = this.messageManager.currentMessageIndex;
+        return this.components.filter((component) =>
+            (component !== null && (
+                component.index === messageIndex
+                || component.index == -2 // -2 for all messages
+                || (messageIndex === -1 && component.index === currentIndex) // -1 for current message
+                || (component.index === -1 && messageIndex === currentIndex))));
+    }
+
+    frameUpdate() {
+        this.components.forEach((component) => {
+            if (component.updateOn === 'frame') {
+                component.frameUpdate();
+            }
+        });
     }
 
     addMessage(message) {
@@ -32,7 +58,7 @@ class ViewManager {
         if (index === -1) return;
 
         console.log("playing index", index, "input", message.inputText);
-        this.views.getComponents(index).forEach((component) => {
+        this.getComponents(index).forEach((component) => {
             component.onPlay();
         });
     }
@@ -41,7 +67,7 @@ class ViewManager {
         this.playingMessages.delete(message);
         this.queuedMessages.delete(message);
         const index = this.messageManager.getMessageIndex(message);
-        this.views.getComponents(index).forEach((component) => {
+        this.getComponents(index).forEach((component) => {
             component.onStop();
         });
     }
@@ -50,7 +76,7 @@ class ViewManager {
         this.playingMessages.delete(message);
         this.queuedMessages.add(message);
         const index = this.messageManager.getMessageIndex(message);
-        this.views.getComponents(index).forEach((component) => {
+        this.getComponents(index).forEach((component) => {
             component.onQueue();
         });
     }
@@ -59,14 +85,14 @@ class ViewManager {
         this.messageManager.switchToMessageIndex(index);
         const message = this.messageManager.getMessage(index);
 
-        this.views.getComponents(index).forEach((component) => {
+        this.getComponents(index).forEach((component) => {
             component.loadMessage(message);
         });
 
         if (message.isPlaying) {
             // pass
         } else {
-            this.views.getComponents(index).forEach((component) => {
+            this.getComponents(index).forEach((component) => {
                 component.stopped();
             });
         }
@@ -90,20 +116,16 @@ class ViewManager {
 
     playAudioIndex(index) {
         const message = this.messageManager.getMessage(index);
-        if (message == null) return false;
+        if (message == null || message.isPlaying) return false;
 
         console.log('playing: ', message.inputText);
-
-        const success = message.playAudio();
+      
+        const success = message.playAudio(); // triggers viewManager.onPlay(this);
 
         // triggered by message.playAudio already
         //this.views.getComponents(index).forEach((component) => { component.onPlay(); });
 
         return success;
-    }
-
-    frameUpdate(currentTime) {
-        this.views.frameUpdate(currentTime);
     }
 }
 
@@ -189,44 +211,15 @@ class MessageManager {
     }
 }
 
-class Views {
-    constructor(messageManager) {
-        this.messageManager = messageManager;
-        this.components = [];
-    }
-
-    registerComponent(component) {
-        this.components.push(component);
-        component.messageManager = this.messageManager;
-        component.create();
-        component.loadMessage(this.messageManager.getMessage(component.index));
-    }
-
-    getComponents(messageIndex) {
-        const currentIndex = this.messageManager.currentMessageIndex;
-        return this.components.filter((component) =>
-            (component !== null && component.index === messageIndex)
-            || (messageIndex === -1 && component.index === currentIndex)
-            || (component.index === -1 && messageIndex === currentIndex)
-        );
-    }
-
-    frameUpdate(currentTime) {
-        this.components.forEach((component) => {
-            if (component.updateOn === 'frame') {
-                component.frameUpdate();
-            }
-        });
-    }
-}
-
 class Component {
     constructor(index, container) {
         this.index = index;
+        this.updateOn = null; // 'symbol', 'frame', 'message' // not used
         this.container = container;
-        this.element = null;
+        this.element = null; // not used?
         this.message = null;
-        this.updateOn = null; // 'symbol', 'frame', 'message'
+        this.viewManager = null;
+        this.messageManager = null;
     }
 
     create() {

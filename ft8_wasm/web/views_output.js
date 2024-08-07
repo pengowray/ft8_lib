@@ -170,9 +170,7 @@ class OutputComponent extends Component {
                     output.innerHTML += `<br> ❌ Symbols: Expected: "${expectedSymbols}", Decoded: "${actualSymbols}"`;
                 }
             }
-            
         }
-
     }
 
     FT8MessageTypeInfo() { 

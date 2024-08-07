@@ -261,6 +261,7 @@ class FT8Message extends EventTarget {
             msg.audioSource.buffer = msg.audioBuffer;
             msg.audioSource.connect(msg.audioContext.destination);
             msg.audioSource.start();
+            
             msg.audioSource.onended = () => this.resetAudioState();
             if (this.viewManager) this.viewManager.onPlay(this);
 
@@ -276,6 +277,7 @@ class FT8Message extends EventTarget {
         if (this.audioSource) this.audioSource.stop();
         this.queuingStartedAt = null;
         //this.clearAudioAndBuffer();
+        
         if (this.viewManager) this.viewManager.onStop(this);
         this.dispatchEvent(new Event('stop'));
     }

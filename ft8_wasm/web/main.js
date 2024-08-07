@@ -35,11 +35,6 @@ function initializeUI() {
     const sampleRateSelect = document.getElementById('sample-rate-select');
 
     const audioControls = document.getElementById('audio-controls');
-    const playAudioButton = document.getElementById('play-audio');
-    const playAudioTimedButton = document.getElementById('play-audio-timed');
-    const stopAudioButton = document.getElementById('stop-audio');
-    const downloadAudioButton = document.getElementById('download-audio');
-    const countdownDiv = document.getElementById('countdown');
     const themeToggle = document.getElementById('theme-toggle');
     const exampleMessagesDiv = document.getElementById('example-messages');
     const pianoRollDiv = document.getElementById('piano-roll');
@@ -51,6 +46,7 @@ function initializeUI() {
     viewManager.registerComponent(new PianoRollComponent(-1, pianoRollDiv));
     viewManager.registerComponent(new OutputComponent(-1, output));
     viewManager.registerComponent(new TribbleComponent(-1, tribbleViz));
+    viewManager.registerComponent(new PlayComponent(-2, audioControls));
 
     const initializeTestInputs = () => {;
         testInputs.forEach((test, index) => {
@@ -215,177 +211,6 @@ function initializeUI() {
         return { baseHz: baseHz, customTones: offsets.map( offset => baseHz + offset) };
     }
 
-    function stopAudio() {
-        //todo: do via ViaController
-        //const msg = messageManager.getCurrentMessage();
-        //msg?.resetAudioState();
-        viewManager.stopAllAudio();
-
-        updateButtonState(false);
-    }
-
-    function resetAudioState(msg) {
-        msg.resetAudioState();
-
-        updateButtonState(false);
-    }
-
-    function playAudio() {
-        //const msg = messageManager.getCurrentMessage();
-        //msg.playAudio();
-        viewManager.playAudioIndex(-1);
-
-        //todo: move everything below to viz components
-
-        updateButtonState(true);
-
-    }
-
-    function updateButtonState(isPlaying) {
-        playAudioButton.disabled = isPlaying;
-        playAudioTimedButton.disabled = isPlaying;
-        stopAudioButton.disabled = !isPlaying;
-        //downloadAudioButton.disabled = isPlaying;
-    }
-
-    function playAudioTimed() {
-        const msg = messageManager.getCurrentMessage();
-        msg.readyAudioAndBuffer();
-
-        if (msg != null && msg.audioSamples != null && !msg.audioSource) {
-            const now = new Date().getSeconds();
-            const latency = (msg.audioContext?.outputLatency ?? 0);
-            const secondsUntilNext15 = 15 - ((now + latency) % 15);
-            //const displaySecondsUntilNext15 = 15 - (now % 15);
-            let totalSecondsTilNext = secondsUntilNext15;
-            let nextCycleTime = new Date().getTime() + totalSecondsTilNext * 1000;
-
-            updateButtonState(true);
-            countdownDiv.style.display = 'block';
-
-            function updateCountdown() {
-                const timeRemaining = (nextCycleTime - new Date().getTime()) / 1000;
-
-                //const minutes = Math.floor(timeRemaining / 60);
-                const seconds = timeRemaining % 60;
-                countdownDiv.textContent = `Playing in ${seconds.toFixed(1).toString().padStart(2, '0')}`;
-                
-                if (timeRemaining <= 0) {
-                    clearInterval(countdownInterval);
-                    countdownInterval = null;
-                    countdownDiv.style.display = 'none';
-                    playAudio();
-                }
-                //totalSeconds--;
-            }
-
-            updateCountdown(); // Call immediately to show correct time
-            countdownInterval = setInterval(updateCountdown, 12); // 12ms update interval
-        }
-    }
-
-    playAudioButton.addEventListener('click', playAudio);
-    playAudioTimedButton.addEventListener('click', playAudioTimed);
-    stopAudioButton.addEventListener('click', stopAudio);
-    downloadAudioButton.addEventListener('click', downloadAudio);
-
-    function downloadAudio() {
-        const msg = messageManager.getCurrentMessage();
-        msg.readyAudio();
-
-        if (msg == null) return;
-
-        if (msg.audioSamples == null) return;
-
-        const wavData = audioBufferToWav(msg);
-        const blob = new Blob([wavData], { type: 'audio/wav' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = url;
-        const baseFreq = msg.getBaseFrequency();
-        const message = messageInput.value.replace(/\s+/g, '_');
-        a.download = `FT8-${Math.round(baseFreq)}Hz_${msg}.wav`;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => {
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
-        }, 100);
-    }
-
-    /**
-     * 
-     * @param {FT8Message} msg 
-     * @returns 
-     */
-    function audioBufferToWav(msg) {
-        if (msg == null || msg.audioSamples == null) return null;
-
-        //TODO: don't require AudioBuffer, so can just use readyAudio(); 
-        msg.readyAudioAndBuffer();
-        //msg.readyAudio(); 
-
-        if (msg.audioSamples == null || msg.audioBuffer == null) return null;
-
-        const buffer = msg.audioBuffer;
-
-        //const numChannels = 1; 
-        const numChannels = buffer.numberOfChannels;
-        //const sampleRate = msg.getSampleRate(); // buffer.sampleRate;
-        const sampleRate = buffer.sampleRate;
-        const format = 1; // PCM
-        const bitDepth = 16;
-
-        let byteRate = sampleRate * numChannels * bitDepth / 8;
-        let blockAlign = numChannels * bitDepth / 8;
-        //let dataSize = msg.audioSamples.length * numChannels * bitDepth / 8;
-        let dataSize = buffer.length * numChannels * bitDepth / 8;
-
-        let headerSize = 44;
-        let totalSize = headerSize + dataSize;
-
-        let arrayBuffer = new ArrayBuffer(totalSize);
-        let view = new DataView(arrayBuffer);
-
-        // RIFF chunk descriptor
-        writeString(view, 0, 'RIFF');
-        view.setUint32(4, totalSize - 8, true);
-        writeString(view, 8, 'WAVE');
-
-        // FMT sub-chunk
-        writeString(view, 12, 'fmt ');
-        view.setUint32(16, 16, true); // subchunk1size (16 for PCM)
-        view.setUint16(20, format, true);
-        view.setUint16(22, numChannels, true);
-        view.setUint32(24, sampleRate, true);
-        view.setUint32(28, byteRate, true);
-        view.setUint16(32, blockAlign, true);
-        view.setUint16(34, bitDepth, true);
-
-        // Data sub-chunk
-        writeString(view, 36, 'data');
-        view.setUint32(40, dataSize, true);
-
-        // Write the PCM samples
-        let offset = 44;
-        for (let i = 0; i < buffer.length; i++) {
-            for (let channel = 0; channel < numChannels; channel++) {
-                let sample = Math.max(-1, Math.min(1, buffer.getChannelData(channel)[i]));
-                sample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
-                view.setInt16(offset, sample, true);
-                offset += 2;
-            }
-        }
-
-        return arrayBuffer;
-    }
-
-    function writeString(view, offset, string) {
-        for (let i = 0; i < string.length; i++) {
-            view.setUint8(offset + i, string.charCodeAt(i));
-        }
-    }
 
     messageInput.addEventListener('keypress', function(event) {
         if (event.key === 'Enter') {
@@ -449,7 +274,7 @@ function initializeUI() {
                 errorOutput.innerHTML = "";
             }
             errorOutput.innerHTML += "No audio data generated";
-            audioControls.style.display = 'none';
+            //audioControls.style.display = 'none';
         }
     }
 

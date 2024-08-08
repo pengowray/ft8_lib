@@ -234,7 +234,7 @@ button:hover {
     flex-grow: 1;
 }
 
-#encode-output, #decode-output, #output {
+#encode-output, #decode-output {
     background-color: var(--input-bg);
     padding: 10px;
     margin-top: 10px;
@@ -502,9 +502,11 @@ body:not(.dark-mode) #piano-roll {
     background-color: var(--box-bg);
     border-radius: 8px;
     box-shadow: var(--box-shadow);
+    margin-top: 35px;
     margin-bottom: 20px;
     overflow: hidden;
     white-space: normal;
+
 }
 
 .output-box h2 {

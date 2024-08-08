@@ -307,9 +307,45 @@ function symbolsToPrettyBinary(symbols) {
 }
 
 
-function hashBitsPrettyHex(bits) {
-    console.log('hashBitsPrettyHex', bits);
+const ZBASE32 = 'ybndrfg8ejkmcpqxot1uwisza345h769';
+const ZBASE32_Reverse = {};
+for (let i = 0; i < ZBASE32.length; i++) {
+    ZBASE32_Reverse[ZBASE32[i]] = i;
+}
 
+function bitsToZBase32(bits) {
+    if (bits.length % 5 !== 0) {
+        throw new Error("Invalid length");
+    }
+    let result = "";
+    for (let i = 0; i < bits.length; i += 5) {
+        const chunk = bits.slice(i, i + 5);
+        result += ZBASE32[parseInt(chunk, 2)];
+    }
+    return result;
+}
+function hashBitsPrettyZ32(bits) {
+    if (bits.match(/[^01]/)) {
+        throw new Error("Invalid characters");
+    }
+
+    // 22 bit: aa-b-cc
+    // 12 bit: aa-b-00
+    // 10 bit: aa-0-00
+    const len = bits.length;
+    if (len == 22) {
+        return `${bitsToZBase32(bits.slice(0, 10))}-${bitsToZBase32(bits.slice(10, 12).padStart(5, '0'))}-${bitsToZBase32(bits.slice(12, 22))}`;
+    } else if (len == 12) {
+        return `${bitsToZBase32(bits.slice(0, 10))}-${bitsToZBase32(bits.slice(10, 12).padStart(5, '0'))}-00`;
+    } else if (len == 10) {
+        return `${bitsToZBase32(bits.slice(0, 10))}-0-00`;
+    } else {
+        throw new Error("Invalid length: " + len + " in '" + bits + "'");
+    }
+}
+
+
+function hashBitsPrettyHex(bits) {
     if (bits.match(/[^01]/)) {
         throw new Error("Invalid characters");
     }
@@ -992,7 +1028,8 @@ function bitsToCallDetails(bits, extraBit = "") {
             result.callsign = `CQ ${call.trim()}`;
             result.details.alphabeticCode = call.trim();
         } else {
-            result.callsign = "<undefined special token>";
+            result.type = 'undefined';
+            result.callsign = '';
         }
     }
     // Check for 22-bit hash
@@ -1001,7 +1038,8 @@ function bitsToCallDetails(bits, extraBit = "") {
         const hashValue = n - NTOKENS;
         result.details.hashValue = hashValue
         //result.callsign = "<...>";
-        result.callsign = hashBitsPrettyHex(hashValue.toString(2).padStart(22, '0'));
+        //result.callsign = hashBitsPrettyHex(hashValue.toString(2).padStart(22, '0'));
+        result.callsign = hashBitsPrettyZ32(hashValue.toString(2).padStart(22, '0'));
     }
     // Standard callsign
     else {
@@ -1107,7 +1145,7 @@ function bitsToGrid4OrReportDetails(bits) {
         let j3 = Math.floor(remainder / 10);
         let j4 = remainder % 10;
 
-        return { resullt: String.fromCharCode('A'.charCodeAt(0) + j1) +
+        return { result: String.fromCharCode('A'.charCodeAt(0) + j1) +
                String.fromCharCode('A'.charCodeAt(0) + j2) +
                j3.toString() +
                j4.toString(), type: 'grid' };

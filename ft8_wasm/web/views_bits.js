@@ -97,7 +97,8 @@ function bitsToGrid6(bits) {
 
 function bitsToHash(bits) {
     // if (bits.length == 22) return hashBits22styleBase10(bits); // 
-    return hashBitsPrettyHex(bits);
+    //return hashBitsPrettyHex(bits);
+    return hashBitsPrettyZ32(bits);
     
 }
 function bitsToSerialOrState(bits) {
@@ -271,7 +272,7 @@ class TribbleComponent extends Component {
 
         if (annotationDefinitions[messageType]) {
             annotationDefinitions[messageType].forEach(annotation => {
-                const value = annotation.getValue(payloadBits);
+                let value = annotation.getValue(payloadBits) ?? '';
                 let shortValue = value;
                 if (value.endsWith(' (undecoded value)')) {
                     shortValue = value.split(' ')[0] + "*";

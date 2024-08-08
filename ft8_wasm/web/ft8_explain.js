@@ -45,12 +45,12 @@ function explainFT8Message(text, msgType) {
         if (isReport(parts[2]) && parts[2] !== '73') {
             explanation = `This is a signal report message. Station ${parts[0]} is sending a signal report of ${parts[2]} dB to station ${parts[1]}.`;
             if (parts[2] === '73') { 
-                explanation += ' 73 is also shorthand for <i>best regards</i>.'
+                explanation += ' 73 is also shorthand for "best regards".'
             }
         } else if (parts[2] === 'RRR') {
             explanation = `This is an acknowledgment message. Station ${parts[0]} is confirming receipt of information from station ${parts[1]}.`;
         } else if (parts[2] === 'RR73') {
-            explanation = `This is a combined acknowledgment and goodbye message. Station ${parts[0]} is confirming receipt and saying <i>best regards</i> to station ${parts[1]}.`;
+            explanation = `This is a combined acknowledgment and goodbye message. Station ${parts[0]} is confirming receipt and saying "best regards" to station ${parts[1]}.`;
         } else if (parts[2] === '73') {
             explanation = `This is a goodbye message. Station ${parts[0]} is saying goodbye to station ${parts[1]} with "73" (best regards).`;
         } else if (isGridLocator(parts[2])) {

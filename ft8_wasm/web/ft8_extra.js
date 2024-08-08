@@ -1128,6 +1128,11 @@ function grid4ToG15(input) {
     }
 }
 
+function bitsToGrid4OrReportWithType(bits) {
+    const details = bitsToGrid4OrReportDetails(bits)
+    return `${details.result} (${details.type})`;
+}
+
 function bitsToGrid4OrReport(bits) {
     return bitsToGrid4OrReportDetails(bits).result;
 }

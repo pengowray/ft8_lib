@@ -50,14 +50,14 @@ const annotationDefinitions = {
         { label: "r", start: 57, length: 1, getValue: (bits) => bits[57] === '1' ? '/R' : '' },
         //{ label: "R", start: 58, length: 1, getValue: (bits) => placeholder(bits.slice(58, 59)) },
         { label: "R", start: 58, length: 1, getValue: (bits) => bits[58] === '1' ? 'R' : '' },
-        { label: "Grid/Report", start: 59, length: 15, getValue: (bits) => bitsToGrid4OrReport(bits.slice(59, 74)) },
+        { label: "Grid/Report", start: 59, length: 15, getValue: (bits) => bitsToGrid4OrReportWithType(bits.slice(59, 74)) },
         { label: "i3", start: 74, length: 3, getValue: (bits) => `1` }
     ],
     "2": [ // EU VHF Contest
         { label: "Call1", start: 0, length: 28, getValue: (bits) => bitsToCall(bits.slice(0, 28)) },
         { label: "Call2", start: 29, length: 28, getValue: (bits) => bitsToCall(bits.slice(29, 57)) },
         { label: "R", start: 58, length: 1, getValue: (bits) => bits[58] === '1' ? 'R' : '' },
-        { label: "Grid4", start: 59, length: 15, getValue: (bits) => bitsToGrid4OrReport(bits.slice(59, 74)) },
+        { label: "Grid4", start: 59, length: 15, getValue: (bits) => bitsToGrid4OrReportWithType(bits.slice(59, 74)) },
         { label: "i3", start: 74, length: 3, getValue: (bits) => `2` }
     ],
     "3": [ // ARRL RTTY Roundup

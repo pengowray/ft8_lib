@@ -26,6 +26,7 @@ class OutputComponent extends Component {
             decoded: this.prepareDecodedInfo(),
             symbols: message.symbolsText,
             packed: packedToHexStrSp(message.packedData),
+            codeword: bitsNoCosta, // 174 bits
             messageBits: bitsNoCosta.slice(0, 77),
             crcBits: bitsNoCosta.slice(77, 91),            
             parityBits: bitsNoCosta.slice(91),
@@ -217,6 +218,7 @@ class OutputComponent extends Component {
                 ${this.renderRowData('Message (77 bits)', data.messageBits)}
                 ${this.renderRowDataHighlights('CRC (14 bits)', data.crcBits, false, this.getCRCHighlights(data.crcCheck))}
                 ${this.renderRowDataHighlights('LDPC (83 bits)', data.parityBits, false, this.getParityHighlights(data.parityCheck))}
+                ${data.parityCheck.result === 'error' ? this.renderRowDataHighlights('174-bit codeword<br>with LDPC errors', data.codeword, false, this.getLDPCErrorHighlights(data.parityCheck)) : ''}
 
                 ${this.renderSubheading('Decoding')}
                 ${this.renderChecks('Decode check', data.decoded )}
@@ -228,7 +230,7 @@ class OutputComponent extends Component {
                 ${data.explanation ? this.renderRowText('Explanation', data.explanation) : ''}
                 ${data.encodeError ? this.renderRowData('Free text reason', data.encodeError) : ''}
 
-                ${data.tests && data.tests.tests ? this.renderSubheading('Comparison to known implementaiton') : ''}
+                ${data.tests && data.tests.tests ? this.renderSubheading('Comparison to known reference') : ''}
                 ${data.tests && data.tests.tests ? this.renderChecks('Tests', data.tests.tests) : ''}
                 ${data.tests && data.tests.renderedRows ? data.tests.renderedRows : ''}
 
@@ -272,9 +274,35 @@ class OutputComponent extends Component {
     }
 
     renderRowDataHighlights(label, value, fullWidth = false, highlightIndices = []) {
-        const highlightedValue = value.split('').map((char, index) => 
-            highlightIndices.includes(index) ? `<span class="highlighted-error">${char}</span>` : char
-        ).join('');
+        let highlightedValue = value;
+        //Array.isArray(highlightIndices)
+        //highlightIndices instanceof Set
+
+        if ( highlightIndices === null || highlightIndices.length === 0 || value === '') {
+            // pass
+
+        } else if (typeof highlightIndices === 'object' && highlightIndices.hasOwnProperty('uniqueNumbers')) {
+            // todo: pretty print
+            // only used for parity bits
+            highlightedValue = value.split('').map((char, index) => {
+                if (highlightIndices.mostFrequentNumbers.has(index)) {
+                    return `<span class="highlighted-error" title="bit ${index + 1} / ${value.length}">${char}</span>`;
+                } else if (highlightIndices.uniqueNumbers.has(index)) {
+                    return `<span class="highlighted-lesser-error" title="bit ${index + 1} / ${value.length}">${char}</span>`;
+                } else {
+                    return char;
+                }
+            }).join('');
+
+        } else {
+            // note: don't add more title tooltip with bit position, unless sure it will be accurate for symbol data and pretty printed bits/symbols (with extra spaces)
+            highlightedValue = value.split('').map((char, index) => {
+                const isHighlighted = Array.isArray(highlightIndices) 
+                    ? highlightIndices.includes(index) 
+                    : highlightIndices.has(index);
+                return isHighlighted ? `<span class="highlighted-error">${char}</span>` : char
+            }).join('');
+        }
     
         return `
             <div class="output-row ${fullWidth ? 'full-width' : ''}">
@@ -407,10 +435,15 @@ class OutputComponent extends Component {
             
     
     getParityHighlights(parityCheck) {
-        
         return parityCheck.result === 'error' ? 
-            //parityCheck.failedMessageErrors.filter(index => index >= 91 && index < 174).map(index => index - 91) : [];
-            parityCheck.failedParityErrors : [];
+            parityCheck.parityErrors : [];
+    }
+
+    getLDPCErrorHighlights(parityCheck) {
+        var analysis = parityCheck.messageErrors;
+
+        return parityCheck.result === 'error' ? 
+            analysis : [];
     }
 }
 
@@ -427,3 +460,4 @@ function escapeHTML(text) {
         return map[match];
     });
 }
+

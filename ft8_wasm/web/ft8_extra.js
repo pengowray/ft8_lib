@@ -439,7 +439,7 @@ function checkParity(symbols) {
     let bits = symbolsToBitsStrNoCosta(symbols).slice(0, 174).split('').map(Number);  // We need all 174 bits
     
     let failedParityBits = new Set();
-    let failedMessageBits = new Set();
+    let failedMessageBits = []; // can contain duplicates
 
     // Check parity equations
     for (let i = 0; i < LDPC_MATRIX.length; i++) {
@@ -455,19 +455,19 @@ function checkParity(symbols) {
             failedParityBits.add(i);
             for (let j = 0; j < LDPC_NUM_ROWS[i]; j++) {
                 let bitIndex = LDPC_MATRIX[i][j] - 1;
-                if (bitIndex >= 0 && bitIndex < 91) {  // Only include message bits
-                    failedMessageBits.add(bitIndex);
-                }
+                //if (bitIndex >= 0 && bitIndex < 91) {  // Only include message bits
+                    failedMessageBits.push(bitIndex);
+                //}
             }
         }
     }
-    
+
     return {
         result: failedParityBits.size === 0 ? 'ok' : 'error',
         failedParityCount: failedParityBits.size,
         failedMessageCount: failedMessageBits.size,
-        failedParityErrors: Array.from(failedParityBits),
-        failedMessageErrors: Array.from(failedMessageBits)
+        parityErrors: failedParityBits,
+        messageErrors: (failedMessageBits.length > 0) ? analyzeNumbers(failedMessageBits) : null, // { frequencyMap, uniqueNumbers, mostFrequentNumbers }
     };
 }
 
@@ -509,6 +509,32 @@ function calculateParity(binaryString) {
         fullCodeword: fullCodeword.join('')
     };
 }
+
+//TODO: roll this into calculateParity
+function analyzeNumbers(numbers) {
+    // Count occurrences of each number
+    const frequencyMap = new Map();
+    for (const num of numbers) {
+      frequencyMap.set(num, (frequencyMap.get(num) || 0) + 1);
+    }
+  
+    // Find the maximum frequency
+    const maxFrequency = Math.max(...frequencyMap.values());
+  
+    // Create sets
+    const uniqueNumbers = new Set(numbers);
+    const mostFrequentNumbers = new Set(
+      [...frequencyMap.entries()]
+        .filter(([_, frequency]) => frequency === maxFrequency)
+        .map(([number, _]) => number)
+    );
+  
+    return {
+      frequencyMap,
+      uniqueNumbers,
+      mostFrequentNumbers
+    };
+  }
 
 // not used / tested
 function decodeFT8FreeTextPayload(payload) {

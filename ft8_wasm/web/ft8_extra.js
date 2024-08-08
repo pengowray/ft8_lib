@@ -3,6 +3,7 @@ const FT8_CHAR_TABLE_FULL = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+-./?";
 
 // Costas array for sync
 const COSTAS_ARRAY = [3, 1, 4, 0, 6, 5, 2];
+const COSTAS_STR = '3140652';
 // CRC polynomial
 const CRC_POLYNOMIAL = 0x2757;  // 14-bit CRC polynomial without the leading 1
 
@@ -263,24 +264,6 @@ function binary91ToSymbols(binaryString) { // 77 bits + CRC
 
 }
 
-function checkSync(symbols) {
-    const syncPositions = [0, 36, 72];
-    let errors = [];
-    
-    for (let i = 0; i < syncPositions.length; i++) {
-        for (let j = 0; j < COSTAS_ARRAY.length; j++) {
-            if (parseInt(symbols[syncPositions[i] + j]) !== COSTAS_ARRAY[j]) {
-                errors.push(syncPositions[i] + j);
-            }
-        }
-    }
-    
-    return {
-        result: errors.length === 0 ? 'ok' : 'error',
-        errors: errors // list of bad symbols
-    };
-}
-
 function debugPrintMessageDetails(symbols) {
     if (!symbols || symbols.length === 0) {
         console.log("No symbols to print.");
@@ -375,7 +358,29 @@ function hashBits22styleBase10(bits) {
         throw new Error("Invalid length: " + len + " in '" + bits + "'");
     }
 
-    return binaryToInt(bits).toString().padStart(7, '0');
+    return parseInt(bits, 2).toString().padStart(7, '0');
+}
+
+function checkSync(symbols) {
+    if (symbols.length !== 79) {
+        throw new Error("Input must be 79 characters (symbols) long");
+    }
+    const syncPositions = [0, 36, 72];
+    let errors = [];
+    
+    for (let i = 0; i < syncPositions.length; i++) {
+        const syncPos = syncPositions[i];
+        for (let j = 0; j < COSTAS_STR.length; j++) {
+            if (symbols[syncPos + j] !== COSTAS_STR[j]) {
+                errors.push(syncPos + j);
+            }
+        }
+    }
+    
+    return {
+        result: errors.length === 0 ? 'ok' : 'error',
+        errors: errors // list of bad symbols
+    };
 }
 
 const FT8_CRC_WIDTH = 14;
@@ -918,7 +923,7 @@ function bitsToCallDetails(bits, extraBit = "") {
     extraOn = (bits.length === 29 && bits[28] === '1');
     bits = bits.slice(0, 28);
 
-    const n = binaryToInt(bits);
+    const n = parseInt(bits, 2);
     
     const NTOKENS = 2063592;  // Number of special tokens
     const MAX22 = 4194304;    // 2^22, maximum 22-bit hash value
@@ -1021,6 +1026,7 @@ function isGrid4(grid) {
            grid[3] >= '0' && grid[3] <= '9';
 }
 
+// not used
 function grid4ToG15(input) {
     if (isGrid4(input) && input !== 'RR73') {
         let j1 = (input.charCodeAt(0) - 'A'.charCodeAt(0)) * 18 * 10 * 10;
@@ -1054,31 +1060,34 @@ function grid4ToG15(input) {
 }
 
 function bitsToGrid4OrReport(bits) {
+    return bitsToGrid4OrReportDetails(bits).result;
+}
+
+function bitsToGrid4OrReportDetails(bits) {
     if (bits.length !== 15) throw new Error("Grid/Report must be 15 bits");
     
-    const g15 = binaryToInt(bits);
+    const g15 = parseInt(bits, 2);
     
     if (g15 < MAXGRID4) {
-        // This is a grid locator
-        let j1 = Math.floor(g15 / (18 * 10 * 10));
-        let remainder = g15 % (18 * 10 * 10);
-        let j2 = Math.floor(remainder / (10 * 10));
-        remainder = remainder % (10 * 10);
+        let j1 = Math.floor(g15 / 1800);
+        let remainder = g15 % 1800;
+        let j2 = Math.floor(remainder / 100);
+        remainder = remainder % (100);
         let j3 = Math.floor(remainder / 10);
         let j4 = remainder % 10;
 
-        return String.fromCharCode('A'.charCodeAt(0) + j1) +
+        return { resullt: String.fromCharCode('A'.charCodeAt(0) + j1) +
                String.fromCharCode('A'.charCodeAt(0) + j2) +
                j3.toString() +
-               j4.toString();
+               j4.toString(), type: 'grid' };
     } else {
-        // This is a signal report or special message
         const irpt = g15 - MAXGRID4;
-        if (irpt === 1) return '';
-        if (irpt === 2) return 'RRR';
-        if (irpt === 3) return 'RR73';
-        if (irpt === 4) return '73';
-        return (irpt - 35).toString();  // Signal report
+        if (irpt === 1) return { result: '', type: 'blank' };
+        if (irpt === 2) return { result: 'RRR', type: 'special' };
+        if (irpt === 3) return { result: 'RR73', type: 'special' };
+        if (irpt === 4) return { result: '73', type: 'special' };
+
+        return { result: (irpt - 35).toString(), type: 'signal' };
     }
 }
 
@@ -1086,7 +1095,7 @@ function bitsToReport(bits) {
     // r5 Report: -30 to +32, even numbers only
 
     if (bits.length !== 5) throw new Error("Report must be 5 bits");
-    const n = binaryToInt(bits); // 0 to 31
+    const n = parseInt(bits, 2); // 0 to 31
     return ((n * 2) - 30).toString();
 }
 
@@ -1125,7 +1134,7 @@ function bitsToGrid4_old(bits) {
 function bitsToGrid4Details_old(bits) {
     if (bits.length !== 15) throw new Error("Grid must be 15 bits");
     
-    const n = binaryToInt(bits);
+    const n = parseInt(bits, 2);
     
     let result = {
         raw: bits,
@@ -1175,7 +1184,7 @@ function bitsToGrid4OrReport_old(bits) {
 function bitsToGrid4OrReportDetails_old(bits) {
     if (bits.length !== 15) throw new Error("Grid/Report must be 15 bits");
     
-    const n = binaryToInt(bits);
+    const n = parseInt(bits, 2);
     
     let result = {
         raw: bits,
@@ -1217,12 +1226,12 @@ function bitsToGrid4OrReportDetails_old(bits) {
 
 function bitsToFieldDayClass(bits) {
     //k3 Field Day Class: A, B, ... F
-    return String.fromCharCode('A'.charCodeAt(0) + binaryToInt(bits));
+    return String.fromCharCode('A'.charCodeAt(0) + parseInt(bits, 2));
 }
 
 function bitsToARRLSection(bits) {
     if (bits.length !== 7) throw new Error("ARRL Section must be 7 bits");
-    const n = binaryToInt(bits);
+    const n = parseInt(bits, 2);;
     if (n == 0) {
         return '';
     }
@@ -1238,13 +1247,13 @@ function bitsToARRLSection(bits) {
 function bitsToTxNumber(bits) {
     // n4 Number of transmitters: 1-16, 17-32
     if (bits.length !== 4) throw new Error("Tx Number must be 4 bits");
-    const n = binaryToInt(bits);
+    const n = parseInt(bits, 2);
     return `${n + 1} or ${n + 17}`;
 }
 
 function bitsToRST(bits) {
     //r3 Report: 2-9, displayed as 529 – 599 or 52 - 59
     if (bits.length !== 3) throw new Error("RST must be 3 bits");
-    const n = binaryToInt(bits) + 2;
+    const n = parseInt(bits, 2) + 2;
     return `5${n} or 5${n}9`;
 }

@@ -15,6 +15,7 @@ class OutputComponent extends Component {
     prepareOutputData() {
         const message = this.message;
         const bitsNoCosta = symbolsToBitsStrNoCosta(message.symbolsText);
+        
         return {
             inputText: message.inputText,
             inputType: message.inputType,
@@ -26,8 +27,12 @@ class OutputComponent extends Component {
             symbols: message.symbolsText,
             packed: packedToHexStrSp(message.packedData),
             messageBits: bitsNoCosta.slice(0, 77),
-            crcBits: bitsNoCosta.slice(77, 91),
+            crcBits: bitsNoCosta.slice(77, 91),            
             parityBits: bitsNoCosta.slice(91),
+            symbols: message.symbolsText,
+            syncCheck: message.getSyncCheck(),
+            crcCheck: message.getCRCCheck(),
+            parityCheck: message.getParityCheck(),
             checks: this.prepareChecks(),
             explanation: this.message.reDecodedResult.success ? 
                 explainFT8Message(this.message.reDecodedResult.decodedText, this.message.ft8MessageType) : 
@@ -71,11 +76,16 @@ class OutputComponent extends Component {
             if (normalizeMessage(decoded) !== normalizeMessage(originalInput)) {
                 decodeTest2.resultInfo = "Decoded message does not appear to match input.";
                 decodeTest2.result = 'warning';
-                resultText = 'might not match input';
-                if (normalizeBracketedFreeText(originalInput).toUpperCase().startsWith(decoded.toUpperCase())) {
+                decodeTest2.resultText = 'might not match input';
+                if (normalizeMessageAndHashes(originalInput).startsWith(normalizeMessageAndHashes(decoded))) {
+                    //todo: only catches if both contain a hash; check if decoded has transformed text into hash
+                    //decodeTest2.resultInfo = "Hashes appear different.";
+                    decodeTest2.resultText = 'match but unable to check hash data';
+
+                } else if (normalizeBracketedFreeText(originalInput).toUpperCase().startsWith(decoded.toUpperCase())) {
                     decodeTest2.resultInfo = "Original message appears to be truncated.";
                     decodeTest2.resultText = 'input truncated';
-                }
+                } 
             } else  {
                 decodeTest2.resultText = 'ok'
             }
@@ -125,7 +135,7 @@ class OutputComponent extends Component {
             };
             tests.push(test);
             if (!match) {
-                renderedRows += this.renderRowData(`${test.name} (test expected)`, test.expected);
+                renderedRows += this.renderRowData(`${test.name} (reference)`, test.expected);
                 renderedRows += this.renderRowData(`${test.name} (decoded)`, test.actual);
             }
         }
@@ -141,9 +151,21 @@ class OutputComponent extends Component {
                 actual: this.message.reDecodedResult.decodedText,
                 note: expected.error ? "Error or truncated result expected" : null
             };
-            tests.push(test);
+            const hashMatch = (normalizeMessageAndHashes(expectedMessage) === normalizeMessageAndHashes(this.message.reDecodedResult.decodedText));
+            if (!match && hashMatch) {
+                test.result = 'ok';
+                test.resultText = 'Matched test*';
+                tests.push(test);
+                tests.push({ name: "Note", result: 'warning', resultText: 'ignored hashed callsigns' });
+            } else {
+                tests.push(test);
+            }
+            if (expected.error) {
+                tests.push({ name: "Note", result: 'warning', resultText: 'Expected (successful) test will have an error or truncated text' });
+            }
+            
             if (!match) {
-                renderedRows += this.renderRowData(`${test.name} (test expected)`, test.expected);
+                renderedRows += this.renderRowData(`${test.name} (reference)`, test.expected);
                 renderedRows += this.renderRowData(`${test.name} (decoded)`, test.actual);
             }
         }
@@ -160,8 +182,17 @@ class OutputComponent extends Component {
             };
             tests.push(test);
             if (!match) {
-                renderedRows += this.renderRowData(`${test.name} (test expected)`, test.expected);
-                renderedRows += this.renderRowData(`${test.name} (decoded)`, test.actual);
+                const prettyExpected = symbolsPretty(test.expected);
+                const prettyActual = symbolsPretty(test.actual);
+                renderedRows += this.renderRowData(`${test.name} (reference)`, prettyExpected);
+                //renderedRows += this.renderRowData(`${test.name} (decoded)`, test.actual);
+                renderedRows += this.renderRowDataHighlights(`${test.name} (decoded)`, prettyActual, false, this.getDiffHighlights(prettyExpected, prettyActual));
+
+                const expectedBits = symbolsToBitsStrNoCosta(test.expected).slice(0, 77);
+                const actualBits = symbolsToBitsStrNoCosta(test.actual).slice(0, 77);
+                renderedRows += this.renderRowData(`Message bits (reference)`, expectedBits);
+                renderedRows += this.renderRowDataHighlights(`Message bits (decoded)`, actualBits, false, this.getDiffHighlights(expectedBits, actualBits));
+
             } 
         }
 
@@ -181,11 +212,11 @@ class OutputComponent extends Component {
 
                 ${this.renderChecks('Checks', data.checks)}
                 ${this.renderRowData('Message type', `(${data.messageType.type}) ${data.messageType.info}`)}
-                ${this.renderRowData('Symbols', symbolsPretty(data.symbols), true)}
+                ${this.renderRowDataHighlights('Symbols', symbolsPretty(data.symbols), true, this.getSyncHighlights(data.syncCheck))}
                 ${this.renderRowData('Packed', data.packed)}
                 ${this.renderRowData('Message (77 bits)', data.messageBits)}
-                ${this.renderRowData('CRC (14 bits)', data.crcBits)}
-                ${this.renderRowData('LDPC (83 bits)', data.parityBits)}
+                ${this.renderRowDataHighlights('CRC (14 bits)', data.crcBits, false, this.getCRCHighlights(data.crcCheck))}
+                ${this.renderRowDataHighlights('LDPC (83 bits)', data.parityBits, false, this.getParityHighlights(data.parityCheck))}
 
                 ${this.renderSubheading('Decoding')}
                 ${this.renderChecks('Decode check', data.decoded )}
@@ -197,7 +228,7 @@ class OutputComponent extends Component {
                 ${data.explanation ? this.renderRowText('Explanation', data.explanation) : ''}
                 ${data.encodeError ? this.renderRowData('Free text reason', data.encodeError) : ''}
 
-                ${data.tests && data.tests.tests ? this.renderSubheading('Special test input') : ''}
+                ${data.tests && data.tests.tests ? this.renderSubheading('Comparison to known implementaiton') : ''}
                 ${data.tests && data.tests.tests ? this.renderChecks('Tests', data.tests.tests) : ''}
                 ${data.tests && data.tests.renderedRows ? data.tests.renderedRows : ''}
 
@@ -211,6 +242,11 @@ class OutputComponent extends Component {
 
 // old decode renderer: (now part of checks)
 //${this.renderDecodedInfo(data.decoded)}
+
+//unhighlighted:
+//${this.renderRowData('Symbols', symbolsPretty(data.symbols), true)}
+//${this.renderRowData('CRC (14 bits)', data.crcBits)}
+//${this.renderRowData('LDPC (83 bits)', data.parityBits)}
 
 //todo: fix full text: "Fallback to free text reason"
 
@@ -231,6 +267,19 @@ class OutputComponent extends Component {
             <div class="output-row ${fullWidth ? 'full-width' : ''}">
                 <div class="output-label">${label}</div>
                 <div class="output-value">${escapeHTML(value)}</div>
+            </div>
+        `;
+    }
+
+    renderRowDataHighlights(label, value, fullWidth = false, highlightIndices = []) {
+        const highlightedValue = value.split('').map((char, index) => 
+            highlightIndices.includes(index) ? `<span class="highlighted-error">${char}</span>` : char
+        ).join('');
+    
+        return `
+            <div class="output-row ${fullWidth ? 'full-width' : ''}">
+                <div class="output-label">${label}</div>
+                <div class="output-value">${highlightedValue}</div>
             </div>
         `;
     }
@@ -308,6 +357,61 @@ class OutputComponent extends Component {
     onStop() {}
     initialUpdate() {}
     frameUpdate() {}
+
+    getDiffHighlights(expected, actual) {
+        // generic
+        const diff = [];
+        const maxLength = Math.max(expected.length, actual.length);
+        for (let i = 0; i < maxLength; i++) {
+            if (expected[i] !== actual[i]) diff.push(i);
+        }
+        return diff;
+    }
+
+    getSyncHighlights_noPrettyPrint(syncCheck) {
+        if (syncCheck.result !== 'error') return [];
+        const costasPositions = [0, 36, 72];
+        return syncCheck.errors.filter(index => 
+            costasPositions.some(pos => index >= pos && index < pos + 7)
+        );
+    }
+    
+    getSyncHighlights(syncCheck) {
+        //3240652 03224752350406114701746102526 3142652 00751360767311242423320017621 3142652
+        if (syncCheck.result !== 'error') return [];
+        const costasPositions = [0, 36, 72];
+        
+        return syncCheck.errors.map(index => {
+            let prettyIndex = index;
+            if (index > 72) prettyIndex += 4; 
+            else if (index > 36) prettyIndex += 2; 
+            //prettyIndex += 7;
+            
+            return prettyIndex;
+        });
+    }
+
+    getCRCHighlights(crcCheck) {
+        if (crcCheck.result === 'ok') return [];
+    
+        const crcInMessage = crcCheck.crc;
+        const crcExpected = crcCheck.received;
+    
+        return crcInMessage.split('').map((bit, index) => 
+            bit !== crcExpected[index] ? index : null
+        ).filter(index => index !== null);
+
+        //highlight all:
+        //return Array.from({ length: 14 }, (_, i) => i);
+    }
+            
+    
+    getParityHighlights(parityCheck) {
+        
+        return parityCheck.result === 'error' ? 
+            //parityCheck.failedMessageErrors.filter(index => index >= 91 && index < 174).map(index => index - 91) : [];
+            parityCheck.failedParityErrors : [];
+    }
 }
 
 function escapeHTML(text) {

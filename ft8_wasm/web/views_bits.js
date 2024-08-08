@@ -14,7 +14,7 @@ const annotationDefinitions = {
         { label: "Call1", start: 0, length: 28, getValue: (bits) => bitsToCall(bits.slice(0, 28)).callsign },
         { label: "Call2", start: 28, length: 28, getValue: (bits) => bitsToCall(bits.slice(28, 56)).callsign },
         { label: "R", start: 56, length: 1, getValue: (bits) => bits[56] === '1' ? 'R' : '' },
-        { label: "Serial", start: 57, length: 13, getValue: (bits) => binaryToInt(bits.slice(57, 70)).toString() },
+        { label: "Serial", start: 57, length: 13, getValue: (bits) => placeholder(bits.slice(57, 70)) },
         { label: "i3.n3", start: 71, length: 6, getValue: (bits) => `0.2` }
     ],
     "0.3": [ // ARRL Field Day
@@ -104,7 +104,7 @@ function bitsToSerialOrState(bits) {
     return placeholder(bits);
 }
 function placeholder(bits) {
-    return `${binaryToInt(bits).toString()} (undecoded value)`;
+    return `${parseInt(bits, 2).toString()} (undecoded value)`;
 }
 
 

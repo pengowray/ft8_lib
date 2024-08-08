@@ -277,7 +277,7 @@ class FT8Message extends EventTarget {
         if (this.audioSource) this.audioSource.stop();
         this.queuingStartedAt = null;
         //this.clearAudioAndBuffer();
-        
+
         if (this.viewManager) this.viewManager.onStop(this);
         this.dispatchEvent(new Event('stop'));
     }
@@ -407,6 +407,11 @@ function detectFreeTextBrackets(str) {
 
 function normalizeMessage(message) {
     return message.trim().toUpperCase().replace(/\s+/g, ' ');
+}
+
+function normalizeMessageAndHashes(message) {
+    // replace contents of <...> with '<...>'
+    return message.trim().toUpperCase().replace(/\s+/g, ' ').replace(/<[^>]*>/g, '<...>');
 }
 
 function normalizeBracketedFreeText(input) {

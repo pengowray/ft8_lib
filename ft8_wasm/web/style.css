@@ -650,3 +650,14 @@ body:not(.dark-mode) #piano-roll {
 .check-icon {
     margin-right: 4px;
 }
+
+.highlighted-error {
+    background-color: #ffcccc;
+    color: #cc0000;
+    font-weight: bold;
+}
+
+.dark-mode .highlighted-error {
+    background-color: #4c1d1d;
+    color: #ff6666;
+}

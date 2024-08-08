@@ -315,15 +315,17 @@ function hashBitsPrettyHex(bits) {
     }
 
     // 22 bit: aaa-b-ccc
-    // 12 bit: xxx-b-ccc
-    // 10 bit: xxx-x-ccc
+    // 12 bit: aaa-b-xxx
+    // 10 bit: aaa-x-xxx
     const len = bits.length;
     if (len == 22) {
         return `${bitsToHex(bits.slice(0, 10).padStart(12, '0'))}-${bitsToHex(bits.slice(10, 12).padStart(4, '0'))}-${bitsToHex(bits.slice(12, 22).padStart(12, '0'))}`;
     } else if (len == 12) {
-        return `xxx-${bitsToHex(bits.slice(0, 2).padStart(4, '0'))}-${bitsToHex(bits.slice(2, 10).padStart(12, '0'))}`;
+        //return `xxx-${bitsToHex(bits.slice(0, 2).padStart(4, '0'))}-${bitsToHex(bits.slice(2, 10).padStart(12, '0'))}`;
+        return `${bitsToHex(bits.slice(0, 10).padStart(12, '0'))}-${bitsToHex(bits.slice(10, 12).padStart(4, '0'))}-xxx`;
     } else if (len == 10) {
-        return `xxx-x-${bitsToHex(bits)}`;
+        //return `xxx-x-${bitsToHex(bits)}`;
+        return `${bitsToHex(bits.slice(0, 10).padStart(12, '0'))}-x-xxx`;
     } else {
         throw new Error("Invalid length: " + len + " in '" + bits + "'");
     }
@@ -338,9 +340,12 @@ function hashBitsPretty(bits) {
     if (len == 22) {
         return `${bits.slice(0, 10)}-${bits.slice(10, 12)}-${bits.slice(12, 22)}`;
     } else if (len == 12) {
-        return `xxxxxxxxxx-${bits.slice(0, 2)}-${bits.slice(2, 12)}`;
+        //return `xxxxxxxxxx-${bits.slice(0, 2)}-${bits.slice(2, 12)}`;
+        return `${bits.slice(0, 10)}-${bits.slice(10, 12)}-xxxxxxxxxx`;
+
     } else if (len == 10) {
-        return `xxxxxxxxxx-xx-${bits}`;
+        //return `xxxxxxxxxx-xx-${bits}`;
+        return `${bits.slice(0, 10)}-xx-xxxxxxxxxx`;
     }
 
     // other length/error

@@ -5,17 +5,6 @@ class PlayComponent extends Component {
     }
 
     create() {
-        /*
-        <button id="play-audio" class="btn">Play Audio</button>
-        <button id="play-audio-timed" class="btn">Play Next 15s Slot</button>
-        <button id="stop-audio" class="btn" disabled>Stop Audio</button>
-        <button id="download-audio" class="btn">Download Audio</button>
-        <div id="countdown"></div>
-        */
-
-        // examples
-        //this.toggleVisualizationButton = this.container.querySelector('#toggle-visualization');
-        //this.toggleVisualizationButton.onclick = () => this.toggleVisualization();
         
         this.playAudioButton = this.container.querySelector('#play-audio');
         this.playAudioTimedButton = this.container.querySelector('#play-audio-timed');

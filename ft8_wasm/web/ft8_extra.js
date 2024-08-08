@@ -276,7 +276,7 @@ function checkSync(symbols) {
     }
     
     return {
-        result: errors.length === 0 ? 'OK' : 'FAILED',
+        result: errors.length === 0 ? 'ok' : 'error',
         errors: errors // list of bad symbols
     };
 }
@@ -421,7 +421,7 @@ function checkCRC(symbols) {
     return {
         crc: calculatedCRC.toString(2).padStart(14, '0'),
         received: receivedCRC.toString(2).padStart(14, '0'),
-        result: calculatedCRC === receivedCRC ? 'OK' : 'FAILED'
+        result: calculatedCRC === receivedCRC ? 'ok' : 'error'
     };
 }
 
@@ -453,7 +453,7 @@ function checkParity(symbols) {
     }
     
     return {
-        result: failedParityBits.size === 0 ? 'OK' : 'FAILED',
+        result: failedParityBits.size === 0 ? 'ok' : 'error',
         failedParityCount: failedParityBits.size,
         failedMessageCount: failedMessageBits.size,
         failedParityErrors: Array.from(failedParityBits),
@@ -825,6 +825,7 @@ const decodeFT8PackedData = (packedData) => {
     if (resultPtr === 0) {
         return {
             success: false,
+            result: 'error',
             errorCode: -1,
             errorMessage: "Failed to allocate memory for result"
         };
@@ -840,6 +841,8 @@ const decodeFT8PackedData = (packedData) => {
     
     return {
         success: result.errorCode === 0,
+        result: result.errorCode === 0 ? 'ok' : 'error',
+        resultText: result.errorCode === 0 ? 'ok' : 'error (' + result.errorCode + ')',
         decodedText: result.decodedText,
         errorCode: result.errorCode,
         errorMessage: result.errorMessage

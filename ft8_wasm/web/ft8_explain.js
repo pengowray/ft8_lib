@@ -42,32 +42,38 @@ function explainFT8Message(text, msgType) {
             explanation = `This is an unrecognized CQ message.`;
         }
     } else if (parts.length === 3 && isValidCallsign(parts[0]) && isValidCallsign(parts[1])) {
-        if (isReport(parts[2]) && parts[2] !== '73') {
-            explanation = `This is a signal report message. Station ${parts[0]} is sending a signal report of ${parts[2]} dB to station ${parts[1]}.`;
+        const receiver = parts[0];
+        const sender = parts[1];
+        const report = parts[2];
+        if (isReport(report) && report !== '73') {
+            explanation = `Station ${sender} is sending a signal report of ${report} dB to station ${receiver}.`;
             if (parts[2] === '73') { 
                 explanation += ' 73 is also shorthand for "best regards".'
             }
         } else if (parts[2] === 'RRR') {
-            explanation = `Station ${parts[0]} is confirming receipt of information from station ${parts[1]}.`;
+            explanation = `Station ${sender} is confirming receipt of information from station ${receiver}.`;
         } else if (parts[2] === 'RR73') {
-            explanation = `Station ${parts[0]} is confirming receipt and saying "best regards" to station ${parts[1]}.`;
+            explanation = `Station ${sender}} is confirming receipt and saying "best regards" (goodbye) to station ${receiver}.`;
         } else if (parts[2] === '73') {
-            explanation = `Station ${parts[0]} is saying goodbye to station ${parts[1]} with "73" (best regards).`;
+            explanation = `Station ${sender} is saying goodbye to station ${receiver} with "73" (best regards).`;
         } else if (isGridLocator(parts[2])) {
-            explanation = `Station ${parts[0]} is sending its grid locator ${parts[2]} to station ${parts[1]}.`;
+            explanation = `Station ${sender} is sending its grid locator ${report} to station ${receiver}.`;
         } else if (parts[2].startsWith('R')) {
-            explanation = `Station ${parts[0]} is acknowledging receipt of a message from ${parts[1]} and sending a signal report of ${parts[2].slice(1)} dB.`;
+            explanation = `Station ${sender} is acknowledging receipt of a message from ${receiver} and sending a signal report of ${report.slice(1)} dB.`;
         } else {
-            explanation = `This is a message from ${parts[0]} to ${parts[1]}, but the content "${parts[2]}" is not recognized.`;
+            explanation = `This is a message from ${sender} to ${receiver}, but the content "${report}" is not recognized.`;
         }
     } else if (parts.length === 4 && isValidCallsign(parts[0]) && isValidCallsign(parts[1])) {
+        const receiver = parts[0];
+        const sender = parts[1];
+
         if (parts[2] === 'R' && isReport(parts[3])) {
-            explanation = `This is a signal report acknowledgment. Station ${parts[0]} is confirming receipt of a previous message and sending a signal report of ${parts[3]} dB to station ${parts[1]}.`;
+            explanation = `This is a signal report acknowledgment. Station ${sender} is confirming receipt of a previous message and sending a signal report of ${parts[3]} dB to station ${receiver}.`;
         } else {
-            explanation = `This is a message from ${parts[0]} to ${parts[1]}, but the content "${parts[2]} ${parts[3]}" is not recognized.`;
+            explanation = `This is a message from ${sender} to ${receiver}, but the content "${parts[2]} ${parts[3]}" is not recognized.`;
         }
     } else if (msgType === '0.0') { // || message.startsWith('<') && message.endsWith('>')) {
-        explanation = `This is a free-text message: "${text}".`; // Free-text messages in FT8 are limited to 13 characters.
+        explanation = `This is a free-text message: "${text}".`;
         if (text.length == 13) {
             explanation += ' The message is the maximum length of 13 characters.';
         }

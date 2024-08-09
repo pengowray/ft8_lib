@@ -24,6 +24,7 @@ class OutputComponent extends Component {
                 info: getFT8MessageTypeName(message.ft8MessageType)
             },
             decoded: this.prepareDecodedInfo(),
+            comment: message.expectedResults?.comment,
             decodedText: message.reDecodedResult.decodedText,
             symbols: message.symbolsText,
             packed: packedToHexStrSp(message.packedData),
@@ -122,6 +123,7 @@ class OutputComponent extends Component {
 
     prepareTests() {
         if (!this.message.expectedResults) return null;
+        if (this.message.expectedResults.notest) return null;
 
         const expected = this.message.expectedResults;
         const tests = [];
@@ -209,29 +211,29 @@ class OutputComponent extends Component {
         outputBox.innerHTML = `
             <h2>${data.messageType.info} (${data.messageType.type})</h2>
             <div class="output-content">
-                ${this.renderRowData('Input text', data.inputText)}
+                ${this.renderRowData('Input text', data.inputText, data.comment)}
                 ${this.renderRowText('Input type', data.inputType)}
 
                 ${this.renderSubheading('Encoding')}
 
                 ${this.renderChecks('Checks', data.checks)}
                 ${this.renderRowData('Message type', `(${data.messageType.type}) ${data.messageType.info}`)}
-                ${this.renderRowDataHighlights('Symbols', symbolsPretty(data.symbols), this.getSyncHighlights(data.syncCheck), 'Incorrect sync symbols highlighted in red.')}
+                ${this.renderRowDataHighlights('Symbols', symbolsPretty(data.symbols), this.getSyncHighlights(data.syncCheck), 'Incorrect sync symbols highlighted in red. Use 3140652.')}
                 ${this.renderRowData('Packed', data.packed)}
                 ${this.renderRowData('Message (77 bits)', data.messageBits)}
                 ${this.renderRowDataHighlights('CRC (14 bits)', data.crcBits, this.getCRCHighlights(data.crcCheck))}
-                ${this.renderRowDataHighlights('LDPC (83 bits)', data.parityBits, this.getParityHighlights(data.parityCheck), 'If a Low Density Parity Check (LDPC) were generated to match the Message and CRC, it would differ in highlighted bits.')}
+                ${this.renderRowDataHighlights('Parity (83 bits)', data.parityBits, this.getParityHighlights(data.parityCheck), 'If a Low Density Parity Check (LDPC) were generated for the Message and CRC, it would differ in the above highlighted bits.')}
                 ${data.parityCheck.result === 'error' ? this.renderRowDataHighlights('174-bit codeword<br>with LDPC errors', data.codeword, this.getLDPCErrorHighlights(data.parityCheck), 'Given the LPDC data, red highlighted bits are the most likely to be incorrect. Orange highlights are less likely errors. The 174-bits are the combined Message + CRC + LDPC.') : ''}
 
                 ${this.renderSubheading('Decoding')}
                 ${this.renderChecks('Decode check', data.decoded )}
                 ${this.renderRowData('Input text', data.inputText )}
                 ${this.renderRowData('Decoded text', data.decodedText, data.decodedText.includes('<...>') ? '<...> represents a hashed callsign.' : null)}
-                ${!data.decoded[0].success ? this.renderRowData('Decode error', data.decoded[0].errorMessage) : ''}
+                ${!data.decoded[0].success ? this.renderRowData('Decode error', data.decoded[0].errorMessage, "See also the binary visualization chart for more of the message content.") : ''}
 
                 ${(data.explanation || data.encodeError) ? this.renderSubheading('More info') : ''}
                 ${data.explanation ? this.renderRowText('Explanation', data.explanation) : ''}
-                ${data.encodeError ? this.renderRowData('Initial error', data.encodeError, 'As a fallback the input was encoded as free text after this initial error encoding via FT8_Lib.') : ''}
+                ${data.encodeError ? this.renderRowData('Initial error', data.encodeError, 'As a fallback the input was encoded as free text after this initial error.') : ''}
 
                 ${data.tests && data.tests.tests ? this.renderSubheading('Comparison to known reference') : ''}
                 ${data.tests && data.tests.tests ? this.renderChecks('Tests', data.tests.tests) : ''}
@@ -420,8 +422,8 @@ class OutputComponent extends Component {
         
         return syncCheck.errors.map(index => {
             let prettyIndex = index;
-            if (index > 72) prettyIndex += 4; 
-            else if (index > 36) prettyIndex += 2; 
+            if (index >= 72) prettyIndex += 4; 
+            else if (index >= 36) prettyIndex += 2; 
             //prettyIndex += 7;
             
             return prettyIndex;

@@ -70,14 +70,20 @@ function initializeUI() {
     const initializeTestInputs_ft8code = () => {;
         testInputs_ft8code.forEach((test, index) => {
             const option = document.createElement('option');
-            option.value = `msg ${index}`;
+            option.value = `ft8codeMsg ${index}`;
             option.textContent = `(${test.type}) ${test.message}`;
             testSelect.appendChild(option);
 
             const option2 = document.createElement('option');
-            option2.value = `symbols ${index}`;
-            option2.textContent = `(${test.type}) ${test.message} (from symbols)`;
+            option2.value = `ft8codeSymbols ${index}`;
+            option2.textContent = `(${test.type}) ${test.message} (unpack)`;
             testSelect.appendChild(option2);
+        });
+        ft8_examples.forEach((test, index) => {
+            const option = document.createElement('option');
+            option.value = `example ${index}`;
+            option.textContent = test.name || test.value;
+            testSelect.appendChild(option);
         });
 
         testSelect.addEventListener('change', (event) => {
@@ -85,15 +91,20 @@ function initializeUI() {
             selectedType = selected[0];
             selectedIndex = parseInt(selected[1]);
             if (selectedIndex !== "") {
-                const selectedTest = testInputs_ft8code[selectedIndex];
-                if (selectedType === 'msg') {
+                if (selectedType === 'ft8codeMsg') {
+                    const selectedTest = testInputs_ft8code[selectedIndex];
                     messageInput.value = selectedTest.message;
                     const expectedResults = selectedTest;
                     doEncode(expectedResults);
-                } else if (selectedType === 'symbols') {
+                } else if (selectedType === 'ft8codeSymbols') {
+                    const selectedTest = testInputs_ft8code[selectedIndex];
                     messageInput.value = selectedTest.symbols;
-                    const expectedResults = {...selectedTest, ...{symbols:null}}; // don't bother testing symbols when it's supplied
+                    const expectedResults = {...selectedTest, ...{symbols:null}}; // don't bother testing symbols when they're in the input
                     doEncode(expectedResults);
+                } else if (selectedType === 'example') {
+                    const selectedTest = ft8_examples[selectedIndex];
+                    messageInput.value = selectedTest.value;
+                    doEncode(selectedTest); // to add a comment
                 }
             }
         });

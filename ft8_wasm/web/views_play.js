@@ -1,24 +1,24 @@
-class PlayComponent extends Component {
+class PlayBtnComponent extends Component {
     constructor(index, container) {
         super(index, container); // index -2 for all messages
         this.countdownInterval = null;
-    }
-
-    create() {
+        this.queuingMessage = null;
         
         this.playAudioButton = this.container.querySelector('#play-audio');
         this.playAudioTimedButton = this.container.querySelector('#play-audio-timed');
         this.stopAudioButton = this.container.querySelector('#stop-audio');
         this.downloadAudioButton = this.container.querySelector('#download-audio');
         this.countdownDiv = this.container.querySelector('#countdown');
+    }
 
+    create() {
+        
         if (this.playAudioButton) this.playAudioButton.addEventListener('click', () => this.playAudioClicked() );
         if (this.playAudioTimedButton) this.playAudioTimedButton.addEventListener('click', () => this.playAudioTimedClicked());
         if (this.stopAudioButton) this.stopAudioButton.addEventListener('click', () => this.stopAudioClicked());
         if (this.downloadAudioButton) this.downloadAudioButton.addEventListener('click', () => this.downloadAudioClicked());
 
         console.log("PlayComponent created", this.index, this.playAudioButton, this.playAudioTimedButton, this.stopAudioButton, this.downloadAudioButton, this.countdownDiv);
-    
     }
 
     /**
@@ -43,17 +43,19 @@ class PlayComponent extends Component {
     }
 
     onPlay() {
+        this.stopCountdownDisplay(); // assume it's the same message
         this.updateButtonState();
-        this.stopCountdownDisplay();
     }
     onStop() {
-        this.updateButtonState();
         this.stopCountdownDisplay();
+        this.updateButtonState();
     }
 
     stopCountdownDisplay() {
+        //TODO: check if countdown should still be going?
         if (this.countdownInterval) {
-            clearInterval(this.countdownInterval);
+            this.queuingMessage = null;
+            if (this.countdownInterval != null) clearInterval(this.countdownInterval);
             this.countdownInterval = null;
             this.countdownDiv.style.display = 'none';
         }
@@ -71,12 +73,15 @@ class PlayComponent extends Component {
         const msg = this.getCurrentMessage();
         if (msg == null) return;
 
+        this.stopCountdownDisplay(); // stop previous
+
         this.countdownDiv.style.display = 'block';
+        this.queuingMessage = msg;
 
         function updateCountdown(playview) { // playview = this
             //const minutes = Math.floor(timeRemaining / 60);
             //const seconds = timeRemaining % 60;
-            const seconds = msg.queueTimeRemaining();
+            const seconds = msg?.queueTimeRemaining();
             if (seconds == null || seconds < 0) {
                 playview.stopCountdownDisplay();
                 //message.playAudio(); // should be done elsewhere hopefully
@@ -122,8 +127,8 @@ class PlayComponent extends Component {
 
         this.viewManager.stopAllAudio();
 
-        //this.updateButtonState(false);
         this.updateButtonState();;
+        this.stopCountdownDisplay();
     }
 
     resetAudioState(msg) {
@@ -134,7 +139,7 @@ class PlayComponent extends Component {
 
     playAudioClicked() {
         //console.log('this', this);
-        const msg = this.getCurrentMessage();
+        //const msg = this.getCurrentMessage();
 
         //msg.playAudio();
         //this.viewManager.playAudioIndex(-1);

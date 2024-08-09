@@ -311,6 +311,7 @@ class FT8Message extends EventTarget {
 
             msg.playStartTime = msg.audioContext.currentTime;
         });
+        //if (this.viewManager) this.viewManager.onPlay(this);
         return true;
     }
     

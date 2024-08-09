@@ -1,6 +1,6 @@
 
 const showModes = [ 
-    {name: "Off", "mode": "off", "zoom": 1}, 
+    //{name: "Off", "mode": "off", "zoom": 1}, 
     {name: "Frequency Deviation", "mode": "dphi", "zoom": 1},  // aka "Unmodulated", or "frequency deviation waveform generated using the Gaussian smoothed frequency deviation pulse"
     {name: "Frequency Deviation (zoom)", "mode": "dphi", "zoom": 16}, 
     {name: "Waveform", "mode": "wave", "zoom": 256},
@@ -36,7 +36,7 @@ class VizComponent extends Component {
         this.canvas.width = this.canvas.clientWidth;
         this.canvas.height = 200;
         
-        this.toggleVisualization();
+        this.toggleVisualization(0);
 
         window.addEventListener('resize', this.handleResize);
     }
@@ -51,16 +51,34 @@ class VizComponent extends Component {
     messageUpdate() {
         // Update any cached data that depends on the message
         console.log('VizComponent.messageUpdate()');
-        this.frameUpdate();
+
+        if (this.message != null && this.message.isplaying) {
+            this.onPlay();
+        } else {
+            this.onStop();
+        }
     }
 
     frameUpdate() {
-        if (this.message == null) return;
+        const canvas = this.canvas;
+        const ctx = this.ctx;
+
+        if (canvas == null) return;
+        if (ctx == null) return;
+
+        if (this.message == null) {
+            const width = canvas.width;
+            const height = canvas.height;
+            const middle = height / 2;
+            ctx.clearRect(0, 0, width, height);
+            if (this.timeDisplay != null) this.timeDisplay.textContent = '';
+            return;
+        };
 
         this.message.readyAudioAndBuffer(); // needed for viz
 
         const timing = this.message.getTiming();
-        if (timing == null) return; // todo: or clear?
+        //if (timing == null) return; // todo: or clear?
 
         // todo: keep track of if need to update when not playing
         //if (!timing.isPlaying) return;
@@ -68,19 +86,16 @@ class VizComponent extends Component {
         const currentTime = timing.currentTime ?? 0;
         const totalDuration = timing.duration ?? 0;
 
-        const canvas = this.canvas;
-        const ctx = this.ctx;
-
         // Update time display
-        if (this.timeDisplay && this.timeDisplay.textContent) {
+        if (this.timeDisplay && this.timeDisplay.textContent && currentTime != null) {
             this.timeDisplay.textContent = `${currentTime.toFixed(2)} / ${totalDuration.toFixed(2)}`;
+        } else {
+            this.timeDisplay.textContent = '';
         }
         
         const mode = showModes[this.showMode];
         const showDphi = (mode['mode'] === 'dphi');
         const off = (mode['mode'] === 'off');
-
-        if (!canvas) return;
 
         const width = canvas.width;
         const height = canvas.height;
@@ -150,7 +165,6 @@ class VizComponent extends Component {
                 }
             }
         }
-
         ctx.beginPath();
         ctx.moveTo(0, middle);
 
@@ -170,22 +184,22 @@ class VizComponent extends Component {
                 }
             }
         }
-
         ctx.strokeStyle = showDphi ? 'green' : 'steelblue';
         ctx.stroke();
 
-        // Draw playback position line
-        const playbackX = ((currentTime - startTime) / visibleDuration) * width;
-        ctx.beginPath();
-        ctx.moveTo(playbackX, 0);
-        ctx.lineTo(playbackX, height);
-        ctx.strokeStyle = 'red';
-        ctx.stroke();
-
+        if (this.message.isPlaying) {
+            // Draw playback position line
+            const playbackX = ((currentTime - startTime) / visibleDuration) * width;
+            ctx.beginPath();
+            ctx.moveTo(playbackX, 0);
+            ctx.lineTo(playbackX, height);
+            ctx.strokeStyle = 'red';
+            ctx.stroke();
+        }
     }
 
-    toggleVisualization() { // todo: rename cycleVisualization
-        this.showMode = (this.showMode + 1) % showModes.length;
+    toggleVisualization(add = 1) { // todo: rename cycleVisualization
+        this.showMode = (this.showMode + add) % showModes.length;
 
         if (this.VisualizationCaption) {
             this.VisualizationCaption.innerHTML = showModes[this.showMode]['name'];
@@ -195,15 +209,12 @@ class VizComponent extends Component {
     }
 
     onPlay() {
-        console.log('viz playing');
-
-        if (this.message == null) return;
+        if (this.message == null) onStop();
 
         this.message.readyAudioAndBuffer();
+        if (this.interval != null) return;
 
         this.interval = setInterval(() => {
-            //const currentTime = this.message.audioContext.currentTime - this.message.startTime;
-
             this.frameUpdate();
 
         }, 23); // Update every 23ms
@@ -211,7 +222,13 @@ class VizComponent extends Component {
 
 
     onStop() {
-        clearInterval(this.interval);
+        if (this.interval != null) clearInterval(this.interval);
+        this.interval = null;
+        this.frameUpdate();
     }
+    onQueued() {
+        this.frameUpdate();
+    }
+
 }
 

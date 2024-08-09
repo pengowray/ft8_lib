@@ -46,7 +46,7 @@ function initializeUI() {
     viewManager.registerComponent(new PianoRollComponent(-1, pianoRollDiv));
     viewManager.registerComponent(new OutputComponent(-1, output));
     viewManager.registerComponent(new TribbleComponent(-1, tribbleViz));
-    viewManager.registerComponent(new PlayComponent(-2, audioControls));
+    viewManager.registerComponent(new PlayBtnComponent(-2, audioControls));
 
     const initializeTestInputs = () => {;
         testInputs.forEach((test, index) => {

@@ -4,6 +4,8 @@ class ViewManager {
         this.components = [];
         this.playingMessages = new Set();
         this.queuedMessages = new Set();
+
+        window.viewManager = this;
     }
 
     /**
@@ -105,6 +107,18 @@ class ViewManager {
         this.playAudioIndex(-1);
     }
 
+    playAudioIndex(index) {
+        const message = this.messageManager.getMessage(index);
+        if (message == null || message.isPlaying) return false;
+        message.viewManager = this;
+        const success = message.playAudio(); // triggers viewManager.onPlay(this);
+
+        // triggered by message.playAudio already
+        //this.views.getComponents(index).forEach((component) => { component.onPlay(); });
+
+        return success;
+    }
+    
     stopAllAudio() {
         this.playingMessages.forEach((message) => {
             message.resetAudioState();
@@ -115,21 +129,8 @@ class ViewManager {
         this.playingMessages.clear();
         this.queuedMessages.clear();
     }
-
-    playAudioIndex(index) {
-        const message = this.messageManager.getMessage(index);
-        if (message == null || message.isPlaying) return false;
-
-        console.log('playing: ', message.inputText);
-      
-        const success = message.playAudio(); // triggers viewManager.onPlay(this);
-
-        // triggered by message.playAudio already
-        //this.views.getComponents(index).forEach((component) => { component.onPlay(); });
-
-        return success;
-    }
 }
+
 
 class MessageManager {
     constructor() {

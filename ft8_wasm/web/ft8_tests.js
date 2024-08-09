@@ -26,6 +26,10 @@ const testInputs = [
     { notest: true, name: "input example: telemetry data", comment: 'To sent a message as the telemetry data type, or enter T: followed by 1 to 18 hex digits. Telemetry data is 71-bits.', value: "Telemetry: A858DE45 F56D9BC9" },
     { notest: true, name: 'input example: telemetry data (exactly 18 digits)', comment: 'Another way to enter telemetry message. Use exactly 18 hexadecimal digits. The first digit must be between 0 and 7..', value: "1005e1eafcafec0ffe" },
     { notest: true, name: "input example: packed hex", comment: 'Format used by FT8_lib. Exactly 10 hexadecimal digits containing your 77-bit payload (zero-padded on the end, not the start). Input may contain spaces or dashes between the bytes. This format is found in the output of gen_ft8, a command line tool which comes as source code in FT8_lib', value: '5f a5 ec 39 30 6f aa c3 d6 00' },
+    { notest: true, name: 'test pattern: siren', comment: 'Not a valid FT8 message.', value: '0707070 70707070707070707070707070707 0707070 70707070707070707070707070707 0707070' },
+    { notest: true, name: 'test pattern: chirp', comment: 'Not a valid FT8 message.', value: '2345670 12345670123456701234567012345 6701234 56701234567012345670123456701 2345670' },
+    { notest: true, name: 'test pattern: costa camouflage', comment: 'A technically valid FT8 message.', value: '8M6TVW/R R3NFJ/R DN12' },
+    
   ]
   
 // ft8code.exe

@@ -129,7 +129,7 @@ class FT8Message extends EventTarget {
                 let result = encodeFT8Telemetry(input);
                 if (result.error) {
                     this.encodeError = result.error;
-                    return;
+                    throw new Error(result.error);
                 }
                 this.packedData = new Uint8Array(result.result.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
                 break;
@@ -172,18 +172,18 @@ class FT8Message extends EventTarget {
         if (this.symbolsText == null && this.packedData != null) {
             this.symbolsText = packedDataToSymbols(this.packedData);
         } else if (this.packedData == null && this.symbolsText != null) {
-            console.log("empty packed data, generating from symbols");
+            //console.log("empty packed data, generating from symbols");
             this.packedData = symbolsToPackedData(this.symbolsText);
         }
 
         if (this.symbolsText == null) {
             this.encodeError = "Failed to generate symbols";
-            return;
+            throw new Error(this.encodeError);
         }
 
         if (this.packedData == null) {
             this.encodeError = "Failed to generate packed data";
-            return;
+            throw new Error(this.encodeError);
         }
     
         this.ft8MessageType = getFT8MessageType(this.packedData);
@@ -354,6 +354,7 @@ class FT8Message extends EventTarget {
     generateAudio() {
         // was generateAudioFromSymbols(symbols, options = {}) 
         const options = this.getOptions();
+        if (this.symbolsText == null) return;
 
         const symbolsArray = symbolsToArray(this.symbolsText); // .split('').map(Number)
         console.log("symbols", this.symbolsText, symbolsArray);

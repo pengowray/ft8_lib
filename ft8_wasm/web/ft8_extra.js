@@ -654,26 +654,22 @@ function encodeFT8FreeText(message) {
   return output;
 }
 
-// Encode 71-bit telemetry data
+// Encode hex to 71-bits of telemetry data in a 77-bit payload
 function encodeFT8Telemetry(telemetryHex) {
-  // Ensure the input is a valid 18-character hex string
+  
   if (!/^[0-9A-Fa-f]{1,18}$/.test(telemetryHex)) {
-    return { "error": "Error: Telemetry data must be a 1 to 18 character hex string" };
+    return { "error": "Telemetry data must be a 1 to 18 character hex string" };
   }
 
-  // Convert hex to binary string
   let binaryString = hexToBinary(telemetryHex); // leading 0's are trimmed
 
   // Check if the binary string starts with 1 (exceeding 71 bits)
   if (binaryString.length > 71) { // || binaryString[0] == '1'
-    return { "error": "Error: First digit of 18-character hex string telemetry data must fall in the range 0 to 7." };
+    return { "error": "First digit of 18-character hex string telemetry data must fall in the range 0 to 7." };
   }
 
-  // Add message type 0.5 (000101 in binary)
-  binaryString = binaryString.padStart(71, '0') + '101000' // slice(-71)
+  binaryString = binaryString.padStart(71, '0') + '101000' // message type 0.5
 
-
-  //console.log('telemetry', binaryString);
   // Convert binary string back to hex string
   return { "result": bitsToHexForTelemetry(binaryString, true) };
 }

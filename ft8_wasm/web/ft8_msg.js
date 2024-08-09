@@ -36,7 +36,11 @@ class FT8Message extends EventTarget {
       // for playing
       this.isPlaying = false; // == (audioSource != null)
       this.playStartTime = null;
+
+      // all should be null when not queuing
       this.queuingStartedAt = null; // if playing is queued for next 15s
+      this.queuingUntil == null; // when to start playing
+      this.queueInterval = null; // check if ready to play
 
       this.audioContext = null;
       this.audioBuffer = null;
@@ -239,15 +243,55 @@ class FT8Message extends EventTarget {
         }
     }
 
+    queueTimeRemaining() {
+        if (!this.queuingStartedAt || !this.queuingUntil) return null;
+        const seconds = (this.queuingUntil - new Date().getTime()) / 1000;
+        return seconds < 0 ? 0 : seconds;
+    }
+
     queueAudio() {
-        if (viewManager) viewManager.onQueue(this);
+        if (this.isPlaying) return false; // already playing
+        if (this.queuingStartedAt) return false; // already queued
+
+        this.readyAudioAndBuffer();
+
+        if (!this.audioContext) {
+            console.error("No audio context");
+            return false;
+        }
+
+        this.queuingStartedAt = Date.now();
+        const now = new Date().getSeconds();
+        const latency = (this.audioContext?.outputLatency ?? 0);
+        const secondsUntilNext15 = 15 - ((now + latency) % 15);
+        //const displaySecondsUntilNext15 = 15 - (now % 15);
+        let nextCycleTime = new Date().getTime() + secondsUntilNext15 * 1000;
+        this.queuingUntil = nextCycleTime;
+
+        this.queueInterval = setInterval(() => {
+            const currentTime = new Date().getTime();
+            if (!this.queueInterval || !this.queuingUntil || this.isPlaying) {
+                clearInterval(this.queueInterval);
+                return;
+            }
+            if (currentTime >= this.queuingUntil) {
+                clearInterval(this.queueInterval);
+                this.playAudio();
+            }
+        }, 90); // Check every 90ms
+    
+        if (this.viewManager) this.viewManager.onQueue(this);
         this.dispatchEvent(new Event('queue'));
-        //TODO
     }
 
     playAudio() {
         //if (this.audioSource) { return; /* already playing */ }
         if (this.isPlaying) return false;
+
+        if (this.queuingStartedAt) {
+            this.queuingStartedAt = null;
+            this.queuingUntil = null;
+        }
 
         this.readyAudioAndBuffer();
         if (!this.audioBuffer) return false;
@@ -273,10 +317,13 @@ class FT8Message extends EventTarget {
     resetAudioState() {
         console.log("resetAudioState (stopping)");
         this.isPlaying = false;
+        this.playStartTime = null;
+
         if (this.audioSource) this.audioSource.onended = null;
         if (this.audioSource) this.audioSource.stop();
-        this.queuingStartedAt = null;
         //this.clearAudioAndBuffer();
+        this.queuingStartedAt = null;
+        this.queuingUntil = null;
 
         if (this.viewManager) this.viewManager.onStop(this);
         this.dispatchEvent(new Event('stop'));

@@ -109,9 +109,11 @@ class ViewManager {
         this.playingMessages.forEach((message) => {
             message.resetAudioState();
         });
-        //TODO: stop queued messages
-        //this.playingMessages.clear();
-        //this.queuedMessages.clear();
+        this.queuedMessages.forEach((message) => {
+            message.resetAudioState();
+        });
+        this.playingMessages.clear();
+        this.queuedMessages.clear();
     }
 
     playAudioIndex(index) {

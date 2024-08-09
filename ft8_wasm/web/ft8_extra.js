@@ -306,7 +306,7 @@ function symbolsToPrettyBinary(symbols) {
     return symbolsToBitsStrPreserveSpaces(symbolsPretty(symbols));
 }
 
-
+ // z-base-32: permutation of the RFC3548 standard.
 const ZBASE32 = 'ybndrfg8ejkmcpqxot1uwisza345h769';
 const ZBASE32_Reverse = {};
 for (let i = 0; i < ZBASE32.length; i++) {
@@ -339,6 +339,8 @@ function hashBitsPrettyZ32(bits) {
         return `${bitsToZBase32(bits.slice(0, 10))}-${bitsToZBase32(bits.slice(10, 12).padStart(5, '0'))}-00`;
     } else if (len == 10) {
         return `${bitsToZBase32(bits.slice(0, 10))}-0-00`;
+    } else if (len == 0) {
+        return "00-0-00";
     } else {
         throw new Error("Invalid length: " + len + " in '" + bits + "'");
     }

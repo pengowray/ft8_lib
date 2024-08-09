@@ -44,30 +44,76 @@ class PlayComponent extends Component {
 
     onPlay() {
         this.updateButtonState();
+        this.stopCountdownDisplay();
     }
     onStop() {
         this.updateButtonState();
+        this.stopCountdownDisplay();
     }
-    onQueue() {
+
+    stopCountdownDisplay() {
+        if (this.countdownInterval) {
+            clearInterval(this.countdownInterval);
+            this.countdownInterval = null;
+            this.countdownDiv.style.display = 'none';
+        }
+    }
+
+    playAudioTimedClicked() {
+        const msg = this.getCurrentMessage();
+        if (msg == null) return;
+
+        msg.queueAudio();
         this.updateButtonState();
+    }
+
+    onQueue() {
+        const msg = this.getCurrentMessage();
+        if (msg == null) return;
+
+        this.countdownDiv.style.display = 'block';
+
+        function updateCountdown(playview) { // playview = this
+            //const minutes = Math.floor(timeRemaining / 60);
+            //const seconds = timeRemaining % 60;
+            const seconds = msg.queueTimeRemaining();
+            if (seconds == null || seconds < 0) {
+                playview.stopCountdownDisplay();
+                //message.playAudio(); // should be done elsewhere hopefully
+                return;
+            }
+
+            playview.countdownDiv.textContent = `Playing in ${seconds.toFixed(1).toString().padStart(2, '0')}`;
+        }
+
+        updateCountdown(this); // Call immediately to show correct time
+        this.countdownInterval = setInterval(() => updateCountdown(this), 12); // 12ms update interval
+        this.updateButtonState(); // don't do this until after countdownInterval is set (to avoid endless loop)
     }  
 
     messageUpdate() {
+        this.stopCountdownDisplay();
         this.updateButtonState();
     }
     
 
     updateButtonState() {
+        const msg = this.getCurrentMessage();
         const nowPlaying = this.viewManager.playingMessages;
         const anyPlaying = nowPlaying.size > 0;
-        const isPlaying = this.getCurrentMessage()?.isPlaying ?? false;
-
+        const isPlaying =  msg?.isPlaying ?? false;
+        const isQueued =  msg?.queuingStartedAt != null ?? false;
+        
         //console.log("updateButtonState (isPlaying, nowPlaying, nowPlaying.length):", isPlaying, nowPlaying, nowPlaying.length);
 
         this.playAudioButton.disabled = isPlaying;
-        this.playAudioTimedButton.disabled = isPlaying;
-        this.stopAudioButton.disabled = !anyPlaying;
+        this.playAudioTimedButton.disabled = isPlaying || isQueued;
+        this.stopAudioButton.disabled = !anyPlaying && !isQueued;
         //downloadAudioButton.disabled = isPlaying;
+
+        if (isQueued && !this.countdownInterval) {
+            this.onQueue();
+        }
     }
 
     stopAudioClicked() {
@@ -99,47 +145,6 @@ class PlayComponent extends Component {
         //listen for audio end event to update button state (don't need. already done by message's playAudio)
         //msg.audioSource.onended = () => this.updateButtonState(); 
     }
-
-
-    playAudioTimedClicked() {
-        const msg = this.getCurrentMessage();
-        if (msg == null) return;
-
-        msg.readyAudioAndBuffer();
-
-        if (msg != null && msg.audioSamples != null && !msg.audioSource) {
-            const now = new Date().getSeconds();
-            const latency = (msg.audioContext?.outputLatency ?? 0);
-            const secondsUntilNext15 = 15 - ((now + latency) % 15);
-            //const displaySecondsUntilNext15 = 15 - (now % 15);
-            let totalSecondsTilNext = secondsUntilNext15;
-            let nextCycleTime = new Date().getTime() + totalSecondsTilNext * 1000;
-
-            this.updateButtonState();
-            this.countdownDiv.style.display = 'block';
-
-            function updateCountdown(playview) { // playview = this
-                const timeRemaining = (nextCycleTime - new Date().getTime()) / 1000;
-
-                //const minutes = Math.floor(timeRemaining / 60);
-                const seconds = timeRemaining % 60;
-                playview.countdownDiv.textContent = `Playing in ${seconds.toFixed(1).toString().padStart(2, '0')}`;
-                
-                if (timeRemaining <= 0) {
-                    clearInterval(playview.countdownInterval);
-                    playview.countdownInterval = null;
-                    playview.countdownDiv.style.display = 'none';
-                    //this.playAudio(msg);
-                    msg.playAudio();
-                }
-                //totalSeconds--;
-            }
-
-            updateCountdown(this); // Call immediately to show correct time
-            this.countdownInterval = setInterval(() => updateCountdown(this), 12); // 12ms update interval
-        }
-    }
-
 
     downloadAudioClicked() {
         const msg = this.getCurrentMessage();

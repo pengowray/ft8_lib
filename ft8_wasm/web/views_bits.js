@@ -228,7 +228,6 @@ class TribbleComponent extends Component {
     }
 
     createSymbolElement(symbol, index, hz) {
-        console.log('hz', hz);
         const symbolElement = document.createElement('div');
         symbolElement.className = `symbol ${this.isCostasSymbol(index) ? 'costas' : 'data'}`;
         symbolElement.textContent = symbol;

@@ -24,6 +24,7 @@ class OutputComponent extends Component {
                 info: getFT8MessageTypeName(message.ft8MessageType)
             },
             decoded: this.prepareDecodedInfo(),
+            decodedText: message.reDecodedResult.decodedText,
             symbols: message.symbolsText,
             packed: packedToHexStrSp(message.packedData),
             codeword: bitsNoCosta, // 174 bits
@@ -58,6 +59,8 @@ class OutputComponent extends Component {
         if (!decodeResult.success) {
             //return { error: true, result: 'error', message: `${decodeResult.errorCode}: ${decodeResult.errorMessage}` };
             return [ decodeTest1 ];
+        } else {
+            decodeTest1.resultText = 'success';
         }
 
         const decoded = decodeResult.decodedText;
@@ -187,12 +190,12 @@ class OutputComponent extends Component {
                 const prettyActual = symbolsPretty(test.actual);
                 renderedRows += this.renderRowData(`${test.name} (reference)`, prettyExpected);
                 //renderedRows += this.renderRowData(`${test.name} (decoded)`, test.actual);
-                renderedRows += this.renderRowDataHighlights(`${test.name} (decoded)`, prettyActual, this.getDiffHighlights(prettyExpected, prettyActual));
+                renderedRows += this.renderRowDataHighlights(`${test.name} (decoded)`, prettyActual, this.getDiffHighlights(prettyExpected, prettyActual), 'Red highlights show symbols which differ from the test reference');
 
                 const expectedBits = symbolsToBitsStrNoCosta(test.expected).slice(0, 77);
                 const actualBits = symbolsToBitsStrNoCosta(test.actual).slice(0, 77);
                 renderedRows += this.renderRowData(`Message bits (reference)`, expectedBits);
-                renderedRows += this.renderRowDataHighlights(`Message bits (decoded)`, actualBits, this.getDiffHighlights(expectedBits, actualBits));
+                renderedRows += this.renderRowDataHighlights(`Message bits (decoded)`, actualBits, this.getDiffHighlights(expectedBits, actualBits), 'Red highlights show bits which are flipped compared to the test reference.');
 
             } 
         }
@@ -213,22 +216,22 @@ class OutputComponent extends Component {
 
                 ${this.renderChecks('Checks', data.checks)}
                 ${this.renderRowData('Message type', `(${data.messageType.type}) ${data.messageType.info}`)}
-                ${this.renderRowDataHighlights('Symbols', symbolsPretty(data.symbols), this.getSyncHighlights(data.syncCheck))}
+                ${this.renderRowDataHighlights('Symbols', symbolsPretty(data.symbols), this.getSyncHighlights(data.syncCheck), 'Incorrect sync symbols highlighted in red.')}
                 ${this.renderRowData('Packed', data.packed)}
                 ${this.renderRowData('Message (77 bits)', data.messageBits)}
                 ${this.renderRowDataHighlights('CRC (14 bits)', data.crcBits, this.getCRCHighlights(data.crcCheck))}
-                ${this.renderRowDataHighlights('LDPC (83 bits)', data.parityBits, this.getParityHighlights(data.parityCheck))}
-                ${data.parityCheck.result === 'error' ? this.renderRowDataHighlights('174-bit codeword<br>with LDPC errors', data.codeword, this.getLDPCErrorHighlights(data.parityCheck)) : ''}
+                ${this.renderRowDataHighlights('LDPC (83 bits)', data.parityBits, this.getParityHighlights(data.parityCheck), 'If a Low Density Parity Check (LDPC) were generated to match the Message and CRC, it would differ in highlighted bits.')}
+                ${data.parityCheck.result === 'error' ? this.renderRowDataHighlights('174-bit codeword<br>with LDPC errors', data.codeword, this.getLDPCErrorHighlights(data.parityCheck), 'Given the LPDC data, red highlighted bits are the most likely to be incorrect. Orange highlights are less likely errors. The 174-bits are the combined Message + CRC + LDPC.') : ''}
 
                 ${this.renderSubheading('Decoding')}
                 ${this.renderChecks('Decode check', data.decoded )}
                 ${this.renderRowData('Input text', data.inputText )}
-                ${this.renderRowData('Decoded text', data.decoded[0].decodedText ?? '' )}
+                ${this.renderRowData('Decoded text', data.decodedText, data.decodedText.includes('<...>') ? '<...> represents a hashed callsign.' : null)}
                 ${!data.decoded[0].success ? this.renderRowData('Decode error', data.decoded[0].errorMessage) : ''}
 
                 ${(data.explanation || data.encodeError) ? this.renderSubheading('More info') : ''}
                 ${data.explanation ? this.renderRowText('Explanation', data.explanation) : ''}
-                ${data.encodeError ? this.renderRowData('Free text reason', data.encodeError) : ''}
+                ${data.encodeError ? this.renderRowData('Initial error', data.encodeError, 'As a fallback the input was encoded as free text after this initial error encoding via FT8_Lib.') : ''}
 
                 ${data.tests && data.tests.tests ? this.renderSubheading('Comparison to known reference') : ''}
                 ${data.tests && data.tests.tests ? this.renderChecks('Tests', data.tests.tests) : ''}
@@ -250,8 +253,6 @@ class OutputComponent extends Component {
 //${this.renderRowData('CRC (14 bits)', data.crcBits)}
 //${this.renderRowData('LDPC (83 bits)', data.parityBits)}
 
-//todo: fix full text: "Fallback to free text reason"
-
         this.container.innerHTML = '';
         this.container.appendChild(outputBox);
     }
@@ -264,20 +265,22 @@ class OutputComponent extends Component {
         `;
     }
 
-    renderRowData(label, value) {
+    renderRowData(label, value, comment = null) {
         return `
             <div class="output-row">
                 <div class="output-label">${label}</div>
                 <div class="output-value">${escapeHTML(value)}</div>
+                ${comment ? `<div class="output-comment">${escapeHTML(comment)}</div>` : ''}
             </div>
         `;
     }
 
-    renderRowDataHighlights(label, value, highlightIndices = []) {
+    renderRowDataHighlights(label, value, highlightIndices = [], ifHighlightsComment = null) {
         let highlightedValue = value;
         //Array.isArray(highlightIndices)
         //highlightIndices instanceof Set
 
+        let hasHighlights = false
         if ( highlightIndices === null || highlightIndices.length === 0 || value === '') {
             // pass
 
@@ -286,8 +289,10 @@ class OutputComponent extends Component {
             // only used for parity bits
             highlightedValue = value.split('').map((char, index) => {
                 if (highlightIndices.mostFrequentNumbers.has(index)) {
+                    hasHighlights = true;
                     return `<span class="highlighted-error" title="bit ${index + 1} / ${value.length}">${char}</span>`;
                 } else if (highlightIndices.uniqueNumbers.has(index)) {
+                    hasHighlights = true;
                     return `<span class="highlighted-lesser-error" title="bit ${index + 1} / ${value.length}">${char}</span>`;
                 } else {
                     return char;
@@ -300,16 +305,19 @@ class OutputComponent extends Component {
                 const isHighlighted = Array.isArray(highlightIndices) 
                     ? highlightIndices.includes(index) 
                     : highlightIndices.has(index);
+                if (isHighlighted) hasHighlights = true;
                 return isHighlighted ? `<span class="highlighted-error">${char}</span>` : char
             }).join('');
         }
-    
+        
         return `
             <div class="output-row">
                 <div class="output-label">${label}</div>
                 <div class="output-value">${highlightedValue}</div>
+                ${hasHighlights && ifHighlightsComment ? `<div class="output-comment">${ifHighlightsComment}</div>` : ''}
             </div>
         `;
+
     }
 
     renderRowText(label, value) {
@@ -317,6 +325,7 @@ class OutputComponent extends Component {
             <div class="output-row plain-text">
                 <div class="output-label">${label}</div>
                 <div class="output-value">${escapeHTML(value)}</div>
+                
             </div>
         `;
     }

@@ -47,11 +47,6 @@ class PianoRollComponent extends Component {
 
     getSymbolBackgroundColor(index) {
         return 'var(--data-bg)';
-        if (this.isCostasSymbol(index)) {
-            return 'var(--costas-bg)';
-        } else {
-            return 'var(--data-bg)';
-        }
     }
 
     getHighlightColor(index, symbol) {

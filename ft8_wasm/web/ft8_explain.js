@@ -48,11 +48,11 @@ function explainFT8Message(text, msgType) {
                 explanation += ' 73 is also shorthand for "best regards".'
             }
         } else if (parts[2] === 'RRR') {
-            explanation = `This is an acknowledgment message. Station ${parts[0]} is confirming receipt of information from station ${parts[1]}.`;
+            explanation = `Station ${parts[0]} is confirming receipt of information from station ${parts[1]}.`;
         } else if (parts[2] === 'RR73') {
-            explanation = `This is a combined acknowledgment and goodbye message. Station ${parts[0]} is confirming receipt and saying "best regards" to station ${parts[1]}.`;
+            explanation = `Station ${parts[0]} is confirming receipt and saying "best regards" to station ${parts[1]}.`;
         } else if (parts[2] === '73') {
-            explanation = `This is a goodbye message. Station ${parts[0]} is saying goodbye to station ${parts[1]} with "73" (best regards).`;
+            explanation = `Station ${parts[0]} is saying goodbye to station ${parts[1]} with "73" (best regards).`;
         } else if (isGridLocator(parts[2])) {
             explanation = `Station ${parts[0]} is sending its grid locator ${parts[2]} to station ${parts[1]}.`;
         } else if (parts[2].startsWith('R')) {

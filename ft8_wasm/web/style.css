@@ -9,7 +9,9 @@
     --warning-text: rgb(181, 112, 0);
 
     --position-line-color: red;
-    --costas-bg: #a9a9a9;
+    --costas-bg: rgb(8, 78, 255);
+    --costas-bg-bits: #a9a9a9;
+
     --data-bg: #737373;
     --ramp-bg: #d0d0d0;
 }
@@ -25,7 +27,8 @@
     --warning-text: orange;
 
     --position-line-color: white;
-    --costas-bg: rgb(33, 59, 125);
+    --costas-bg: rgb(8, 78, 255);
+    --costas-bg-bits: rgb(33, 59, 125);
     --data-bg: #837e94;
     --ramp-bg: #333333;
 
@@ -364,7 +367,7 @@ body:not(.dark-mode) #piano-roll {
 }
 
 .symbol.costas {
-    background-color: var(--costas-bg);
+    background-color: var(--costas-bg-bits);
     color: var(--packed-color);
 }
 
@@ -413,7 +416,7 @@ body:not(.dark-mode) #piano-roll {
     :root {
         --border-color: #555;
         --data-bg: #2c3e50;
-        --costas-bg: #34495e;
+        --costas-bg-bits: #34495e;
         --bit-one-bg: #b36954;
         --bit-zero-bg: #4da8ed;
         --packed-bg: #7f8c8d;
@@ -543,6 +546,7 @@ body:not(.dark-mode) #piano-roll {
 .output-row {
     margin-bottom: 5px;
     display: contents;
+    grid-column: 1 / -1;
 }
 
 .output-row.plain-text {
@@ -558,10 +562,6 @@ body:not(.dark-mode) #piano-roll {
     word-break: normal;
 }
 
-
-.full-width {
-    grid-column: 1 / -1;
-}
 
 .output-label {
     font-weight: bold;
@@ -672,4 +672,16 @@ body:not(.dark-mode) #piano-roll {
 .dark-mode .highlighted-lesser-error {
     background-color: #4c3d1d;
     color: #ffa366;
+}
+
+.output-comment {
+    font-size: 0.7em;
+    color: #666;
+    margin-top: 2px;
+    grid-column: 2;
+    padding-left: 5px;
+}
+
+.dark-mode .output-comment {
+    color: #999;
 }

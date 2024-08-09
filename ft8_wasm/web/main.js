@@ -68,6 +68,13 @@ function initializeUI() {
     //initializeTestInputs();
 
     const initializeTestInputs_ft8code = () => {;
+        ft8_examples.forEach((test, index) => {
+            const option = document.createElement('option');
+            option.value = `example ${index}`;
+            option.textContent = test.name || test.value;
+            testSelect.appendChild(option);
+        });
+
         testInputs_ft8code.forEach((test, index) => {
             const option = document.createElement('option');
             option.value = `ft8codeMsg ${index}`;
@@ -78,12 +85,6 @@ function initializeUI() {
             option2.value = `ft8codeSymbols ${index}`;
             option2.textContent = `(${test.type}) ${test.message} (unpack)`;
             testSelect.appendChild(option2);
-        });
-        ft8_examples.forEach((test, index) => {
-            const option = document.createElement('option');
-            option.value = `example ${index}`;
-            option.textContent = test.name || test.value;
-            testSelect.appendChild(option);
         });
 
         testSelect.addEventListener('change', (event) => {

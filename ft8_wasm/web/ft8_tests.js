@@ -1,27 +1,4 @@
-//random
-const testInputs = [
-    { name: "Standard message", value: "CQ K1ABC FN42" },
-    { name: "Signal report", value: "K1ABC W9XYZ -15" },
-    { name: "Roger report", value: "W9XYZ K1ABC R-17" },
-    { name: "RRR", value: "K1ABC W9XYZ RRR" },
-    { name: "73", value: "W9XYZ K1ABC 73" },
-    { name: "Free text", value: "<TNX BOB 73 GL>" },
-    { name: "DXpedition mode", value: "K1ABC RR73; W9XYZ <KH1/KH7Z> -12" },
-    { name: "ARRL Field Day 1", value: "CQ FD K1ABC FN42" },
-    { name: "ARRL Field Day 2", value: "K1ABC W9XYZ 2B EMA" },
-    { name: "EU VHF Contest", value: "CQ TEST G4ABC IO91" },
-    //{ name: "Telemetry", value: "T#001,234,235,002,000,001" },
-    { name: "Telemetry 1", value: "1005e1eafcafe #Telemetry" }, // b0ab 
-    { name: "Telemetry 2", value: "T: ca55e77e" },
-    { name: "Nonstandard call", value: "CQ PJ4/K1ABC" },
-    { name: "Compound call", value: "CQ SP/K1ABC" },
-    { name: "ARRL RTTY Roundup 1", value: "CQ RU K1ABC FN42" },
-    { name: "ARRL RTTY Roundup 2", value: "K1ABC W9XYZ 579 WI" },
-  ];
-
   const ft8_examples = [
-    { notest: true, name: "error example: one bit flipped", comment: 'This message contains a single bit error. See if you can find and correct it.', value: "01101110111011001100001110100110100001110001110011001110110010101100101000000 00101000101001 11011001110010010010001100011001011000001110110010001010011110110001000011110111001" },
-    { notest: true, name: "error example: wrong sync symbols", comment: 'Example of a message contains errors in the sync symbols.', value: "5550001 00000000011541472111206301447 5550001 52112705440021501172302627711 5550001" },
     { notest: true, name: "input example: <free text>", comment: 'To make sure your message is sent as free text, write it between < and >. Free text will be uppercased and truncated to 13 characters. Valid characters are 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+-./? and space.', value: "<YOUR MSG HERE>" },
     { notest: true, name: "input example: telemetry data", comment: 'To sent a message as the telemetry data type, or enter T: followed by 1 to 18 hex digits. Telemetry data is 71-bits.', value: "Telemetry: A858DE45 F56D9BC9" },
     { notest: true, name: 'input example: telemetry data (exactly 18 digits)', comment: 'Another way to enter telemetry message. Use exactly 18 hexadecimal digits. The first digit must be between 0 and 7..', value: "1005e1eafcafec0ffe" },
@@ -29,7 +6,9 @@ const testInputs = [
     { notest: true, name: 'test pattern: siren', comment: 'Not a valid FT8 message.', value: '0707070 70707070707070707070707070707 0707070 70707070707070707070707070707 0707070' },
     { notest: true, name: 'test pattern: chirp', comment: 'Not a valid FT8 message.', value: '2345670 12345670123456701234567012345 6701234 56701234567012345670123456701 2345670' },
     { notest: true, name: 'test pattern: costa camouflage', comment: 'A technically valid FT8 message.', value: '8M6TVW/R R3NFJ/R DN12' },
-    
+    { notest: true, name: "error example: one bit flipped", comment: 'This message contains a single bit error. See if you can find and correct it.', value: "01101110111011001100001110100110100001110001110011001110110010101100101000000 00101000101001 11011001110010010010001100011001011000001110110010001010011110110001000011110111001" },
+    { notest: true, name: "error example: wrong sync symbols", comment: 'Example of a message contains errors in the sync symbols.', value: "5550001 00000000011541472111206301447 5550001 52112705440021501172302627711 5550001" },
+    { notest: true, name: 'error example: telemetry too long (bad input)', value: 'Telemetry: F20F1044242408F20F' },
   ]
   
 // ft8code.exe

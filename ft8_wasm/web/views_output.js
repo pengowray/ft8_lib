@@ -187,12 +187,12 @@ class OutputComponent extends Component {
                 const prettyActual = symbolsPretty(test.actual);
                 renderedRows += this.renderRowData(`${test.name} (reference)`, prettyExpected);
                 //renderedRows += this.renderRowData(`${test.name} (decoded)`, test.actual);
-                renderedRows += this.renderRowDataHighlights(`${test.name} (decoded)`, prettyActual, false, this.getDiffHighlights(prettyExpected, prettyActual));
+                renderedRows += this.renderRowDataHighlights(`${test.name} (decoded)`, prettyActual, this.getDiffHighlights(prettyExpected, prettyActual));
 
                 const expectedBits = symbolsToBitsStrNoCosta(test.expected).slice(0, 77);
                 const actualBits = symbolsToBitsStrNoCosta(test.actual).slice(0, 77);
                 renderedRows += this.renderRowData(`Message bits (reference)`, expectedBits);
-                renderedRows += this.renderRowDataHighlights(`Message bits (decoded)`, actualBits, false, this.getDiffHighlights(expectedBits, actualBits));
+                renderedRows += this.renderRowDataHighlights(`Message bits (decoded)`, actualBits, this.getDiffHighlights(expectedBits, actualBits));
 
             } 
         }
@@ -213,12 +213,12 @@ class OutputComponent extends Component {
 
                 ${this.renderChecks('Checks', data.checks)}
                 ${this.renderRowData('Message type', `(${data.messageType.type}) ${data.messageType.info}`)}
-                ${this.renderRowDataHighlights('Symbols', symbolsPretty(data.symbols), true, this.getSyncHighlights(data.syncCheck))}
+                ${this.renderRowDataHighlights('Symbols', symbolsPretty(data.symbols), this.getSyncHighlights(data.syncCheck))}
                 ${this.renderRowData('Packed', data.packed)}
                 ${this.renderRowData('Message (77 bits)', data.messageBits)}
-                ${this.renderRowDataHighlights('CRC (14 bits)', data.crcBits, false, this.getCRCHighlights(data.crcCheck))}
-                ${this.renderRowDataHighlights('LDPC (83 bits)', data.parityBits, false, this.getParityHighlights(data.parityCheck))}
-                ${data.parityCheck.result === 'error' ? this.renderRowDataHighlights('174-bit codeword<br>with LDPC errors', data.codeword, false, this.getLDPCErrorHighlights(data.parityCheck)) : ''}
+                ${this.renderRowDataHighlights('CRC (14 bits)', data.crcBits, this.getCRCHighlights(data.crcCheck))}
+                ${this.renderRowDataHighlights('LDPC (83 bits)', data.parityBits, this.getParityHighlights(data.parityCheck))}
+                ${data.parityCheck.result === 'error' ? this.renderRowDataHighlights('174-bit codeword<br>with LDPC errors', data.codeword, this.getLDPCErrorHighlights(data.parityCheck)) : ''}
 
                 ${this.renderSubheading('Decoding')}
                 ${this.renderChecks('Decode check', data.decoded )}
@@ -246,7 +246,7 @@ class OutputComponent extends Component {
 //${this.renderDecodedInfo(data.decoded)}
 
 //unhighlighted:
-//${this.renderRowData('Symbols', symbolsPretty(data.symbols), true)}
+//${this.renderRowData('Symbols', symbolsPretty(data.symbols))}
 //${this.renderRowData('CRC (14 bits)', data.crcBits)}
 //${this.renderRowData('LDPC (83 bits)', data.parityBits)}
 
@@ -264,16 +264,16 @@ class OutputComponent extends Component {
         `;
     }
 
-    renderRowData(label, value, fullWidth = false) {
+    renderRowData(label, value) {
         return `
-            <div class="output-row ${fullWidth ? 'full-width' : ''}">
+            <div class="output-row">
                 <div class="output-label">${label}</div>
                 <div class="output-value">${escapeHTML(value)}</div>
             </div>
         `;
     }
 
-    renderRowDataHighlights(label, value, fullWidth = false, highlightIndices = []) {
+    renderRowDataHighlights(label, value, highlightIndices = []) {
         let highlightedValue = value;
         //Array.isArray(highlightIndices)
         //highlightIndices instanceof Set
@@ -305,16 +305,16 @@ class OutputComponent extends Component {
         }
     
         return `
-            <div class="output-row ${fullWidth ? 'full-width' : ''}">
+            <div class="output-row">
                 <div class="output-label">${label}</div>
                 <div class="output-value">${highlightedValue}</div>
             </div>
         `;
     }
 
-    renderRowText(label, value, fullWidth = false) {
+    renderRowText(label, value) {
         return `
-            <div class="output-row plain-text ${fullWidth ? 'full-width' : ''}">
+            <div class="output-row plain-text">
                 <div class="output-label">${label}</div>
                 <div class="output-value">${escapeHTML(value)}</div>
             </div>

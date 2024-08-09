@@ -191,8 +191,17 @@ class TribbleComponent extends Component {
                     rowElement.appendChild(this.createBitElement(bits[i], i));
                 }
             } else if (rowType === 'symbols') {
+                //if (this.message) this.message.readyAudioAndBuffer();
+                const audioOptions = this.message?.getOptions();
+                const baseFreq = audioOptions?.baseFrequency ?? 0;
+                const toneSpacing = audioOptions?.toneSpacing ?? 6.25;                
+                //TODO: if bad symbol ('-' or ' ') then no frequency
+                const hz = (symbol) => { 
+                    return audioOptions?.customToneFrequencies[parseInt(symbol)] 
+                        || (baseFreq + toneSpacing * parseInt(symbol)) 
+                };
                 symbols.split('').forEach((symbol, index) => {
-                    rowElement.appendChild(this.createSymbolElement(symbol, index));
+                    rowElement.appendChild(this.createSymbolElement(symbol, index, hz(symbol)));
                 });
             } else if (rowType === 'packed') {
                 // Add spacer for sync bits
@@ -218,13 +227,14 @@ class TribbleComponent extends Component {
         return bitElement;
     }
 
-    createSymbolElement(symbol, index) {
+    createSymbolElement(symbol, index, hz) {
+        console.log('hz', hz);
         const symbolElement = document.createElement('div');
         symbolElement.className = `symbol ${this.isCostasSymbol(index) ? 'costas' : 'data'}`;
         symbolElement.textContent = symbol;
         symbolElement.dataset.index = index;
         symbolElement.style.gridColumn = `${index * 3 + 1} / span 3`;
-        symbolElement.title = `${symbol}\nSymbol #${index + 1}\nGraycode: ${symbolsToGrayBitsStr(symbol)}\nMaps to binary: ${symbolsToBitsStr(symbol)} (=${parseInt(symbolsToBitsStr(symbol),2)})\nStart: ${(index * 0.160).toFixed(2)}s, duration: ${(0.160).toFixed(2)}s`;
+        symbolElement.title = `${symbol}\n${(hz ? `${hz.toFixed(2)} Hz\n` : '')}Symbol ${index + 1} of ${this.message?.symbols?.length ?? 79}\nGraycode: ${symbolsToGrayBitsStr(symbol)}\nMaps to binary: ${symbolsToBitsStr(symbol)} (=${parseInt(symbolsToBitsStr(symbol),2)})\nStart: ${(index * 0.160).toFixed(2)}s, duration: ${(0.160).toFixed(2)}s`;
         return symbolElement;
     }
 

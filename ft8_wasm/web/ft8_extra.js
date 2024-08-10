@@ -502,6 +502,7 @@ function checkParity(symbols) {
 
     return {
         result: failedParityBits.size === 0 ? 'ok' : 'error',
+        success: failedParityBits.size === 0,
         failedParityCount: failedParityBits.size,
         failedMessageCount: failedMessageBits.size,
         parityErrors: failedParityBits,
@@ -572,7 +573,21 @@ function analyzeNumbers(numbers) {
       uniqueNumbers,
       mostFrequentNumbers
     };
-  }
+}
+
+function repairErrorsOnce(codewordBits, parityCheck) {
+    // naively repair codeword by flipping the most frequent error bits in the LDPC parity check
+    // does not check if repair leads to parity check passing
+    
+    if (parityCheck.success) return null; // codewordBits; // nothing to repair
+    const flip = parityCheck.messageErrors.mostFrequentNumbers;
+    const flipped = codewordBits.split('').map((element, index) => { 
+        if (flip.has(index)) return element === '0' ? '1' : '0';
+        return element;
+    }).join('');
+        console.log('flip:', flip, 'flipped:', flipped);
+    return flipped;
+}
 
 // not used / tested
 function decodeFT8FreeTextPayload(payload) {

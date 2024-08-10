@@ -53,7 +53,7 @@ function explainFT8Message(text, msgType) {
         } else if (parts[2] === 'RRR') {
             explanation = `Station ${sender} is confirming receipt of information from station ${receiver}.`;
         } else if (parts[2] === 'RR73') {
-            explanation = `Station ${sender}} is confirming receipt and saying "best regards" (goodbye) to station ${receiver}.`;
+            explanation = `Station ${sender} is confirming receipt and saying "best regards" (goodbye) to station ${receiver}.`;
         } else if (parts[2] === '73') {
             explanation = `Station ${sender} is saying goodbye to station ${receiver} with "73" (best regards).`;
         } else if (isGridLocator(parts[2])) {

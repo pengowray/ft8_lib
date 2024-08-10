@@ -72,6 +72,13 @@ class FT8Message extends EventTarget {
         if (this.ParityCheck == null) this.ParityCheck = checkParity(this.symbolsText);
         return this.ParityCheck;
     }
+    getParityRepairedCodeword() {
+        // returns null if nothing to repair
+        const parityCheck = this.getParityCheck();
+        if (parityCheck == null || parityCheck.success) return null;
+        const repaired = repairErrorsOnce(symbolsToBitsStrNoCosta(this.symbolsText), parityCheck);
+        return repaired;
+    }
 
     getTiming() {
         const isPlaying = this.isPlaying;

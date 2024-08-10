@@ -689,3 +689,14 @@ body:not(.dark-mode) #piano-roll {
 .dark-mode .output-comment {
     color: #999;
 }
+
+.highlighted-corrected {
+    background-color: #ccffcc;
+    color: #006600;
+    font-weight: bold;
+}
+
+.dark-mode .highlighted-corrected {
+    background-color: #1d4c1d;
+    color: #66ff66;
+}

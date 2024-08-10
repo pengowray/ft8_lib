@@ -41,7 +41,8 @@ class OutputComponent extends Component {
                 explainFT8Message(this.message.reDecodedResult.decodedText, this.message.ft8MessageType) : 
                 null,
             encodeError: message.encodeError_ft8lib,
-            tests: this.prepareTests()
+            tests: this.prepareTests(),
+            repaired: message.getParityRepairedCodeword()
         };
     }
 
@@ -223,8 +224,9 @@ class OutputComponent extends Component {
                 ${this.renderRowData('Message (77 bits)', data.messageBits)}
                 ${this.renderRowDataHighlights('CRC (14 bits)', data.crcBits, this.getCRCHighlights(data.crcCheck))}
                 ${this.renderRowDataHighlights('Parity (83 bits)', data.parityBits, this.getParityHighlights(data.parityCheck), 'If a Low Density Parity Check (LDPC) were generated for the Message and CRC, it would differ in the above highlighted bits.')}
-                ${data.parityCheck.result === 'error' ? this.renderRowDataHighlights('174-bit codeword<br>with LDPC errors', data.codeword, this.getLDPCErrorHighlights(data.parityCheck), 'Given the LPDC data, red highlighted bits are the most likely to be incorrect. Orange highlights are less likely errors. The 174-bits are the combined Message + CRC + LDPC.') : ''}
-
+                ${(!data.parityCheck.success) ? this.renderRowDataHighlights('174-bit codeword<br>with LDPC errors', data.codeword, this.getLDPCErrorHighlights(data.parityCheck), 'Given the LPDC data, red highlighted bits are the most likely to be incorrect. Orange highlights are less likely errors. The 174-bits are the combined Message + CRC + LDPC.') : ''}
+                ${(!data.parityCheck.success && data.repaired) ? this.renderRowDataHighlights('One-step Repair', data.repaired, data.parityCheck.messageErrors.mostFrequentNumbers, 'Single step error repair using parity check data. May repair the message if there are a small number of errors. Copy this into the input and encode to see the result.', 'corrected') : ''  }
+                
                 ${this.renderSubheading('Decoding')}
                 ${this.renderChecks('Decode check', data.decoded )}
                 ${this.renderRowData('Input text', data.inputText )}
@@ -277,7 +279,7 @@ class OutputComponent extends Component {
         `;
     }
 
-    renderRowDataHighlights(label, value, highlightIndices = [], ifHighlightsComment = null) {
+    renderRowDataHighlights(label, value, highlightIndices = [], ifHighlightsComment = null, colorOverride = null) {
         let highlightedValue = value;
         //Array.isArray(highlightIndices)
         //highlightIndices instanceof Set
@@ -289,6 +291,7 @@ class OutputComponent extends Component {
         } else if (typeof highlightIndices === 'object' && highlightIndices.hasOwnProperty('uniqueNumbers')) {
             // todo: pretty print
             // only used for parity bits
+
             highlightedValue = value.split('').map((char, index) => {
                 if (highlightIndices.mostFrequentNumbers.has(index)) {
                     hasHighlights = true;
@@ -308,7 +311,7 @@ class OutputComponent extends Component {
                     ? highlightIndices.includes(index) 
                     : highlightIndices.has(index);
                 if (isHighlighted) hasHighlights = true;
-                return isHighlighted ? `<span class="highlighted-error">${char}</span>` : char
+                return isHighlighted ? `<span class="${colorOverride ? 'highlighted-' + colorOverride : 'highlighted-error'}">${char}</span>` : char
             }).join('');
         }
         

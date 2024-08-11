@@ -169,27 +169,18 @@ class TribbleComponent extends Component {
         const payloadBits = symbolsToBitsStr(this.message.symbolsText).slice(21, 108);
 
         if (annotationDefinitions[messageType]) {
-            annotationDefinitions[messageType].forEach(annotation => {
-                let value = DefinitionGetValue(annotation, payloadBits) ?? '';
-                let shortValue = value;
-                if (value.endsWith(' (undecoded value)')) {
-                    shortValue = value.split(' ')[0] + "*";
-                }
+            annotationDefinitions[messageType].forEach(annotationDef => {
+                let annotation = AnnotationDefGetAnnotation(annotationDef, payloadBits) ?? '';
 
-                this.addAnnotation(
-                    annotationsRow3, 
-                    `${annotation.label}`, 
-                    `${annotation.label}`, 
-                    21 + annotation.start, 
-                    annotation.length
-                );
-                this.addAnnotation(
-                    annotationsRow4, 
-                    shortValue, 
-                    `${annotation.label}:\n${value}`, 
-                    21 + annotation.start, 
-                    annotation.length
-                );
+                const anno3_text = annotation.shortLabel ?? annotation.label ?? annotation.tag;
+                const anno3_tooltip = `${annotation.label ?? annotation.shortLabel ?? annotation.tag}\n${annotation.tag}\nPosition in payload: ${annotation.start + 1} to ${annotation.start + annotation.length} bits`;
+                
+                this.addAnnotation(annotationsRow3, anno3_text, anno3_tooltip, 21 + annotation.start, annotation.length);
+
+                const anno4_text = annotation.short ?? annotation.value ?? annotation.long;
+                const anno4_tooltip = `${annotation.label ?? annotation.shortLabel ?? annotation.tag}\n${annotation.long ?? annotation.value ?? annotation.short}\nRaw bits (=integer): ${annotation.bits} (=${parseInt(annotation.bits, 2)})`;
+        
+                this.addAnnotation(annotationsRow4, anno4_text, anno4_tooltip, 21 + annotation.start, annotation.length);
             });
         } else {
             console.warn(`No annotation definition for message type: ${messageType}`);
@@ -206,7 +197,7 @@ class TribbleComponent extends Component {
         const annotation = document.createElement('div');
         annotation.className = 'annotation';
         annotation.textContent = label;
-        annotation.title = `${tooltip ?? label}\nBits: ${len}`;
+        annotation.title = `${tooltip ?? label}\nLength: ${len} bits`;
 
         annotation.style.gridColumn = `${start + 1} / span ${len}`;
         row.appendChild(annotation);

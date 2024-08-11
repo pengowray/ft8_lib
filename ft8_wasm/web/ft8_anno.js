@@ -51,18 +51,18 @@ const annotationDefinitions = {
 
     "1": [ // Standard message
         { label: "Call1", tag:'c28', start: 0, length: 28, getValue: bitsToCall },
-        { label: "/R for Call1", shortLabel:'r', tag:'r1', start: 28, length: 1, getValue: (bit) => bit === '1' ? '1 /R' : '0' },
+        { label: "Call1/R", shortLabel:'r', tag:'r1', start: 28, length: 1, getValue: (bit) => bit === '1' ? '1 /R' : '0' },
         { label: "Call2", tag:'c28', start: 29, length: 28, getValue: bitsToCall },
-        { label: "/R for Call2", shortLabel:'r',  tag:'r1', start: 57, length: 1, getValue: (bit) => bit === '1' ? '1 /R' : '0' },
-        { shortLabel: 'R', tag:'R1', start: 58, length: 1, getValue: (bit) => bit === '1' ? '1 (R)' : '0' },
+        { label: "Call2/R", shortLabel:'r',  tag:'r1', start: 57, length: 1, getValue: (bit) => bit === '1' ? '1 /R' : '0' },
+        { shortLabel: 'R', tag:'R1', start: 58, length: 1, getValue: (bit) => bit === '1' ? '1 R' : '0' },
         { label: "Grid/Report", tag:'g15', start: 59, length: 15, getValue: bitsToGrid4OrReportWithType },
         def_i3
     ],
     "2": [ // EU VHF Contest c28 p1 c28 p1 R1 g15
         { label: "Call1", tag:'c28', start: 0, length: 28, getValue: (bits) => bitsToCall(bits) },
-        { label: "/P for Call1", shortLabel:'p', tag:'p1', start: 28, length: 1, getValue: (bit) => bit === '1' ? '/P' : '' },
+        { label: "Call1/P", shortLabel:'p', tag:'p1', start: 28, length: 1, getValue: (bit) => bit === '1' ? '/P' : '' },
         { label: "Call2", tag:'c28', start: 29, length: 28, getValue: (bits) => bitsToCall(bits) },
-        { label: "/P for Call1", shortLabel:'p', tag:'p1', start: 57, length: 1, getValue: (bit) => bit === '1' ? '/P' : '' },
+        { label: "Call2/P", shortLabel:'p', tag:'p1', start: 57, length: 1, getValue: (bit) => bit === '1' ? '/P' : '' },
         { shortLabel: 'R', tag:'R1', start: 58, length: 1, getValue: (bit) => bit === '1' ? 'R' : '' },
         { label: "Grid4", tag:'g15', start: 59, length: 15, getValue: (bits) => bitsToGrid4OrReportWithType(bits) },
         def_i3

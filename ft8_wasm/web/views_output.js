@@ -275,9 +275,11 @@ class OutputComponent extends Component {
             annotationDefinitions[ft8MessageType].forEach(annotationDef => {
                 let annotation = AnnotationDefGetAnnotation(annotationDef, payloadBits);
 
-                let label = annotation.label ?? annotation.shortLabel ?? annotation.tag;
+                const label = annotation.tag ?? annotation.label ?? annotation.shortLabel;
                 //TODO: move tag to own field
-                if (annotation.tag != null && label != annotation.tag) label += ` (${annotation.tag})`;
+                //if (annotation.tag != null && label != annotation.tag) label += ` (${annotation.tag})`;
+                const shortLabel = (annotation.tag != null) ? annotation.label ?? annotation.shortLabel : null;
+
                 const pos = annotation.bits.length === 1 ?
                       `bit ${annotation.start + 1}`
                     : `bits ${annotation.start + 1} to ${annotation.start + annotation.length} (length: ${annotation.length} bits)`;
@@ -285,7 +287,8 @@ class OutputComponent extends Component {
                 const text = annotation.long ?? annotation.value ?? annotation.short;
                 const note = `Raw bits (=integer): ${annotation.bits} (=${annotation.rawIntValue})\nPosition in payload: ${pos}`;
         
-                rowContent += this.renderRowData(label, text, note);
+                //rowContent += this.renderRowData(label, text, note);
+                rowContent += this.renderRowDataField( {...annotation, value: text, label, shortLabel, comment: 'comment example'} );
             });
         } else {
             console.warn(`No annotation definition for message type: ${ft8MessageType}`);
@@ -299,6 +302,42 @@ class OutputComponent extends Component {
                 <div class="output-label">${label}</div>
                 <div class="output-value">${escapeHTML(value)}</div>
                 ${comment ? `<div class="output-comment">${escapeHTML(comment).replace('\n','<br>')}</div>` : ''}
+            </div>
+        `;
+    }
+
+    renderRowDataField(fieldData) {
+        const {
+            label,
+            shortLabel,
+            tag,
+            value,
+            description,
+            subType,
+            bits,
+            rawIntValue,
+            start,
+            length,
+            comment
+        } = fieldData;
+    
+        return `
+            <div class="output-row field-data">
+                <div class="field-main">
+                    <div class="field-label">${escapeHTML(label)}</div>
+                    <div class="field-value">${escapeHTML(value)}</div>
+                </div>
+                <div class="field-details">
+                    ${shortLabel ? `<div class="field-short-label">${escapeHTML(shortLabel)}</div>` : ''}
+                    ${description ? `<div class="field-description">${escapeHTML(description)}</div>` : ''}
+                    ${subType ? `<div class="field-subtype">${escapeHTML(subType)}</div>` : ''}
+                    <div class="field-raw-data">
+                        <span class="field-raw-bits">${escapeHTML(bits)}</span>
+                        <span class="field-raw-int">(${escapeHTML(rawIntValue)})</span>
+                    </div>
+                    <div class="field-position">Bits ${start + 1} to ${start + length} (length: ${length} bits)</div>
+                    ${comment ? `<div class="field-comment">${escapeHTML(comment)}</div>` : ''}
+                </div>
             </div>
         `;
     }

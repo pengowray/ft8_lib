@@ -700,3 +700,70 @@ body:not(.dark-mode) #piano-roll {
     background-color: #1d4c1d;
     color: #66ff66;
 }
+
+/* output: field data display */
+
+.field-data {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 15px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.field-main {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background-color: var(--header-bg);
+    color: var(--header-color);
+}
+
+.field-label {
+    font-weight: bold;
+    font-size: 1.1em;
+}
+
+.field-value {
+    font-weight: bold;
+    font-size: 1.2em;
+}
+
+.field-details {
+    padding: 10px;
+    background-color: var(--value-bg);
+    font-size: 0.9em;
+}
+
+.field-short-label,
+.field-description,
+.field-subtype,
+.field-raw-data,
+.field-position,
+.field-comment {
+    margin-bottom: 5px;
+}
+
+.field-raw-data {
+    font-family: monospace;
+}
+
+.field-raw-bits {
+    margin-right: 5px;
+}
+
+.field-raw-int {
+    color: var(--text-color-secondary);
+}
+
+.field-position {
+    font-style: italic;
+    color: var(--text-color-secondary);
+}
+
+.field-comment {
+    font-style: italic;
+    color: var(--text-color-tertiary);
+}

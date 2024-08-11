@@ -19,10 +19,8 @@ class OutputComponent extends Component {
         return {
             inputText: message.inputText,
             inputType: message.inputType,
-            messageType: {
-                type: message.ft8MessageType,
-                info: getFT8MessageTypeName(message.ft8MessageType)
-            },
+            ft8MessageType: message.ft8MessageType,
+            messageTypeInfo: getFT8MessageTypeName(message.ft8MessageType),
             decoded: this.prepareDecodedInfo(),
             comment: message.expectedResults?.comment,
             decodedText: message.reDecodedResult.decodedText,
@@ -68,7 +66,6 @@ class OutputComponent extends Component {
         const decoded = decodeResult.decodedText;
         const originalInput = this.message.inputText;
         const inputType = this.message.inputType;
-        
 
         const decodeTest2 = {
             name: 'input match',
@@ -210,15 +207,18 @@ class OutputComponent extends Component {
         const outputBox = document.createElement('div');
         outputBox.className = 'output-box';
         outputBox.innerHTML = `
-            <h2>${data.messageType.info} (${data.messageType.type})</h2>
+            <h2>${data.messageTypeInfo} (${data.ft8MessageType})</h2>
             <div class="output-content">
                 ${this.renderRowData('Input text', data.inputText, data.comment)}
                 ${this.renderRowText('Input type', data.inputType)}
 
+                ${this.renderSubheading('Message Fields')}
+                ${this.renderRows(data.messageBits, data.ft8MessageType)}
+
                 ${this.renderSubheading('Encoding')}
 
                 ${this.renderChecks('Checks', data.checks)}
-                ${this.renderRowData('Message type', `(${data.messageType.type}) ${data.messageType.info}`)}
+                ${this.renderRowData('Message type', `(${data.ft8MessageType}) ${data.messageTypeInfo}`)}
                 ${this.renderRowDataHighlights('Symbols', symbolsPretty(data.symbols), this.getSyncHighlights(data.syncCheck), 'Incorrect sync symbols highlighted in red. Use 3140652.')}
                 ${this.renderRowData('Packed', data.packed)}
                 ${this.renderRowData('Message (77 bits)', data.messageBits)}
@@ -269,12 +269,34 @@ class OutputComponent extends Component {
         `;
     }
 
+    renderRows(payloadBits, ft8MessageType) {
+        let rowContent = '';
+        if (annotationDefinitions[ft8MessageType]) {
+            annotationDefinitions[ft8MessageType].forEach(annotationDef => {
+                let annotation = AnnotationDefGetAnnotation(annotationDef, payloadBits);
+
+                let label = annotation.label ?? annotation.shortLabel ?? annotation.tag;
+                //TODO: move tag to own field
+                if (label != annotation.tag) label += ` (${annotation.tag})`;
+                const pos = `${annotation.start + 1} to ${annotation.start + annotation.length} bits (length: ${annotation.length})`;
+                
+                const text = annotation.long ?? annotation.value ?? annotation.short;
+                const note = `Raw bits (=integer): ${annotation.bits} (=${annotation.rawIntValue})\nPosition in payload: ${pos}`;
+        
+                rowContent += this.renderRowData(label, text, note);
+            });
+        } else {
+            console.warn(`No annotation definition for message type: ${ft8MessageType}`);
+        }
+        return rowContent;
+    }
+
     renderRowData(label, value, comment = null) {
         return `
             <div class="output-row">
                 <div class="output-label">${label}</div>
                 <div class="output-value">${escapeHTML(value)}</div>
-                ${comment ? `<div class="output-comment">${escapeHTML(comment)}</div>` : ''}
+                ${comment ? `<div class="output-comment">${escapeHTML(comment).replace('\n','<br>')}</div>` : ''}
             </div>
         `;
     }

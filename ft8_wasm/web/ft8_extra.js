@@ -1344,3 +1344,52 @@ function bitsToRST(bits) {
     const n = parseInt(bits, 2) + 2;
     return `5${n} or 5${n}9`;
 }
+
+function bitsToBigIntString(binaryString) {
+    // convert bit string to an integer display.
+    // works for long strings.
+
+    const MAX_SAFE_LENGTH = 52; // JavaScript's max safe integer is 2^53 - 1
+    
+    if (binaryString.length <= MAX_SAFE_LENGTH) {
+        return parseInt(binaryString, 2).toString();
+    }
+
+    let decimal = '0';
+    const binaryLength = binaryString.length;
+
+    for (let i = 0; i < binaryLength; i++) {
+        if (binaryString[i] === '1') {
+            // Calculate 2^(binaryLength - 1 - i)
+            let power = '1';
+            for (let j = 0; j < binaryLength - 1 - i; j++) {
+                power = addStrings(power, power);
+            }
+            decimal = addStrings(decimal, power);
+        }
+    }
+
+    return decimal;
+}
+
+function addStrings(num1, num2) {
+    let i = num1.length - 1;
+    let j = num2.length - 1;
+    let carry = 0;
+    let result = '';
+
+    while (i >= 0 || j >= 0 || carry > 0) {
+        const digit1 = i >= 0 ? parseInt(num1[i]) : 0;
+        const digit2 = j >= 0 ? parseInt(num2[j]) : 0;
+        const sum = digit1 + digit2 + carry;
+        result = (sum % 10) + result;
+        carry = Math.floor(sum / 10);
+        i--;
+        j--;
+    }
+
+    return result;
+}
+
+const manybits = '01110100010101011110100111011111000001011100001111101001011001010110011';
+console.log(bitsToBigIntString(manybits));

@@ -102,10 +102,11 @@ function bitToFlag(bit, on, off) {
 function AnnotationDefGetAnnotation(annotation, payloadBits77) {
     const bits = payloadBits77.slice(annotation.start, annotation.start + annotation.length);
     var value = annotation.getValue(bits);
+    var rawIntValue = bitsToBigIntString(bits);
     if (typeof value === 'object') {
-        return { ...annotation, ...value, bits };
+        return { ...annotation, ...value, bits, rawIntValue };
     } else if (typeof value === 'string') {
-        return { ...annotation, value, bits  };
+        return { ...annotation, value, bits, rawIntValue };
     }
 }
 
@@ -139,7 +140,9 @@ function placeholder(bits) {
 
 //Placeholder for TODOs
 function placeholderText(bits) {
-    return `${parseInt(bits, 2).toString()} (undecoded value)`;
+    //return `${parseInt(bits, 2).toString()} (undecoded value)`;
+    return `${bitsToBigIntString(bits).toString()} (undecoded value)`;
+    
 }
 
 //TODO

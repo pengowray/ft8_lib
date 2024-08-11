@@ -165,12 +165,12 @@ class TribbleComponent extends Component {
         this.addAnnotation(annotationsRow2, 'parity', null, 133, 83);
 
         const message = this.message;
-        const messageType = message.ft8MessageType;
+        const ft8MessageType = message.ft8MessageType;
         const payloadBits = symbolsToBitsStr(this.message.symbolsText).slice(21, 108);
 
-        if (annotationDefinitions[messageType]) {
-            annotationDefinitions[messageType].forEach(annotationDef => {
-                let annotation = AnnotationDefGetAnnotation(annotationDef, payloadBits) ?? '';
+        if (annotationDefinitions[ft8MessageType]) {
+            annotationDefinitions[ft8MessageType].forEach(annotationDef => {
+                let annotation = AnnotationDefGetAnnotation(annotationDef, payloadBits);
 
                 const anno3_text = annotation.shortLabel ?? annotation.label ?? annotation.tag;
                 const anno3_tooltip = `${annotation.label ?? annotation.shortLabel ?? annotation.tag}\n${annotation.tag}\nPosition in payload: ${annotation.start + 1} to ${annotation.start + annotation.length} bits`;
@@ -178,12 +178,12 @@ class TribbleComponent extends Component {
                 this.addAnnotation(annotationsRow3, anno3_text, anno3_tooltip, 21 + annotation.start, annotation.length);
 
                 const anno4_text = annotation.short ?? annotation.value ?? annotation.long;
-                const anno4_tooltip = `${annotation.label ?? annotation.shortLabel ?? annotation.tag}\n${annotation.long ?? annotation.value ?? annotation.short}\nRaw bits (=integer): ${annotation.bits} (=${parseInt(annotation.bits, 2)})`;
+                const anno4_tooltip = `${annotation.label ?? annotation.shortLabel ?? annotation.tag}\n${annotation.long ?? annotation.value ?? annotation.short}\nRaw bits (=integer): ${annotation.bits} (=${annotation.rawIntValue})`;
         
                 this.addAnnotation(annotationsRow4, anno4_text, anno4_tooltip, 21 + annotation.start, annotation.length);
             });
         } else {
-            console.warn(`No annotation definition for message type: ${messageType}`);
+            console.warn(`No annotation definition for message type: ${ft8MessageType}`);
         }
 
         this.gridContainer.appendChild(annotationsRow1);

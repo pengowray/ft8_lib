@@ -710,7 +710,7 @@ function decodeFT8Telemetry(payload) {
   return telemetryHex;
 }
 
-function telemetryToText(binaryStr) {
+function telemetryBitsToText(binaryStr) {
     if (binaryStr.length !== 71) throw new Error("Telemetry must be 71 bits");
 
     // pad the start

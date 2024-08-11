@@ -277,8 +277,10 @@ class OutputComponent extends Component {
 
                 let label = annotation.label ?? annotation.shortLabel ?? annotation.tag;
                 //TODO: move tag to own field
-                if (label != annotation.tag) label += ` (${annotation.tag})`;
-                const pos = `${annotation.start + 1} to ${annotation.start + annotation.length} bits (length: ${annotation.length})`;
+                if (annotation.tag != null && label != annotation.tag) label += ` (${annotation.tag})`;
+                const pos = annotation.bits.length === 1 ?
+                      `bit ${annotation.start + 1}`
+                    : `bits ${annotation.start + 1} to ${annotation.start + annotation.length} (length: ${annotation.length} bits)`;
                 
                 const text = annotation.long ?? annotation.value ?? annotation.short;
                 const note = `Raw bits (=integer): ${annotation.bits} (=${annotation.rawIntValue})\nPosition in payload: ${pos}`;

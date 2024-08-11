@@ -1,6 +1,9 @@
 :root {
     --bg-color: #ffffff;
     --text-color: #333333;
+    --text-color-comment: #666;
+    --text-color-tertiary: #338265;
+    
     --input-bg: #f0f0f0;
     --button-bg: #4CAF50;
     --button-text: #ffffff;
@@ -19,6 +22,9 @@
 .dark-mode {
     --bg-color: #222222;
     --text-color: #f0f0f0;
+    --text-color-comment: #999;
+    --text-color-tertiary: #81c1a9;
+
     --input-bg: #444444;
     --button-bg: #45a049;
     --button-text: #ffffff;
@@ -726,7 +732,8 @@ body:not(.dark-mode) #piano-roll {
 
 .output-sublabel {
     font-size: 0.9em;
-    color: var(--text-color-secondary);
+    color: var(--text-color-comment);
+    font-weight: normal;
 }
 
 .output-value-field {
@@ -741,7 +748,7 @@ body:not(.dark-mode) #piano-roll {
 .output-description {
     grid-column: 1 / -1;
     font-size: 0.9em;
-    color: var(--text-color-secondary);
+    color: var(--text-color-comment);
 }
 
 .output-metadata {
@@ -759,9 +766,16 @@ body:not(.dark-mode) #piano-roll {
 .output-comment-field {
     grid-column: 1 / -1;
     font-size: 0.8em;
-    color: var(--text-color-secondary);
+    color: var(--text-color-comment);
     margin-top: 5px;
     font-style: italic;
+}
+
+.output-raw-values {
+    font-size: 0.6em;
+    color: var(--text-color-comment);
+    margin-top: 5px;
+    font-weight: bold;
 }
 
 

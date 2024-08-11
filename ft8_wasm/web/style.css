@@ -577,10 +577,14 @@ body:not(.dark-mode) #piano-roll {
     background-color: var(--value-bg);
     padding: 5px;
     border-radius: 4px;
+}
+
+.output-data { /* modifies .output-value */
     font-family: monospace;
     white-space: pre-wrap;
     word-break: break-all;
 }
+
 .checks {
     display: flex;
     flex-wrap: wrap;
@@ -701,69 +705,63 @@ body:not(.dark-mode) #piano-roll {
     color: #66ff66;
 }
 
-/* output: field data display */
+/* Output message fields */
 
-.field-data {
-    display: flex;
-    flex-direction: column;
-    margin-bottom: 15px;
+
+.output-row-field {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 5px 10px;
+    margin-bottom: 10px;
+    padding: 5px;
     border: 1px solid var(--border-color);
     border-radius: 4px;
-    overflow: hidden;
 }
 
-.field-main {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px;
-    background-color: var(--header-bg);
-    color: var(--header-color);
-}
-
-.field-label {
+.output-label-field {
+    grid-column: 1 / -1;
     font-weight: bold;
     font-size: 1.1em;
 }
 
-.field-value {
-    font-weight: bold;
-    font-size: 1.2em;
-}
-
-.field-details {
-    padding: 10px;
-    background-color: var(--value-bg);
+.output-sublabel {
     font-size: 0.9em;
+    color: var(--text-color-secondary);
 }
 
-.field-short-label,
-.field-description,
-.field-subtype,
-.field-raw-data,
-.field-position,
-.field-comment {
-    margin-bottom: 5px;
-}
-
-.field-raw-data {
+.output-value-field {
+    grid-column: 1 / -1;
+    background-color: var(--value-bg);
+    padding: 5px;
+    border-radius: 4px;
     font-family: monospace;
+    word-break: break-all;
 }
 
-.field-raw-bits {
-    margin-right: 5px;
-}
-
-.field-raw-int {
+.output-description {
+    grid-column: 1 / -1;
+    font-size: 0.9em;
     color: var(--text-color-secondary);
 }
 
-.field-position {
-    font-style: italic;
-    color: var(--text-color-secondary);
-}
-
-.field-comment {
-    font-style: italic;
+.output-metadata {
+    grid-column: 1 / -1;
+    font-size: 0.8em;
     color: var(--text-color-tertiary);
+    margin-top: 5px;
 }
+
+.output-metadata-item {
+    display: inline-block;
+    margin-right: 10px;
+}
+
+.output-comment-field {
+    grid-column: 1 / -1;
+    font-size: 0.8em;
+    color: var(--text-color-secondary);
+    margin-top: 5px;
+    font-style: italic;
+}
+
+

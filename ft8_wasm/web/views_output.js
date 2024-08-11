@@ -300,12 +300,12 @@ class OutputComponent extends Component {
         return `
             <div class="output-row">
                 <div class="output-label">${label}</div>
-                <div class="output-value">${escapeHTML(value)}</div>
+                <div class="output-value output-data">${escapeHTML(value)}</div>
                 ${comment ? `<div class="output-comment">${escapeHTML(comment).replace('\n','<br>')}</div>` : ''}
             </div>
         `;
     }
-
+    
     renderRowDataField(fieldData) {
         const {
             label,
@@ -321,23 +321,24 @@ class OutputComponent extends Component {
             comment
         } = fieldData;
     
+        const positionInfo = `bits ${start + 1} to ${start + length} (length: ${length} bits)`;
+    
         return `
-            <div class="output-row field-data">
-                <div class="field-main">
-                    <div class="field-label">${escapeHTML(label)}</div>
-                    <div class="field-value">${escapeHTML(value)}</div>
+            <div class="output-row-field">
+                <div class="output-label-field">
+                    ${escapeHTML(label)}
+                    ${tag ? `<span class="output-sublabel">${escapeHTML(tag)}</span>` : ''}
                 </div>
-                <div class="field-details">
-                    ${shortLabel ? `<div class="field-short-label">${escapeHTML(shortLabel)}</div>` : ''}
-                    ${description ? `<div class="field-description">${escapeHTML(description)}</div>` : ''}
-                    ${subType ? `<div class="field-subtype">${escapeHTML(subType)}</div>` : ''}
-                    <div class="field-raw-data">
-                        <span class="field-raw-bits">${escapeHTML(bits)}</span>
-                        <span class="field-raw-int">(${escapeHTML(rawIntValue)})</span>
-                    </div>
-                    <div class="field-position">Bits ${start + 1} to ${start + length} (length: ${length} bits)</div>
-                    ${comment ? `<div class="field-comment">${escapeHTML(comment)}</div>` : ''}
+                ${shortLabel ? `<div class="output-sublabel">${escapeHTML(shortLabel)}</div>` : ''}
+                <div class="output-value-field">${escapeHTML(value)}</div>
+                ${description ? `<div class="output-description">${escapeHTML(description)}</div>` : ''}
+                ${subType ? `<div class="output-description">${escapeHTML(subType)}</div>` : ''}
+                <div class="output-metadata">
+                    <span class="output-metadata-item">Raw bits: ${escapeHTML(bits)}</span>
+                    <span class="output-metadata-item">Integer value: ${rawIntValue}</span>
+                    <span class="output-metadata-item">Position: ${positionInfo}</span>
                 </div>
+                ${comment ? `<div class="output-comment-field">${escapeHTML(comment)}</div>` : ''}
             </div>
         `;
     }
@@ -381,7 +382,7 @@ class OutputComponent extends Component {
         return `
             <div class="output-row">
                 <div class="output-label">${label}</div>
-                <div class="output-value">${highlightedValue}</div>
+                <div class="output-value output-data">${highlightedValue}</div>
                 ${hasHighlights && ifHighlightsComment ? `<div class="output-comment">${ifHighlightsComment}</div>` : ''}
             </div>
         `;
@@ -453,7 +454,7 @@ class OutputComponent extends Component {
         return `
             <div class="output-row full-width">
                 <div class="output-label">Tests:</div>
-                <div class="output-value">${testsHtml}</div>
+                <div class="output-value output-data">${testsHtml}</div>
             </div>
         `;
     }
@@ -525,6 +526,8 @@ class OutputComponent extends Component {
 }
 
 function escapeHTML(text) {
+    if (text == null) return '';
+    
     const map = {
         '<': '&lt;',
         '>': '&gt;',

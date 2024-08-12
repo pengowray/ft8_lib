@@ -372,18 +372,16 @@ function hashBitsPrettyHex(bits) {
 function hashBitsPretty(bits) {
     // 10, 12, or 22 bits
 
-    // 0000000000-11-0000000000
+    // 0000000000 11 0000000000
 
     const len = bits.length;
     if (len == 22) {
-        return `${bits.slice(0, 10)}-${bits.slice(10, 12)}-${bits.slice(12, 22)}`;
+        return `${bits.slice(0, 10)} ${bits.slice(10, 12)} ${bits.slice(12, 22)}`;
     } else if (len == 12) {
-        //return `xxxxxxxxxx-${bits.slice(0, 2)}-${bits.slice(2, 12)}`;
-        return `${bits.slice(0, 10)}-${bits.slice(10, 12)}-xxxxxxxxxx`;
+        return `${bits.slice(0, 10)} ${bits.slice(10, 12)} xxxxxxxxxx`;
 
     } else if (len == 10) {
-        //return `xxxxxxxxxx-xx-${bits}`;
-        return `${bits.slice(0, 10)}-xx-xxxxxxxxxx`;
+        return `${bits.slice(0, 10)} xx xxxxxxxxxx`;
     }
 
     // other length/error
@@ -393,12 +391,13 @@ function hashBitsPretty(bits) {
 function hashBits22styleBase10(bits) {
     // 22-bit hash in the style of hash22calc.exe (WSJT-X)
     // decimal value of the 22-bit hash, padded to 7 digits
-
+    // does not make sense to use for 10 or 12-bit hashes
+    
     if (bits.match(/[^01]/)) {
         throw new Error("Invalid characters");
     }
     if (bits.length != 22) {
-        throw new Error("Invalid length: " + len + " in '" + bits + "'");
+        throw new Error("Invalid length: " + bits.length + " in '" + bits + "'");
     }
 
     return parseInt(bits, 2).toString().padStart(7, '0');
@@ -651,6 +650,9 @@ function encodeFT8FreeText(message) {
   // Encode each character
   for (let i = 0; i < MAX_LEN; i++) {
     const charIndex = FT8_CHAR_TABLE_FULL.indexOf(message[i]);
+    if (charIndex === -1) {
+      throw new Error(`Invalid character: ${message[i]}`);
+    }
     result = result * 42n + BigInt(charIndex);
   }
   
@@ -997,6 +999,39 @@ function bitsToCall(bits) {
     return `${details.callsign} (${details.type})`;
 }
 
+const FT8_CHAR_TABLE_ALPHANUM_SPACE_SLASH = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/";
+
+function nchar(char, table) {
+    return table.indexOf(char);
+}
+
+function hashCallsign(callsign) {
+    let n58 = BigInt(0);
+    const maxLength = Math.min(callsign.length, 11);
+
+    for (let i = 0; i < maxLength; i++) {
+        const j = nchar(callsign[i], FT8_CHAR_TABLE_ALPHANUM_SPACE_SLASH);
+        if (j < 0) {
+            return null; // hash error (wrong character set)
+        }
+        n58 = (BigInt(38) * n58) + BigInt(j);
+    }
+
+    // Pretend to have trailing whitespace
+    for (let i = maxLength; i < 11; i++) {
+        n58 = BigInt(38) * n58;
+    }
+
+    const multiplier = BigInt("47055833459");
+    const n22 = Number((multiplier * n58) >> BigInt(42) & BigInt(0x3FFFFF));
+
+    return n22;
+}
+
+function callsignToHashBits(bits) {
+    return hashCallsign(bits).toString(2).padStart(22, '0');
+}
+
 // Convert 28 bits to a callsign
 function bitsToCallDetails(bits, extraBit = "") {
     if (bits.length !== 28 && bits.length !== 29) throw new Error("Callsign must be 28 or 29 bits");
@@ -1099,6 +1134,11 @@ function bitsToCallDetails(bits, extraBit = "") {
             result.details.specialPrefix = 'Q';
             result.subtype = 'Q code / callsign';
         }
+        const hashed = callsignToHashBits(result.value)
+        result.hashed = hashed;
+        //result.desc = `hash: <span title="${hashBits22styleBase10(hashed)}">${hashBitsPrettyZ32(hashed)} (${hashBitsPretty(hashed)} =${hashBits22styleBase10(hashed)})</span>`;
+        result.desc = `hash: <span title="${hashBits22styleBase10(hashed)}">${hashBitsPrettyZ32(hashed)}</span>`;
+        
     }
 
     return result;
@@ -1174,7 +1214,7 @@ function bitsToGrid4OrReportDetails(bits) {
         const latlon = latLonForGrid(ret.value);
         let desc = `latitude, longitude: ${latlon.lat}, ${latlon.lon}`;
         if (ret.value == 'RR73') {
-            desc += "\n*RR73 means 'report received and best regards', even when it's encoded as a Maidenhead locator.";
+            desc += "\n*RR73 is short for 'report received and best regards'. It can also be encoded with a special token.";
             ret.subtype = 'Maidenhead locator*';
         }
         return { ...ret, ...latlon, desc };
@@ -1214,10 +1254,17 @@ function bitsToR2(bits) { // aka bitsToRR73
     throw new Error("Invalid R2 bits");
 }
 
-
 function bitsToNonstandardCallDetails(bits) {
-    return { value: bitsToNonstandardCall(bits), subtype: 'Nonstandard callsign' }
+    const callsign = bitsToNonstandardCall(bits);
+    const hashed = callsignToHashBits(callsign);
+    return { 
+        value: callsign, 
+        subtype: 'non-standard callsign',
+        hashed: hashed,
+        desc: `hash: <span title="${hashBits22styleBase10(hashed)}">${hashBitsPrettyZ32(hashed)}</span>`
+    };
 }
+
 function bitsToNonstandardCall(bits) {
     const c = ' 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/';
     let n58 = BigInt('0b' + bits);
@@ -1231,104 +1278,6 @@ function bitsToNonstandardCall(bits) {
   
     return callsign.trim();
 }
-
-
-function bitsToGrid4_old(bits) {
-    return bitsToGrid4Details_old(bits).text;
-}
-
-function bitsToGrid4Details_old(bits) {
-    if (bits.length !== 15) throw new Error("Grid must be 15 bits");
-    
-    const n = parseInt(bits, 2);
-    
-    let result = {
-        raw: bits,
-        value: n,
-        type: 'grid',
-        text: '',
-        details: {}
-    };
-
-    if (n === 32768) {
-        result.text = '';
-        result.details.isBlank = true;
-        return result;
-    }
-
-    const longitude = -180 + (n % 180);
-    const latitude = -90 + Math.floor(n / 180);
-
-    const lonIndex = Math.floor((longitude + 180) / 20);
-    const latIndex = Math.floor((latitude + 90) / 10);
-
-    const subLonIndex = Math.floor((longitude + 180) % 20 / 2);
-    const subLatIndex = Math.floor((latitude + 90) % 10);
-
-    const gridChars = "ABCDEFGHIJKLMNOPQR";
-
-    result.text = gridChars[lonIndex] +
-                  gridChars[latIndex] +
-                  subLonIndex.toString() +
-                  subLatIndex.toString();
-
-    result.details = {
-        longitude,
-        latitude,
-        fieldLon: gridChars[lonIndex],
-        fieldLat: gridChars[latIndex],
-        squareLon: subLonIndex,
-        squareLat: subLatIndex
-    };
-
-    return result;
-}
-
-function bitsToGrid4OrReport_old(bits) {
-    return bitsToGrid4OrReportDetails_old(bits).text;
-}
-function bitsToGrid4OrReportDetails_old(bits) {
-    if (bits.length !== 15) throw new Error("Grid/Report must be 15 bits");
-    
-    const n = parseInt(bits, 2);
-    
-    let result = {
-        raw: bits,
-        value: n,
-        type: null,
-        text: '',
-        details: {}
-    };
-
-    if (n < 32768) {
-        // This is a grid locator
-        const gridResult = bitsToGrid4Details_old(bits);
-        result = {...result, ...gridResult};
-    } else {
-        // This is a signal report or special message
-        result.type = 'special';
-        if (n === 32768) {
-            result.text = 'RRR';
-            result.details.meaning = 'Roger, Roger, Roger';
-        } else if (n === 32769) {
-            result.text = 'RR73';
-            result.details.meaning = 'Roger, Roger, Best regards';
-        } else if (n === 32770) {
-            result.text = '73';
-            result.details.meaning = 'Best regards';
-        } else {
-            result.type = 'report';
-            const reportValue = (n - 32768 - 1) * 2 - 30;
-            result.text = reportValue.toString();
-            result.details = {
-                snr: reportValue
-            };
-        }
-    }
-
-    return result;
-}
-
 
 function bitsToFieldDayClass(bits) {
     //k3 Field Day Class: A, B, ... F
@@ -1415,6 +1364,3 @@ function addStrings(num1, num2) {
 
     return result;
 }
-
-const manybits = '01110100010101011110100111011111000001011100001111101001011001010110011';
-console.log(bitsToBigIntString(manybits));

@@ -324,6 +324,28 @@ function bitsToZBase32(bits) {
     }
     return result;
 }
+function hashBitsToZ32Dense(bits) { 
+    if (bits.match(/[^01]/)) {
+        throw new Error("Invalid characters");
+    }
+
+    // 22 bit: aabcc
+    // 12 bit: aab
+    // 10 bit: aa
+    const len = bits.length;
+    if (len == 22) {
+        return `${bitsToZBase32(bits.slice(0, 10))}${bitsToZBase32(bits.slice(10, 12).padStart(5, '0'))}${bitsToZBase32(bits.slice(12, 22))}`;
+    } else if (len == 12) {
+        return `${bitsToZBase32(bits.slice(0, 10))}${bitsToZBase32(bits.slice(10, 12).padStart(5, '0'))}`;
+    } else if (len == 10) {
+        return `${bitsToZBase32(bits.slice(0, 10))}`;
+    } else if (len == 0) {
+        return "";
+    } else {
+        throw new Error("Invalid length: " + len + " in '" + bits + "'");
+    }
+}
+
 function hashBitsPrettyZ32(bits) {
     if (bits.match(/[^01]/)) {
         throw new Error("Invalid characters");
@@ -388,11 +410,15 @@ function hashBitsPretty(bits) {
     return bits;
 }
 
-function hashBits22styleBase10(bits) {
+function hashBitsTo22styleBase10(bits) {
     // 22-bit hash in the style of hash22calc.exe (WSJT-X)
     // decimal value of the 22-bit hash, padded to 7 digits
     // does not make sense to use for 10 or 12-bit hashes
-    
+
+    if (typeof bits === 'number') { // accept numbers too
+        return bits.toString().padStart(7, '0');
+    }
+
     if (bits.match(/[^01]/)) {
         throw new Error("Invalid characters");
     }
@@ -1082,17 +1108,25 @@ function bitsToCallDetails(bits, extraBit = "") {
     // Check for 22-bit hash
     else if (n < NTOKENS + MAX22) {
         result.subtype = 'hash22';
-        result.desc = 'Displayed in Z-Base32 encoding'
+        //result.desc = 'Displayed in Z-Base32 encoding'
         const hashValue = n - NTOKENS;
-        result.details.hashValue = hashValue
+        //result.details.hashValue = hashValue
         //result.callsign = "<...>";
-        //result.callsign = hashBitsPrettyHex(hashValue.toString(2).padStart(22, '0'));
-        result.value = hashBitsPrettyZ32(hashValue.toString(2).padStart(22, '0'));
+        const subBits = hashValue.toString(2).padStart(22, '0');
+        result.value = hashBitsPrettyZ32(subBits);
+        result.rawAppend = `Hash22: ${hashBitsPretty(subBits)} (=${hashBitsTo22styleBase10(subBits)})`;
+
+        const matchDetails = hashMatchDetails(subBits);
+        if (matchDetails) result = {...result, ...matchDetails};
+
     }  else {
         // Standard callsign
 
         result.subtype = 'standard call';
         let c = n - NTOKENS - MAX22;
+
+        const subBits = c.toString(2).padStart(22, '0');
+        result.rawAppend = `Call22: ${subBits} (=${bitsToBigIntString(subBits)})`;
 
         // Decode last 3 characters (from right to left)
         let suffix = '';
@@ -1137,12 +1171,32 @@ function bitsToCallDetails(bits, extraBit = "") {
         const hashed = callsignToHashBits(result.value)
         result.hashed = hashed;
         //result.desc = `hash: <span title="${hashBits22styleBase10(hashed)}">${hashBitsPrettyZ32(hashed)} (${hashBitsPretty(hashed)} =${hashBits22styleBase10(hashed)})</span>`;
-        result.desc = `hash: <span title="${hashBits22styleBase10(hashed)}">${hashBitsPrettyZ32(hashed)}</span>`;
+        result.descNoEsc = `hash: <span title="${hashBitsTo22styleBase10(hashed)}">${hashBitsPrettyZ32(hashed)}</span>`;
         
     }
 
     return result;
 }
+
+function hashMatchDetails(bits) {
+    const match = findHash(bits);
+    if (match) {
+        let result = {};
+        result.hashMatch = match;
+        if (bits.length == 22) {
+            result.desc = `Hash matches ${match.callsign}`;
+        } else {
+            //`Hash matches ${match.callsign} (${match.zhash})`;
+            result.descNoEsc = `Hash matches ${escapeHTML(match.callsign)} <span title="${hashBitsTo22styleBase10(match.hashInt)}">(${match.zhash})</span>`;
+        }
+        result.unhashed = match.callsign;
+        if (match.callsign == '') result.unhashed = '(blank)';
+        
+        return result;
+    }
+    return null;
+}
+
 function isGrid4(grid) {
     return grid.length === 4 &&
            grid[0] >= 'A' && grid[0] <= 'R' &&
@@ -1150,6 +1204,17 @@ function isGrid4(grid) {
            grid[2] >= '0' && grid[2] <= '9' &&
            grid[3] >= '0' && grid[3] <= '9';
 }
+
+function bitsToHash(bits) {
+    //return hashBitsPrettyHex(bits);
+    const hashed = hashBitsPrettyZ32(bits);
+
+    const matchDetails = hashMatchDetails(bits) ?? {};
+
+    // desc: 'Displayed in Z-Base32 encoding'
+    return { ...matchDetails, value: hashed, subtype:'hash' + bits.length };
+}
+
 
 // not used
 function grid4ToG15(input) {
@@ -1221,13 +1286,14 @@ function bitsToGrid4OrReportDetails(bits) {
         
     } else {
         const irpt = g15 - MAXGRID4;
-        if (irpt === 1) return { value: '', subtype: 'blank' };
-        if (irpt === 2) return { value: 'RRR', long: 'RRR (reception report received)', subtype: 'special token', desc: 'RRR means reception report received' };
-        if (irpt === 3) return { value: 'RR73', subtype: 'special token', desc: 'RR73: report received and best regards' };
-        if (irpt === 4) return { value: '73', subtype: 'special token', desc: "73 means 'best regards'" };
+        const also = {rawAppend: `irpt: ${irpt}`};
+        if (irpt === 1) return { value: '', subtype: 'blank', ...also};
+        if (irpt === 2) return { value: 'RRR', long: 'RRR (reception report received)', subtype: 'special token', desc: 'RRR means reception report received', ...also };
+        if (irpt === 3) return { value: 'RR73', subtype: 'special token', desc: 'RR73: report received and best regards', ...also };
+        if (irpt === 4) return { value: '73', subtype: 'special token', desc: "73 means 'best regards'", ...also };
 
         const value = (irpt - 35).toString();
-        return { value, subtype: 'signal report', units: 'dB' };
+        return { value, subtype: 'signal report', units: 'dB', ...also };
     }
 }
 
@@ -1254,16 +1320,18 @@ function bitsToR2(bits) { // aka bitsToRR73
     throw new Error("Invalid R2 bits");
 }
 
-function bitsToNonstandardCallDetails(bits) {
+function bitsToNonstandardCallDetails(bits, message) {
     const callsign = bitsToNonstandardCall(bits);
     const hashed = callsignToHashBits(callsign);
+
     return { 
         value: callsign, 
         subtype: 'non-standard callsign',
         hashed: hashed,
-        desc: `hash: <span title="${hashBits22styleBase10(hashed)}">${hashBitsPrettyZ32(hashed)}</span>`
+        descNoEsc: `hash: <span title="${hashBitsTo22styleBase10(hashed)}">${hashBitsPrettyZ32(hashed)}</span>`
     };
 }
+
 
 function bitsToNonstandardCall(bits) {
     const c = ' 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/';

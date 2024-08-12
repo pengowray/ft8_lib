@@ -253,7 +253,9 @@ function initializeUI() {
 
         message.encode();
         if (message.error != null) {
-            errorOutput.textContent = "Error: " + message.error;
+            errorOutput.textContent = "Error: " + message.error
+            //TODO: try
+            //errorOutput.textContent = "Error: " + message.encodeError + "\nAlso ft8_lib error:" + message.encodeError_ft8lib;
             return;
         } else {
             errorOutput.textContent = "";
@@ -264,7 +266,7 @@ function initializeUI() {
             errorOutput.innerHTML = "Invalid frequency input";
             return;
         }
-        console.log(`freq: ${freqData.baseHz} (${freqData.customTones.join(' ')})`);
+        //console.log(`freq: ${freqData.baseHz} (${freqData.customTones.join(' ')})`);
         const sampleRate = parseInt(sampleRateSelect.value);
         message.setAudioOptions(sampleRate, freqData.baseHz, freqData.customTones);
 

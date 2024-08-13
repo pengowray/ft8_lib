@@ -101,6 +101,7 @@ class ViewManager {
         }
 
         if (oldMessage != null && oldMessage != message && !oldMessage.isPlaying && !oldMessage.queuingStartedAt) {
+            // todo: check again once old message has stopped playing
             this.deleteMessage(oldMessage);
         }
 

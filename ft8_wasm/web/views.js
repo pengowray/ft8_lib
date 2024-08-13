@@ -84,6 +84,7 @@ class ViewManager {
     }
 
     switchToMessageIndex(index) {
+        const oldMessage = this.messageManager.getCurrentMessage();
         this.messageManager.switchToMessageIndex(index);
         const message = this.messageManager.getMessage(index);
 
@@ -99,7 +100,19 @@ class ViewManager {
             });
         }
 
+        if (oldMessage != null && oldMessage != message && !oldMessage.isPlaying && !oldMessage.queuingStartedAt) {
+            this.deleteMessage(oldMessage);
+        }
+
         return message;
+    }
+
+    deleteMessage(oldMessage) {
+        oldMessage.clearAllCached();
+         // TODO: be less aggressive with deleting messages when switching once we have a way to switch back
+        this.messageManager.deleteMessage(oldMessage);
+        this.playingMessages.delete(oldMessage);
+        this.queuedMessages.delete(oldMessage);        
     }
 
     playCurrentMessageAudio() {
@@ -163,6 +176,16 @@ class MessageManager {
 
     getMessageIndex(message) {
         return this.messages.indexOf(message);
+    }
+
+    deleteMessage(oldMessage) {
+        for (let i = 0; i < this.messages.length; i++) {
+            if (this.messages[i] === oldMessage) {
+                this.messages[i] = null;
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

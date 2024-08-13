@@ -677,7 +677,7 @@ function encodeFT8FreeText(message) {
   for (let i = 0; i < MAX_LEN; i++) {
     const charIndex = FT8_CHAR_TABLE_FULL.indexOf(message[i]);
     if (charIndex === -1) {
-      throw new Error(`Invalid character: ${message[i]}`);
+      throw new Error(`Invalid character for free text: ${message[i]}`);
     }
     result = result * 42n + BigInt(charIndex);
   }

@@ -13,8 +13,6 @@ function addHash(callsign) {
         if (callsign == '') return;
     }
 
-    console.log("addHash", callsign);
-
     const hashInt = hashCallsign(callsign);
     if (hashInt == null) return;
     const hashBits = hashInt.toString(2).padStart(22, '0');
@@ -225,6 +223,7 @@ class FT8Message extends EventTarget {
             case '237 bits (graycode)': // symbols (as graycode bits, including sync)
                 this.symbolsText = grayBitsToSymbols(input);
                 break;
+            case 'default':
             default:
                 input = normalizeMessage(input);
                 const packingResult = messageToPackedData(input);
@@ -617,7 +616,7 @@ function doDetectInputType(inputOriginal) {
     } 
 
     // Otherwise, assume it's a message (or 'free text' if ft8_lib fails to encode it)
-    return 'message';
+    return 'default';
 }
 
 /**

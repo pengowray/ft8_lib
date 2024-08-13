@@ -306,6 +306,14 @@ function symbolsToPrettyBinary(symbols) {
     return symbolsToBitsStrPreserveSpaces(symbolsPretty(symbols));
 }
 
+function symbols58ToSymbols79(symbols) {
+    // adds missing costas
+    if (symbols.length !== 58) {
+        throw new Error("Invalid length (expected 58)");
+    }
+    return COSTAS_STR + symbols.slice(0, 29) + COSTAS_STR + symbols.slice(29, 58) + COSTAS_STR;
+}
+
  // z-base-32: permutation of the RFC3548 standard.
 const ZBASE32 = 'ybndrfg8ejkmcpqxot1uwisza345h769';
 const ZBASE32_Reverse = {};

@@ -190,7 +190,6 @@ class TribbleComponent extends Component {
                 
                 // subdefinitons: used only for telemetry bytes right now
                 if (annotation.subdefs) {
-                    console.log('subdefs', annotation.subdefs);
                     requireAnnotationsRow5 = true;
                     annotation.subdefs.forEach(subdef => {
                         const subanno = AnnotationDefGetAnnotation(subdef, payloadBits);
@@ -201,7 +200,6 @@ class TribbleComponent extends Component {
                     });
                 }
             });
-
             
         } else {
             console.warn(`No annotation definition for message type: ${ft8MessageType}`);
@@ -255,7 +253,6 @@ class TribbleComponent extends Component {
         this.interval = setInterval(() => {
             this.frameUpdate();
         }, 50); // Update every 50ms
-
     }
 
     onStop() {

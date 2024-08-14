@@ -1317,19 +1317,19 @@ function bitsToGrid4OrReportDetails(bits) {
         const latlon = latLonForGrid(ret.value);
         let desc = `latitude, longitude: ${latlon.lat}, ${latlon.lon}`;
         if (ret.value == 'RR73') {
-            desc += "\n*RR73 is short for 'report received and best regards'. It can also be encoded with a special token.";
+            desc += "\n*RR73 is short for 'report received and best regards'. It can also be encoded with a special token, but here has been encoded as a location.";
             ret.subtype = 'Maidenhead locator*';
         }
         return { ...ret, ...latlon, desc };
         
     } else {
         const irpt = g15 - MAXGRID4;
-        const also = {rawAppend: `irpt: ${irpt}`};
+        const also = {rawAppend: `Overgrid: ${irpt}`};
         //if (irpt === 0) return { value: '', subtype: 'unknown / reserved', subtype: 'special token', ...also}; // TODO: official meaning? lib_ft8 packs -35 dB to this.
         if (irpt === 1) return { value: '', subtype: 'blank', ...also};
-        if (irpt === 2) return { value: 'RRR', long: 'RRR (reception report received)', subtype: 'special token', desc: 'RRR means reception report received', ...also };
-        if (irpt === 3) return { value: 'RR73', subtype: 'special token', desc: 'RR73: report received and best regards', ...also };
-        if (irpt === 4) return { value: '73', subtype: 'special token', desc: "73 means 'best regards'", ...also };
+        if (irpt === 2) return { value: 'RRR', long: 'RRR (reception report received)', subtype: 'special token', desc: 'RRR is short for "reception report received"', ...also };
+        if (irpt === 3) return { value: 'RR73', subtype: 'special token', desc: 'RR73 is short for "report received and best regards"', ...also };
+        if (irpt === 4) return { value: '73', subtype: 'special token', desc: '73 is short for "best regards"', ...also };
 
         const value = (irpt - 35).toString();
 
@@ -1422,9 +1422,22 @@ function signalReportDetails(dbValue, min = null, max = null) {
 
     explain += '<br>The Signal to Noise Ratio (SNR) quoted for amateur radio modes is traditionally based on a receiver bandwidth of 2500 Hz.';
 
+    let subtype = 'signal report';
+
+    if (dbValue == 73) {
+        explain = "73 is short for 'best regards'. It can also be encoded with a special token, but here has been encoded as a signal report.<br>" 
+            + explain;
+        subtype += '*';
+        
+    } else if (dbValue == 88) {
+        explain = "88 is short for 'love and kisses', and here has been encoded as a signal report.<br>" 
+            + explain;
+        subtype += '*';
+    }
+
     return { 
         value: dbValue.toString(), 
-        subtype: 'signal report', 
+        subtype,
         units: 'dB', 
         descNoEsc: explain 
     }

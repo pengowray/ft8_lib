@@ -930,7 +930,7 @@ function symbolsToPackedData(symbolsText) {
     packedData[i] = byte;
   }
   // debug:
-  console.log('symbolsText, messageBits, packedData', symbolsText, messageBits, packedData);
+  //console.log('symbolsText, messageBits, packedData', symbolsText, messageBits, packedData);
 
   return packedData;
 }

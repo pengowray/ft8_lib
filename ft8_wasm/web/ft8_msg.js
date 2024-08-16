@@ -235,9 +235,7 @@ class FT8Message extends EventTarget {
                 const packingResult = messageToPackedData(input);
 
                 if (packingResult.success) {
-                    console.log("Packed data:", packingResult);
                     this.packedData = packingResult.data;
-                    
                     
                 } else {
                     this.encodeError_ft8lib = `Encoding failed (code ${packingResult.errorCode}): ${packingResult.errorMessage}`;
@@ -451,8 +449,6 @@ class FT8Message extends EventTarget {
         if (this.symbolsText == null) return;
 
         const symbolsArray = symbolsToArray(this.symbolsText); // .split('').map(Number)
-        console.log("symbols", this.symbolsText, symbolsArray);
-        console.log("options", options);
 
         const numSymbols = symbolsArray.length; // 79
         

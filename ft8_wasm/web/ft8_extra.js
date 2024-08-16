@@ -1038,7 +1038,7 @@ function getFT8MessageTypeName(type) {
         case "0.3": return "Field Day";
         case "0.4": return "Field Day";
         case "0.5": return "Telemetry";
-        case "0.6": return "Unknown / Reserved";
+        case "0.6": return "WSPR";
         case "0.7": return "Unknown / Reserved";
         case "1": return "Standard message";
         case "2": return "EU VHF";
@@ -1318,7 +1318,12 @@ function bitsToGrid4OrReportDetails(bits) {
         let desc = `latitude, longitude: ${latlon.lat}, ${latlon.lon}`;
         if (ret.value == 'RR73') {
             desc += "\n*RR73 is short for 'report received and best regards'. It can also be encoded with a special token, but here has been encoded as a location.";
-            ret.subtype = 'Maidenhead locator*';
+            ret.subtype += '*';
+        } else if (ret.value == 'RG58') {
+            desc += "\nRG-58/U is a type of coaxial cable often used for low-power signal and RF connections."
+        } else if (ret.value == 'FB73') {
+            desc += "\nFB in amateur radio slang means 'fine business' or 'excellent', which combines with '73' for 'best regards'. FB73 is in Antarctica.";
+            ret.subtype += '*';
         }
         return { ...ret, ...latlon, desc };
         
@@ -1331,16 +1336,25 @@ function bitsToGrid4OrReportDetails(bits) {
         if (irpt === 3) return { value: 'RR73', subtype: 'special token', desc: 'RR73 is short for "report received and best regards"', ...also };
         if (irpt === 4) return { value: '73', subtype: 'special token', desc: '73 is short for "best regards"', ...also };
 
-        const value = (irpt - 35).toString();
+        //let value = (irpt - 35);
+        //if (value >= 50) value -= 101; // db over 50 is wrapped negative
+        const value = (irpt >= 85) ? (irpt - 136) : (irpt - 35);
+
+        // irpt 5 to 84: regular: -30 to 49 dB; (irpt-35 db)
+        if (irpt >= 85) also.unhashed = 'low signal'; // -51 to -29 dB (irpt-136 db) -- if treated like regular, would be 50 to 72 dB
+        if (irpt >= 106) also.unhashed = 'ambiguous'; // -30 to 49 dB again (irpt-136 db) -- if treated like regular, would be 73 to 150 dB
+        if (irpt >= 207) also.unhashed = 'very high'; // 50 to 231 dB -- if treated like regular, would be 151 to 332 dB
 
         //return { value, subtype: 'signal report', units: 'dB', ...also };
         // in lib_ft8 -35 dB (irpt: 0) also works? probably a bug
         // in (lib_ft8 v2.00): .\gen_ft8.exe "AA9GO VK3PGO R-31" "temp.wav" wraps to give '73' special token 
-        //  -32 gives 'RR73' special token // -62 gives RR73 maidenhead
-        // in ft8code.exe "aa9go vk3pgo R-31" gives 70 dB; Raw value: 111111011111001 (=32505) irpt: 105
+        // way out of range: -32 gives 'RR73' special token // -62 gives RR73 maidenhead
+        // [fixed in ft8play] in ft8code.exe "aa9go vk3pgo R-31" gives 70 dB; Raw value: 111111011111001 (=32505) irpt: 105 -- should give -31 dB; 
+
         // in ft8code (wsjtx), -35 dB gives (irpt: 101 or 66 dB) ft8code.exe "aa9go vk3pgo R-35" gives 66 dB
 
-        const minVal = -30;
+        //const minVal = -30; // only the lowest value before the smaller lowest values
+        const minVal = -51;  // 50 - 101
 
          //332: Raw value: 111111111111111 (=32767) irpt: 367; TODO: check spec and implementations if this is allowed or if higher dB numbers reserved
          // 99 dB is highest you can enter with ft8_lib
@@ -1348,7 +1362,8 @@ function bitsToGrid4OrReportDetails(bits) {
         // unpacking with lib_ft8 gives odd output: R+332 becomes R+Q2
         // in ft8code (wsjtx), ".\ft8code.exe "aa9go vk3pgo R+333" gives "*** bad message ***"" (correctly)
         //322 example: 525a67b7104522bfffc8
-        const maxVal = 332;
+        const maxVal = 49;
+        //const maxVal = 332;
         
         return { ...signalReportDetails(value, minVal, maxVal), ...also };
     }
@@ -1428,7 +1443,7 @@ function signalReportDetails(dbValue, min = null, max = null) {
         explain = "73 is short for 'best regards'. It can also be encoded with a special token, but here has been encoded as a signal report.<br>" 
             + explain;
         subtype += '*';
-        
+
     } else if (dbValue == 88) {
         explain = "88 is short for 'love and kisses', and here has been encoded as a signal report.<br>" 
             + explain;
@@ -1505,6 +1520,22 @@ function bitsToARRLSection(bits) {
         return `Section ${n}`;
     }
     return ARRL_SEC[i];
+}
+
+function bitsToTxDetailsLow(bits) {
+    // n4 Number of transmitters: 1-16
+    if (bits.length !== 4) throw new Error("Tx Number must be 4 bits");
+    const n = parseInt(bits, 2);
+    const low = `${n + 1}`;
+    return { value: low, short: low, subtype: 'transmitter(s)'};
+}
+
+function bitsToTxDetailsHigh(bits) {
+    // n4 Number of transmitters: 17-32
+    if (bits.length !== 4) throw new Error("Tx Number must be 4 bits");
+    const n = parseInt(bits, 2);
+    const high = `${n + 17}`;
+    return { value: low, short: low, subtype: 'transmitter(s)'};
 }
 
 function bitsToTxDetails(bits) {

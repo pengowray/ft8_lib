@@ -4,8 +4,6 @@ const FT8_CHAR_TABLE_FULL = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+-./?";
 // Costas array for sync
 const COSTAS_ARRAY = [3, 1, 4, 0, 6, 5, 2];
 const COSTAS_STR = '3140652';
-// CRC polynomial
-const CRC_POLYNOMIAL = 0x2757;  // 14-bit CRC polynomial without the leading 1
 
 const FTX_PAYLOAD_LENGTH_BYTES = 10;
 const FT8_NN = 79; // Total channel symbols
@@ -459,11 +457,11 @@ function checkSync(symbols) {
     };
 }
 
-const FT8_CRC_WIDTH = 14;
-const FT8_CRC_POLYNOMIAL = 0x2757;  // 14-bit CRC polynomial without the leading 1
-const TOPBIT = 1 << (FT8_CRC_WIDTH - 1);
-
 function ftx_compute_crc(message, num_bits) {
+    const FT8_CRC_WIDTH = 14;
+    const FT8_CRC_POLYNOMIAL = 0x2757;  // 14-bit CRC polynomial without the leading 1
+    const TOPBIT = 1 << (FT8_CRC_WIDTH - 1);
+
     let remainder = 0;
     let idx_byte = 0;
 
@@ -488,17 +486,17 @@ function ftx_compute_crc(message, num_bits) {
 
 function checkCRC(symbols) {
     let bitString = symbolsToBitsStrNoCosta(symbols);
-    let message = bitString.slice(0, 77).padEnd(82, '0').split('').map(Number);
+    let msgBits = bitString.slice(0, 77).padEnd(82, '0').split('').map(Number);
     
     // Convert bit array to byte array
     let messageBytes = [];
     for (let i = 0; i < 82; i += 8) {
-        messageBytes.push(parseInt(message.slice(i, i + 8).join(''), 2));
+        messageBytes.push(parseInt(msgBits.slice(i, i + 8).join(''), 2));
     }
     
     let calculatedCRC = ftx_compute_crc(messageBytes, 82);
     let receivedCRC = parseInt(bitString.slice(77, 91), 2);
-    
+
     return {
         crc: calculatedCRC.toString(2).padStart(14, '0'),
         received: receivedCRC.toString(2).padStart(14, '0'),

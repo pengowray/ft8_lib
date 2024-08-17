@@ -661,6 +661,6 @@ const inputTypeDescriptions = {
     '237 grits': 'All symbols as graycode triplets',
     '58 symbols': 'FSK tone data without sync tones',
     '79 symbols': 'Full FSK tone data',
-    'packed': 'Payload as hexadecimal (right padded)',
+    'packed': 'Payload as hexadecimal (zero-extended)', // aka right padded with 0's
     'default': 'FT8 message text',
 };

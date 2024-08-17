@@ -236,7 +236,7 @@ class OutputComponent extends Component {
 
                 ${this.renderChecks('Checks', data.checks)}
                 ${this.renderRowDataHighlights('Symbols', symbolsPretty(data.symbols), this.getSyncHighlights(data.syncCheck), 'Incorrect sync symbols highlighted in red. Expected sync symbols: 3140652.', null, '79 tones')}
-                ${this.renderRowData('Message', data.packed, `Without spaces: ${data.veryPacked}. Right padded.`, 'packed')}
+                ${this.renderRowData('Message', data.packed, `Without spaces: ${data.veryPacked}. Zero-extended to 10 bytes.`, 'packed')}
                 ${this.renderRowData('Message', data.messageBits, null, '77 bits')}
                 ${this.renderRowDataHighlights('Checksum', data.crcBits, this.getCRCHighlights(data.crcCheck), null, 'CRC failed', '14 bits', 'CRC (cyclic redundancy check)')}
                 ${this.renderRowDataHighlights('Parity', data.parityBits, this.getParityHighlights(data.parityCheck), 'Low Density Parity Check (LDPC). The highlighted bits differ from parity data which would match the combined message and CRC bits.', null, '83 bits', 'Low Density Parity Check (LDPC)')}

@@ -1,7 +1,16 @@
+const deofficializationTable = {
+  'Fed. Rep. of Germany': 'Germany',
+  'Republic of Korea': 'South Korea',
+  'DPR of Korea': 'North Korea',
+  'Republic of South Sudan': 'South Sudan',
+  'Republic of Kosovo': 'Kosovo',
+};
+
 class CTYData {
   constructor() {
     this.countryData = [];
     this.prefixTrie = {};
+    this.countries = []; // for debug only
   }
 
   async loadData() {
@@ -52,6 +61,10 @@ class CTYData {
         const parts = this.splitCSVLine(line);
         if (parts.length >= 9) {
           currentCountry = this.parseCountryLine(parts);
+          this.countries.push(currentCountry.country); // for debug
+          if (deofficializationTable[currentCountry.country]) {
+            currentCountry.country = deofficializationTable[currentCountry.country];
+          }
           this.countryData.push(currentCountry);
         } else if (currentCountry) {
           this.parseAliasPrefixes(line, currentCountry);
@@ -154,3 +167,4 @@ class CTYData {
 
 const cty = new CTYData();
 cty.loadData();
+console.log('countries', cty.countries);

@@ -321,7 +321,10 @@ class OutputComponent extends Component {
             length,
             comment,
             units,
-            unhashed,
+            callsign,
+            zhash,
+            isHash, // focus on hash not call
+            hashInt,
             rawAppend
         } = fieldData;
     
@@ -329,16 +332,24 @@ class OutputComponent extends Component {
         //const positionInfo = `bits ${start + 1} to ${start + length} (length: ${length} bits)`;
 
         //todo: less hackish escapeHTML toggle
+        let valueText = '';
+        if (callsign || zhash) {
+            const boldifyCall = true; // !isHash; // turn off hash highlighting for now
+            valueText = `${ callsign ? `<span class="output-call ${ !boldifyCall ? 'secondary':''}">${escapeHTML(callsign)}</span>` : '' }<span class="output-hash ${ boldifyCall ? 'secondary':''}" title="${hashBitsTo22styleBase10(hashInt ?? 0)}">${escapeHTML(zhash)}</span>`
+        } else {
+            valueText = `<span class="output-data">${escapeHTML(value)}</span>`;
+        }
 
         return `
             <div class="output-row">
-                <div class="output-label">${label} ${secondaryLabel ? `<span class="output-sublabel">${secondaryLabel}` : ''}</span></div>
-                <div class="output-value"><span class="output-data">${escapeHTML(value)}</span>${ units ? `<span class="output-comment-info"> ${units}</span>` : '' }${ unhashed ? `<span class="output-unhashed"> ${unhashed}</span>` : '' }` 
+                <div class="output-label">${label}${secondaryLabel ? ` <span class="output-sublabel">${secondaryLabel}` : ''}</span></div>` 
+                + `<div class="output-value">${valueText}${ units ? `<span class="output-comment-info"> ${units}</span>` : '' }`
                 + `${ subtype ? `<div class="output-metadata">${subtype}</div>` : ''}` 
-                + `${(bits && bits.length >= 2) ? `<div class="output-raw-values">Raw value: ${bits} (=${rawIntValue})${rawAppend ? ` ${rawAppend}` : ''}</div>` : '' }</div>`
+                + `${(bits && bits.length >= 2) ? `<div class="output-raw-values">Raw value: ${bits} (=${rawIntValue})${rawAppend ? ` ${rawAppend}` : ''}</div>` : '' }`  +
+               `</div>`
                 + `${desc ? `<div class="output-comment">${escapeHTML(desc).replace('\n','<br>')}</div>` : ''}` 
                 + `${descNoEsc ? `<div class="output-comment">${descNoEsc}</div>` : ''}
-            </div>
+           </div>
         `;
     }
     

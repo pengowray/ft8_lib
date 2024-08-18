@@ -1149,8 +1149,11 @@ function bitsToCallDetails(bits, extraBit = "") {
         //result.details.hashValue = hashValue
         //result.callsign = "<...>";
         const subBits = hashValue.toString(2).padStart(22, '0');
-        result.value = hashBitsPrettyZ32(subBits);
-        result.rawAppend = `Hash22: ${hashBitsPretty(subBits)} (=${hashBitsTo22styleBase10(subBits)})`;
+        result.isHash = true;
+        //result.value = hashBitsPrettyZ32(subBits);
+        result.zhash = hashBitsPrettyZ32(subBits);
+
+        result.rawAppend = `22-bit hash: ${hashBitsPretty(subBits)} (=${hashBitsTo22styleBase10(subBits)})`;
 
         const matchDetails = hashMatchDetails(subBits);
         if (matchDetails) result = {...result, ...matchDetails};
@@ -1162,7 +1165,7 @@ function bitsToCallDetails(bits, extraBit = "") {
         let c = n - NTOKENS - MAX22;
 
         const subBits = c.toString(2).padStart(22, '0');
-        result.rawAppend = `Call22: ${subBits} (=${bitsToBigIntString(subBits)})`;
+        result.rawAppend = `22-bit call: ${subBits} (=${bitsToBigIntString(subBits)})`;
 
         // Decode last 3 characters (from right to left)
         let suffix = '';
@@ -1209,7 +1212,13 @@ function bitsToCallDetails(bits, extraBit = "") {
         result.descNoEsc = (country) ? `<b>${country}</b> ` : '';
         
         const hashed = callsignToHashBits(result.value)
-        result.hashed = hashed;
+        result.zhash = hashBitsPrettyZ32(hashed);
+        result.isHash = false;
+
+        result.callsign = result.value;
+        result.value = null;
+        result.hashInt = parseInt(hashed, 2);
+
         //result.desc = `hash: <span title="${hashBits22styleBase10(hashed)}">${hashBitsPrettyZ32(hashed)} (${hashBitsPretty(hashed)} =${hashBits22styleBase10(hashed)})</span>`;
         result.descNoEsc += `hash: <span title="${hashBitsTo22styleBase10(hashed)}">${hashBitsPrettyZ32(hashed)}</span>`;
     }
@@ -1241,6 +1250,8 @@ function hashMatchDetails(bits) {
     if (match) {
         let result = {};
         result.hashMatch = match;
+        result.hashInt = match.hashInt;
+        result.zhashFull = match.zhashFull;        
 
         if (bits.length == 22) {
             result.desc = `Hash matches ${match.callsign}`;
@@ -1248,7 +1259,7 @@ function hashMatchDetails(bits) {
             //`Hash matches ${match.callsign} (${match.zhash})`;
             result.descNoEsc = `Hash matches ${escapeHTML(match.callsign)} <span title="${hashBitsTo22styleBase10(match.hashInt)}">(${match.zhash})</span>`;
         }
-        result.unhashed = match.callsign;
+        result.callsign = match.callsign;
         if (match.callsign == '') result.unhashed = '(blank)';
         
         const country = callsignToCountry(match.callsign);
@@ -1275,7 +1286,7 @@ function bitsToHash(bits) {
     const matchDetails = hashMatchDetails(bits) ?? {};
 
     // desc: 'Displayed in Z-Base32 encoding'
-    return { ...matchDetails, value: hashed, subtype:'hash' + bits.length };
+    return { ...matchDetails, isHash: true, zhash: hashed, subtype:'hash' + bits.length };
 }
 
 
@@ -1508,10 +1519,14 @@ function bitsToNonstandardCallDetails(bits, message) {
     const countryStr = country ? ` <b>${country}</b>` : '';
 
     return { 
-        value: callsign, 
+        callsign, 
         subtype: 'non-standard callsign',
         hashed: hashed,
-        descNoEsc: `hash: <span title="${hashBitsTo22styleBase10(hashed)}">${hashBitsPrettyZ32(hashed)}</span>` + countryStr
+        zhash: hashBitsPrettyZ32(hashed),
+        hashInt: parseInt(hashed, 2),
+        isHash: false,
+        //descNoEsc: `hash: <span title="${hashBitsTo22styleBase10(hashed)}">${hashBitsPrettyZ32(hashed)}</span>` + countryStr
+        descNoEsc: countryStr
     };
 }
 

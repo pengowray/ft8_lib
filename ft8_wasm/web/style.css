@@ -3,7 +3,7 @@
     --text-color: #333333;
     --text-color-comment: #666;
     --text-color-tertiary: #338265;
-    --text-color-unhashed:#b0b0b0;
+    --text-color-unhashed:#5e5e5e;
     
     --input-bg: #f0f0f0;
     --button-bg: #4CAF50;
@@ -25,7 +25,7 @@
     --text-color: #f0f0f0;
     --text-color-comment: #999;
     --text-color-tertiary: #81c1a9;
-    --text-color-unhashed: #545454;
+    --text-color-unhashed: #ababab;
 
     --input-bg: #444444;
     --button-bg: #45a049;
@@ -35,7 +35,7 @@
     --warning-text: orange;
 
     --position-line-color: white;
-    --costas-bg: rgb(8, 78, 255);
+    --costas-bg: rgb(26, 90, 253);
     --costas-bg-bits: rgb(33, 59, 125);
     --data-bg: #837e94;
     --ramp-bg: #333333;
@@ -54,6 +54,37 @@ body {
     transition: background-color 0.3s, color 0.3s;
 }
 
+.ibm-plex-serif-regular {
+    font-family: "IBM Plex Serif", serif;
+    font-weight: 400;
+    font-style: normal;
+}
+
+.ibm-plex-serif-semibold {
+    font-family: "IBM Plex Serif", serif;
+    font-weight: 600;
+    font-style: normal;
+}
+
+.ibm-plex-serif-semibold-italic {
+    font-family: "IBM Plex Serif", serif;
+    font-weight: 600;
+    font-style: italic;
+}
+
+.montserrat-call {
+    font-family: "Montserrat", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: 800;
+    font-style: normal;
+}
+
+.mclaren-regular {
+    font-family: "McLaren", sans-serif;
+    font-weight: 400;
+    font-style: normal;
+}
+  
 h1, h2 {
     text-align: center;
 }
@@ -703,7 +734,6 @@ body:not(.dark-mode) #piano-roll {
     color: #666;
     margin-top: 2px;
     grid-column: 2;
-    padding-left: 5px;
 }
 
 .dark-mode .output-comment {
@@ -712,13 +742,48 @@ body:not(.dark-mode) #piano-roll {
 
 .output-unhashed {
     font-size: 0.9em;
-    padding-left: 5px;
     font-weight: bold;
     font-style: italic;
     color: var(--text-color-unhashed);
 }
 
 .dark-mode .output-unhashed {
+    color: var(--text-color-unhashed);
+}
+
+/* */
+
+.output-call {
+    font-size: 0.8em;
+
+    font-family: "Montserrat", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: 800;
+    font-style: normal;
+    letter-spacing: 0.05em;
+}
+
+.output-hash {
+    font-size: 0.8em;
+    padding-left: 8px;
+
+    font-family: "McLaren", sans-serif;
+    font-weight: 400;
+    font-style: normal;
+/*
+    font-family: "IBM Plex Serif", serif;
+    font-weight: 400;
+    font-style: bold;
+    */
+
+    letter-spacing: 0.06em;
+
+}
+
+.primary {
+    color: var(--text-color);
+}
+.secondary {
     color: var(--text-color-unhashed);
 }
 

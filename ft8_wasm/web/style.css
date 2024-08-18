@@ -683,7 +683,7 @@ body:not(.dark-mode) #piano-roll {
     font-optical-sizing: auto;
     font-weight: 900;
     font-style: italic;
-    letter-spacing: -0.02em;
+    letter-spacing: 0.02em;
     padding-right: 8px;
     font-variant-caps: all-small-caps;
 }

@@ -4,7 +4,46 @@ const deofficializationTable = {
   'DPR of Korea': 'North Korea',
   'Republic of South Sudan': 'South Sudan',
   'Republic of Kosovo': 'Kosovo',
+  'Dem. Rep. of the Congo': 'Democratic Republic of the Congo',
+  'Kingdom of Eswatini': 'Eswatini',
+  'United Arab Emirates': 'UAE',
+  'Sov Mil Order of Malta': 'Order of Malta', // Sovereign Military Order of Malta
+  'Timor - Leste': 'East Timor',
+  'The Gambia': 'Gambia',
+  'Czech Republic': 'Czechia',
+  'Slovak Republic': 'Slovakia',
+  'Brunei Darussalam': 'Brunei',
+  'Bosnia-Herzegovina': 'Bosnia and Herzegovina',
+  'Trinidad & Tobago': 'Trinidad and Tobago',
+  'Sao Tome & Principe': 'São Tomé and Príncipe',
+  'St. Kitts & Nevis': 'Saint Kitts and Nevis',
+  'Antigua & Barbuda': 'Antigua and Barbuda',
+  
+  //islands
+  'Amsterdam & St. Paul Is.': 'Amsterdam and Saint Paul Islands',
+  'Andaman & Nicobar Is.': 'Andaman and Nicobar Islands',
+  'N.Z. Subantarctic Is.': 'New Zealand Subantarctic Islands',
+  'Pr. Edward & Marion Is.': 'Prince Edward and Marion Islands',
 };
+
+const cleanupRegexPatterns = [
+  { pattern: /\s&\s/g, replacement: ' and ' },
+  { pattern: /\bSt\./g, replacement: 'Saint' },
+  // { pattern: /\bIs\./g, replacement: 'Islands' }, // island or islands?
+];
+
+function TidyCountry(country) {
+  if (!country) return null;
+  let name = country.trim();
+  if (deofficializationTable[name]) {
+    name = deofficializationTable[name];
+  }
+
+  return cleanupRegexPatterns.reduce((name, { pattern, replacement }) => 
+    name.replace(pattern, replacement), name);
+}
+
+  
 
 class CTYData {
   constructor() {
@@ -61,10 +100,12 @@ class CTYData {
         const parts = this.splitCSVLine(line);
         if (parts.length >= 9) {
           currentCountry = this.parseCountryLine(parts);
-          this.countries.push(currentCountry.country); // for debug
-          if (deofficializationTable[currentCountry.country]) {
-            currentCountry.country = deofficializationTable[currentCountry.country];
-          }
+          
+          //tidy country name
+          const tidyCountry = TidyCountry(currentCountry.country);
+          currentCountry.country = tidyCountry;
+          this.countries.push([currentCountry.country, tidyCountry]); // for debug
+
           this.countryData.push(currentCountry);
         } else if (currentCountry) {
           this.parseAliasPrefixes(line, currentCountry);

@@ -325,7 +325,9 @@ class OutputComponent extends Component {
             zhash,
             isHash, // focus on hash not call
             hashInt,
-            rawAppend
+            operatingStatusIndicator, // e.g. /R or /P indicated elsewehre
+            rawAppend,
+
         } = fieldData;
     
         //todo:
@@ -334,8 +336,8 @@ class OutputComponent extends Component {
         //todo: less hackish escapeHTML toggle
         let valueText = '';
         if (callsign || zhash) {
-            const boldifyCall = true; // !isHash; // turn off hash highlighting for now
-            valueText = `${ callsign ? `<span class="output-call ${ !boldifyCall ? 'secondary':''}">${escapeHTML(callsign)}</span>` : '' }<span class="output-hash ${ boldifyCall ? 'secondary':''}" title="${hashBitsTo22styleBase10(hashInt ?? 0)}">${escapeHTML(zhash)}</span>`
+            //const boldifyCall = true; // !isHash; // turn off hash highlighting for now
+            valueText = `${ callsign ? `<span class="output-call gravity-high"><span class="${ !isHash ? 'call-highlighter':''}">${escapeHTML(callsign)}</span>${operatingStatusIndicator ?? ''} </span>` : '' }<span class="output-hash ${ isHash ? 'gravity-medium':'gravity-low'} ${ isHash ? 'call-highlighter':''}" title="${hashBitsTo22styleBase10(hashInt ?? 0)}">${escapeHTML(zhash)}</span>`
         } else {
             valueText = `<span class="output-data">${escapeHTML(value)}</span>`;
         }

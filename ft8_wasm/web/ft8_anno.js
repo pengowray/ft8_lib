@@ -21,8 +21,8 @@ const annotationDefinitions = {
     "0.3": [ // ARRL Field Day
         { label: "Call A", tag:'c28', start: 0, length: 28, getValue: bitsToCall },
         { label: "Call B", tag:'c28', start: 28, length: 28, getValue: bitsToCall },
-        { label: "/R", shortLabel: 'R', tag:'R1', start: 56, length: 1, getValue: (bit) => bit === '1' ? 'R' : '' },
-        { label: "Number of transmitters", tag:'n4', shortLabel: 'nTX', tag:'n4', start: 57, length: 4, getValue: bitsToTxDetailsLow },
+        { label: "/R", shortLabel: 'R', tag:'R1', start: 56, length: 1, getValue: (bit) => bit === '1' ? '/R' : '0' },
+        { label: "No. of transmitters", tag:'n4', shortLabel: 'nTX', tag:'n4', start: 57, length: 4, getValue: bitsToTxDetailsLow },
         { label: "Class", tag:'k3', start: 61, length: 3, getValue: bitsToFieldDayClass },
         { label: "Section",tag: 'S7', start: 64, length: 7, getValue: bitsToARRLSection },
         def_i3n3
@@ -33,7 +33,7 @@ const annotationDefinitions = {
         { label: "Call A", tag:'c28', start: 0, length: 28, getValue: bitsToCall },
         { label: "Call B", tag:'c28', start: 28, length: 28, getValue: bitsToCall },
         { label: "R", tag:'R1', start: 56, length: 1, getValue: (bit) => bit === '1' ? 'R' : '0' },
-        { label: "Number of transmitters", shortLabel: 'nTX', tag:'n4', start: 57, length: 4, getValue: bitsToTxDetailsHigh },
+        { label: "No. of transmitters", shortLabel: 'nTX', tag:'n4', start: 57, length: 4, getValue: bitsToTxDetailsHigh },
         { label: "Class",  tag:'k3', start: 61, length: 3, getValue: bitsToFieldDayClass },
         { label: "Section", tag: 'S7', start: 64, length: 7, getValue: bitsToARRLSection },
         def_i3n3
@@ -61,9 +61,9 @@ const annotationDefinitions = {
     ],
     "2": [ // EU VHF Contest c28 p1 c28 p1 R1 g15
         { label: "Call A", tag:'c28', start: 0, length: 28, getValue: (bits) => bitsToCall(bits) },
-        { label: "/P", shortLabel:'p', tag:'p1a', start: 28, length: 1, getValue: (bit) => bit === '1' ? '/P' : '' },
+        { label: "/P", shortLabel:'p', tag:'p1a', start: 28, length: 1, getValue: (bit) => bit === '1' ? '/P' : '0' },
         { label: "Call B", tag:'c28', start: 29, length: 28, getValue: (bits) => bitsToCall(bits) },
-        { label: "/P", shortLabel:'p', tag:'p1b', start: 57, length: 1, getValue: (bit) => bit === '1' ? '/P' : '' },
+        { label: "/P", shortLabel:'p', tag:'p1b', start: 57, length: 1, getValue: (bit) => bit === '1' ? '/P' : '0' },
         { shortLabel: 'R', tag:'R1', start: 58, length: 1, getValue: (bit) => bit === '1' ? 'R' : '' },
         { label: "Grid4", tag:'g15', start: 59, length: 15, getValue: (bits) => bitsToGrid4OrReportWithType(bits) },
         def_i3

@@ -307,7 +307,7 @@ class OutputComponent extends Component {
         `;
     }
     renderRowDataField(fieldData) {
-        const {
+        let {
             label,
             secondaryLabel,
             tag,
@@ -326,6 +326,7 @@ class OutputComponent extends Component {
             hashLen,
             isHash, // focus on hash not call
             operatingStatusIndicator, // e.g. /R or /P indicated elsewehre
+            country,
             rawAppend,
 
         } = fieldData;
@@ -336,12 +337,12 @@ class OutputComponent extends Component {
         const zhash = (hashBits && hashBits.length > 0) ? hashBitsPrettyZ32(hashBits) : null;
         const hashIntStr = (hashBits && hashBits.length == 22) ? hashBitsTo22styleBase10(hashBits) : null;
 
-
         //todo: less hackish escapeHTML toggle
         let valueText = '';
         if (callsign || zhash) {
             //const boldifyCall = true; // !isHash; // turn off hash highlighting for now
             valueText = `${ callsign ? `<span class="output-call gravity-high"><span class="${ !isHash ? 'call-highlighter':''}">${escapeHTML(callsign)}</span>${operatingStatusIndicator ?? ''} </span>` : '' }<span class="output-hash ${ isHash ? 'gravity-medium':'gravity-low'}" ${(hashIntStr && hashIntStr != 0) ? `title="${hashIntStr}"` : ''}>${addUnderlineToHash(hashBits, isHash ? hashLen : 0)}</span>`
+            if (country) { valueText += `<div class="output-country gravity-low">${escapeHTML(country)}</div>`; }
         } else {
             valueText = `<span class="output-data">${escapeHTML(value)}</span>`;
         }

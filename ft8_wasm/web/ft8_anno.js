@@ -87,7 +87,7 @@ const annotationDefinitions = {
     ],
     "5": [ // EU VHF Contest with 6-digit grid locator
         { label: "Hash A", tag:'h12', start: 0, length: 12, getValue: bitsToHash },
-        { label: "Hash B", tag:'h12', start: 12, length: 22, getValue: bitsToHash },
+        { label: "Hash B", tag:'h22', start: 12, length: 22, getValue: bitsToHash },
         { label: "R", tag:'R1', start: 34, length: 1, getValue: (bit) => bit === '1 R' ? 'R' : '0' },
         { label: "Report", shortLabel:"RST", tag:'r3', start: 35, length: 3, getValue: bitsToRST },
         { label: "Serial", tag:'s11', desc: 'Serial number (0-2047)', start: 38, length: 11, getValue: bitsToSerial },

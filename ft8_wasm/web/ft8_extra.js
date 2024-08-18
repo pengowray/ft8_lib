@@ -1074,6 +1074,7 @@ function hashCallsign(callsign) {
     for (let i = 0; i < maxLength; i++) {
         const j = nchar(callsign[i], FT8_CHAR_TABLE_ALPHANUM_SPACE_SLASH);
         if (j < 0) {
+            console.error("Invalid character in callsign: " + callsign[i]);
             return null; // hash error (wrong character set)
         }
         n58 = (BigInt(38) * n58) + BigInt(j);
@@ -1151,9 +1152,10 @@ function bitsToCallDetails(bits, extraBit = "") {
         const subBits = hashValue.toString(2).padStart(22, '0');
         result.isHash = true;
         //result.value = hashBitsPrettyZ32(subBits);
-        result.zhash = hashBitsPrettyZ32(subBits);
+        result.hashBits = subBits;
+        result.hashLen = 22;
 
-        result.rawAppend = `22-bit hash: ${hashBitsPretty(subBits)} (=${hashBitsTo22styleBase10(subBits)})`;
+        //result.rawAppend = `22-bit hash: ${hashBitsPretty(subBits)} (=${hashBitsTo22styleBase10(subBits)})`;
 
         const matchDetails = hashMatchDetails(subBits);
         if (matchDetails) result = {...result, ...matchDetails};
@@ -1209,18 +1211,16 @@ function bitsToCallDetails(bits, extraBit = "") {
         }
 
         const country = callsignToCountry(result.value);
-        result.descNoEsc = (country) ? `<b>${country}</b> ` : '';
+        result.country = country;
         
-        const hashed = callsignToHashBits(result.value)
-        result.zhash = hashBitsPrettyZ32(hashed);
+        const hashBits = callsignToHashBits(result.value)
+        result.hashBits = hashBits;
+        result.hashLen = hashBits?.length; // 22
         result.isHash = false;
 
+        ///switcheroo
         result.callsign = result.value;
         result.value = null;
-        result.hashInt = parseInt(hashed, 2);
-
-        //result.desc = `hash: <span title="${hashBits22styleBase10(hashed)}">${hashBitsPrettyZ32(hashed)} (${hashBitsPretty(hashed)} =${hashBits22styleBase10(hashed)})</span>`;
-        result.descNoEsc += `hash: <span title="${hashBitsTo22styleBase10(hashed)}">${hashBitsPrettyZ32(hashed)}</span>`;
     }
 
     return result;
@@ -1250,21 +1250,13 @@ function hashMatchDetails(bits) {
     if (match) {
         let result = {};
         result.hashMatch = match;
-        result.hashInt = match.hashInt;
-        result.zhashFull = match.zhashFull;        
+        result.hash = bits;
+        result.hashLen = bits.length; // should be done already by caller
 
-        if (bits.length == 22) {
-            result.desc = `Hash matches ${match.callsign}`;
-        } else {
-            //`Hash matches ${match.callsign} (${match.zhash})`;
-            result.descNoEsc = `Hash matches ${escapeHTML(match.callsign)} <span title="${hashBitsTo22styleBase10(match.hashInt)}">(${match.zhash})</span>`;
-        }
         result.callsign = match.callsign;
         if (match.callsign == '') result.unhashed = '(blank)';
         
-        const country = callsignToCountry(match.callsign);
-        const countryStr = country ? `<b>${country}</b>` : '';
-        result.descNoEsc = result.descNoEsc ? result.descNoEsc + " " + countryStr : countryStr;
+        result.country = callsignToCountry(match.callsign);
 
         return result;
     }
@@ -1280,13 +1272,11 @@ function isGrid4(grid) {
 }
 
 function bitsToHash(bits) {
-    //return hashBitsPrettyHex(bits);
-    const hashed = hashBitsPrettyZ32(bits);
 
     const matchDetails = hashMatchDetails(bits) ?? {};
 
     // desc: 'Displayed in Z-Base32 encoding'
-    return { ...matchDetails, isHash: true, zhash: hashed, subtype:'hash' + bits.length };
+    return { ...matchDetails, hashBits: bits, isHash: true, hashLen: bits.length, subtype:'hash' + bits.length };
 }
 
 
@@ -1513,20 +1503,15 @@ function bitsToR2(bits) { // aka bitsToRR73
 
 function bitsToNonstandardCallDetails(bits, message) {
     const callsign = bitsToNonstandardCall(bits);
-    const hashed = callsignToHashBits(callsign);
-
+    const hashBits = callsignToHashBits(callsign);
     const country = callsignToCountry(callsign);
-    const countryStr = country ? ` <b>${country}</b>` : '';
 
     return { 
         callsign, 
         subtype: 'non-standard callsign',
-        hashed: hashed,
-        zhash: hashBitsPrettyZ32(hashed),
-        hashInt: parseInt(hashed, 2),
+        hashBits,
         isHash: false,
-        //descNoEsc: `hash: <span title="${hashBitsTo22styleBase10(hashed)}">${hashBitsPrettyZ32(hashed)}</span>` + countryStr
-        descNoEsc: countryStr
+        country,
     };
 }
 
@@ -1646,3 +1631,32 @@ function addStrings(num1, num2) {
 
     return result;
 }
+
+function addUnderlineToHash(hashBits, numBitsToUnderline, classname = "call-highlighter") {
+    if (hashBits == null || hashBits.length == 0) return '';
+
+    const zhash = hashBitsPrettyZ32(hashBits);
+    if (numBitsToUnderline == null ||  numBitsToUnderline == 0) return zhash;
+
+    let bitLen = numBitsToUnderline ?? hashBits?.length ?? 0;
+    let uLen = zhash.length;
+    //if (bitLen == 22) underlineLen = 6;
+    if (bitLen == 12) uLen = 4;
+    if (bitLen == 10) uLen = 2;
+
+    return addSpanToStart(zhash, uLen, classname);
+}
+
+//utility for underlining text
+function addSpanToStart(str, charCount, classname) {
+    if (charCount <= 0) {
+      return str;
+    }
+
+    const len = charCount > str.lengt ? str.length : charCount;
+    
+    const spanContent = str.slice(0, len);
+    const remainder = str.slice(len);
+    
+    return `<span class="${classname}">${spanContent}</span>${remainder}`;
+  }

@@ -620,9 +620,8 @@ body:not(.dark-mode) #piano-roll {
     word-break: normal;
 }
 
-
 .output-label {
-    font-weight: bold;
+    /* font-weight: bold; */
     margin-bottom: 2px;
     padding: 5px 0;
 }

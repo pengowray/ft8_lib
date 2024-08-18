@@ -322,9 +322,9 @@ class OutputComponent extends Component {
             comment,
             units,
             callsign,
-            zhash,
+            hashBits,
+            hashLen,
             isHash, // focus on hash not call
-            hashInt,
             operatingStatusIndicator, // e.g. /R or /P indicated elsewehre
             rawAppend,
 
@@ -333,11 +333,15 @@ class OutputComponent extends Component {
         //todo:
         //const positionInfo = `bits ${start + 1} to ${start + length} (length: ${length} bits)`;
 
+        const zhash = (hashBits && hashBits.length > 0) ? hashBitsPrettyZ32(hashBits) : null;
+        const hashIntStr = (hashBits && hashBits.length == 22) ? hashBitsTo22styleBase10(hashBits) : null;
+
+
         //todo: less hackish escapeHTML toggle
         let valueText = '';
         if (callsign || zhash) {
             //const boldifyCall = true; // !isHash; // turn off hash highlighting for now
-            valueText = `${ callsign ? `<span class="output-call gravity-high"><span class="${ !isHash ? 'call-highlighter':''}">${escapeHTML(callsign)}</span>${operatingStatusIndicator ?? ''} </span>` : '' }<span class="output-hash ${ isHash ? 'gravity-medium':'gravity-low'} ${ isHash ? 'call-highlighter':''}" title="${hashBitsTo22styleBase10(hashInt ?? 0)}">${escapeHTML(zhash)}</span>`
+            valueText = `${ callsign ? `<span class="output-call gravity-high"><span class="${ !isHash ? 'call-highlighter':''}">${escapeHTML(callsign)}</span>${operatingStatusIndicator ?? ''} </span>` : '' }<span class="output-hash ${ isHash ? 'gravity-medium':'gravity-low'}" ${(hashIntStr && hashIntStr != 0) ? `title="${hashIntStr}"` : ''}>${addUnderlineToHash(hashBits, isHash ? hashLen : 0)}</span>`
         } else {
             valueText = `<span class="output-data">${escapeHTML(value)}</span>`;
         }

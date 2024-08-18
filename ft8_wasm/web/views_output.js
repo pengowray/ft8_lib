@@ -226,8 +226,8 @@ class OutputComponent extends Component {
             <h2>${data.messageTypeInfo} (${data.ft8MessageType})</h2>
             <div class="output-content">
                 ${this.renderRowData('Input text', data.inputText, data.comment)}
-                ${this.renderRowDataField( { label: 'Input type', value: data.inputType, subtype: data.inputTypeDescription })}
-                ${data.isATest ? this.renderRowDataField( { label: 'Test case?', value: data.isATest, subtype: data.testType }) : ''}
+                ${this.renderRowDataField( { label: 'Input type', value: data.inputType, subtype: data.inputTypeDescription, isField: false })}
+                ${data.isATest ? this.renderRowDataField( { label: 'Test case?', value: data.isATest, subtype: data.testType, isField: false }) : ''}
 
                 ${this.renderSubheading('Message Fields')}
                 ${this.renderRows(data.messageBits, data.ft8MessageType)}
@@ -246,7 +246,8 @@ class OutputComponent extends Component {
                 ${this.renderSubheading('Decoding')}
                 ${this.renderChecks('Decode check', data.decoded )}
                 ${this.renderRowData('Input text', data.inputText )}
-                ${this.renderRowData('Decoded text', data.decodedText, data.decodedText.includes('<...>') ? '<...> represents a hashed callsign.' : null)}
+                ${this.renderRowDataField({label: 'Decoded text', value: data.decodedText, desc: data.decodedText.includes('<...>') ? '<...> represents a hashed callsign.' : null })}
+
                 ${!data.decoded[0].success ? this.renderRowData('Decode error', data.decoded[0].errorMessage, "Please check if individual message fields were were decoded.") : ''}
 
                 ${(data.explanation || data.encodeError) ? this.renderSubheading('More info') : ''}
@@ -328,6 +329,7 @@ class OutputComponent extends Component {
             operatingStatusIndicator, // e.g. /R or /P indicated elsewehre
             country,
             rawAppend,
+            isField = true, // Field within the data. If rendering something else e.g "Input type", set to false (for smaller font), or lie and say true to make something else big like "Decoded text"
 
         } = fieldData;
     
@@ -344,7 +346,7 @@ class OutputComponent extends Component {
             valueText = `${ callsign ? `<span class="output-call gravity-high"><span class="${ !isHash ? 'call-highlighter':''}">${escapeHTML(callsign)}</span>${operatingStatusIndicator ?? ''} </span>` : '' }<span class="output-hash ${ isHash ? 'gravity-medium':'gravity-low'}" ${(hashIntStr && hashIntStr != 0) ? `title="${hashIntStr}"` : ''}>${addUnderlineToHash(hashBits, isHash ? hashLen : 0)}</span>`
             if (country) { valueText += `<div class="output-country gravity-low">${escapeHTML(country)}</div>`; }
         } else {
-            valueText = `<span class="output-data">${escapeHTML(value)}</span>`;
+            valueText = `<span class="output-data ${isField ? 'output-field' : ''}">${escapeHTML(value)}</span>`;
         }
 
         return `

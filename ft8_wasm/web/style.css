@@ -632,10 +632,60 @@ body:not(.dark-mode) #piano-roll {
     border-radius: 4px;
 }
 
-.output-data { /* modifies .output-value */
+
+.output-data {
     font-family: monospace;
     white-space: pre-wrap;
-    word-break: break-all;
+    /* word-break: break-all; */
+}
+
+
+.output-field,
+.output-call {
+    font-size: 1.1em;
+    font-family: "Atkinson Hyperlegible", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: 700;
+    font-style: normal;
+    letter-spacing: 0.05em;
+    padding-right: 8px;
+}
+
+.output-hash {
+    font-size: 0.8em;
+    letter-spacing: 0.06em;
+    font-family: "Righteous", "McLaren", "IBM Plex Serif", sans-serif;
+    font-weight: 400;
+    font-style: normal;
+}
+
+.call-highlighter { /* modifies .output-call and .output-hash */
+    text-decoration: underline;
+    text-decoration-color: var(--text-color-tertiary);
+    text-decoration-thickness: 0.12em;
+    text-underline-offset: 0.4em;
+    text-decoration-skip-ink: none;
+}
+
+.gravity-high {
+    color: var(--text-color);
+}
+.gravity-medium {
+    color: var(--text-color-gravity-medium);
+}
+.gravity-low {
+    color: var(--text-color-gravity-low);
+}
+
+.output-country {
+    font-size: 0.8em;
+    font-family: "Montserrat", "Roboto", sans-serif;
+    font-optical-sizing: auto;
+    font-weight: 900;
+    font-style: italic;
+    letter-spacing: -0.02em;
+    padding-right: 8px;
+    font-variant-caps: all-small-caps;
 }
 
 .checks {
@@ -744,54 +794,6 @@ body:not(.dark-mode) #piano-roll {
 
 .dark-mode .output-comment {
     color: #5e5e5e;
-}
-
-/* */
-
-.output-call {
-    font-size: 1.1em;
-    font-family: "Atkinson Hyperlegible", sans-serif;
-    font-optical-sizing: auto;
-    font-weight: 700;
-    font-style: normal;
-    letter-spacing: 0.05em;
-    padding-right: 8px;
-}
-
-.output-hash {
-    font-size: 0.8em;
-    letter-spacing: 0.06em;
-    font-family: "Righteous", "McLaren", "IBM Plex Serif", sans-serif;
-    font-weight: 400;
-    font-style: normal;
-}
-.call-highlighter {
-    text-decoration: underline;
-    text-decoration-color: var(--text-color-tertiary);
-    text-decoration-thickness: 0.12em;
-    text-underline-offset: 0.4em;
-    text-decoration-skip-ink: none;
-}
-
-.gravity-high {
-    color: var(--text-color);
-}
-.gravity-medium {
-    color: var(--text-color-gravity-medium);
-}
-.gravity-low {
-    color: var(--text-color-gravity-low);
-}
-
-.output-country {
-    font-size: 0.8em;
-    font-family: "Montserrat", "Roboto", sans-serif;
-    font-optical-sizing: auto;
-    font-weight: 900;
-    font-style: italic;
-    letter-spacing: -0.02em;
-    padding-right: 8px;
-    font-variant-caps: all-small-caps;
 }
 
 .highlighted-corrected {

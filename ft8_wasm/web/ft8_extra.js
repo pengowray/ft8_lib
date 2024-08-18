@@ -799,7 +799,6 @@ function packedToHexStrSp(packedData) {
 }
 
 function bitsToHexForTelemetry(binaryStr) {
-
     // Pad the binary string to ensure its length is a multiple of 4
     // not sure if it should be start or end?
     binaryStr = binaryStr.padEnd(Math.ceil(binaryStr.length / 4) * 4, '0');
@@ -814,6 +813,7 @@ function bitsToHexForTelemetry(binaryStr) {
     return hexString;
 }
 
+
 function bitsToHex(binaryStr) {
     // Pad the binary string to ensure its length is a multiple of 4
     binaryStr = binaryStr.padStart(Math.ceil(binaryStr.length / 4) * 4, '0');
@@ -826,6 +826,11 @@ function bitsToHex(binaryStr) {
     }
     
     return hexString;
+}
+
+
+function bitsToPacked(bitString) {
+    return new Uint8Array(bitsToHex(normalizeBinary(bitString)).match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
 }
 
 // Helper function to convert hex string to binary string

@@ -36,7 +36,7 @@ function findHash(bits) {
     if (zhash in hashes) {
         const entry = hashes[zhash];
         const entryBits = entry[0].toString(2).padStart(22, '0');
-        return {hashInt: entry[0], callsign: entry[1], zhashFull: hashBitsPrettyZ32(entryBits)};
+        return {hashInt: entry[0], callsign: entry[1], hashBits: entryBits};
     }
     return null;
 }

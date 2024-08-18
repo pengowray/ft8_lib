@@ -1063,7 +1063,7 @@ function bitsToCall(bits) {
     return  bitsToCallDetails(bits);
     
     //const details = bitsToCallDetails(bits);
-    return `${details.callsign} (${details.type})`;
+    //return `${details.callsign} (${details.type})`;
 }
 
 const FT8_CHAR_TABLE_ALPHANUM_SPACE_SLASH = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/";
@@ -1254,9 +1254,11 @@ function hashMatchDetails(bits) {
     const match = findHash(bits);
     if (match) {
         let result = {};
+        //result.isHash = true; // shouldn't be needed
         result.hashMatch = match;
-        result.hash = bits;
-        result.hashLen = bits.length; // should be done already by caller
+        result.hashBits = match.hashBits // give full bits in case only had parital
+        result.hashLen = bits.length; // should be done already by caller, but make sure it's set to original length for underlining
+        result.actualHashBits = bits; // save old value
 
         result.callsign = match.callsign;
         if (match.callsign == '') result.unhashed = '(blank)';
@@ -1281,7 +1283,8 @@ function bitsToHash(bits) {
     const matchDetails = hashMatchDetails(bits) ?? {};
 
     // desc: 'Displayed in Z-Base32 encoding'
-    return { ...matchDetails, hashBits: bits, isHash: true, hashLen: bits.length, subtype:'hash' + bits.length };
+    //note: hashBits may be overriden by matchDetails.hashBits, which will have the full 22 bits if a match is found
+    return { hashBits: bits, ...matchDetails, isHash: true, hashLen: bits.length, subtype:'hash' + bits.length };
 }
 
 

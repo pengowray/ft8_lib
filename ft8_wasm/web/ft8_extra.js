@@ -1156,9 +1156,9 @@ function bitsToCallDetails(bits, extraBit = "") {
         //result.callsign = "<...>";
         const subBits = hashValue.toString(2).padStart(22, '0');
         result.isHash = true;
-        //result.value = hashBitsPrettyZ32(subBits);
         result.hashBits = subBits;
         result.hashLen = 22;
+        result.value = hashBitsPrettyZ32(subBits); // for bit viz display
 
         //result.rawAppend = `22-bit hash: ${hashBitsPretty(subBits)} (=${hashBitsTo22styleBase10(subBits)})`;
 
@@ -1223,9 +1223,7 @@ function bitsToCallDetails(bits, extraBit = "") {
         result.hashLen = hashBits?.length; // 22
         result.isHash = false;
 
-        ///switcheroo
         result.callsign = result.value;
-        result.value = null;
     }
 
     return result;
@@ -1284,7 +1282,7 @@ function bitsToHash(bits) {
 
     // desc: 'Displayed in Z-Base32 encoding'
     //note: hashBits may be overriden by matchDetails.hashBits, which will have the full 22 bits if a match is found
-    return { hashBits: bits, ...matchDetails, isHash: true, hashLen: bits.length, subtype:'hash' + bits.length };
+    return { hashBits: bits, value: hashBitsPrettyZ32(bits), ...matchDetails, isHash: true, hashLen: bits.length, subtype:'hash' + bits.length };
 }
 
 
@@ -1516,6 +1514,7 @@ function bitsToNonstandardCallDetails(bits, message) {
 
     return { 
         callsign, 
+        value: callsign,
         subtype: 'non-standard callsign',
         hashBits,
         isHash: false,

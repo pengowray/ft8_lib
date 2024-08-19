@@ -639,12 +639,6 @@ body:not(.dark-mode) #piano-roll {
     word-break: break-all;
 }
 
-.output-verbatim { /* e.g. when need to keep spaces, e.g. for echoing user input */
-    font-family: "Atkinson Hyperlegible", monospace, sans-serif;
-    white-space: pre-wrap;
-    word-break: break-all;
-}
-
 .output-field,
 .output-call {
     font-size: 1.1em;

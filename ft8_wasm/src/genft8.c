@@ -14,8 +14,7 @@
 int calculate_num_samples(int n_sym, float symbol_period, int signal_rate)
 {
     int n_spsym = (int)(0.5f + signal_rate * symbol_period);
-    int n_ramp = n_spsym / 8;
-    return (n_sym * n_spsym) + (2 * n_ramp);
+    return (n_sym * n_spsym);
 }
 
 void gfsk_pulse(int n_spsym, float symbol_bt, float* pulse)
@@ -29,108 +28,91 @@ void gfsk_pulse(int n_spsym, float symbol_bt, float* pulse)
     }
 }
 
+//void synth_gfsk_custom(const char* symbols, float f0_given, const float* custom_tones, float symbol_bt, float symbol_period, int signal_rate, float* signal, float* dphi_out, int* metadata_length, char** metadata_json)
+//{
+//    synth_gfsk_custom(symbols, f0_given, custom_tones, symbol_bt, symbol_period, signal_rate, 0, 0, signal, dphi_out, metadata_length, metadata_json);
+//}
+
 EMSCRIPTEN_KEEPALIVE
-void synth_gfsk_custom(const uint8_t* symbols, int n_sym, float f0, const float* custom_tones, float symbol_bt, float symbol_period, int signal_rate, float* signal, float* dphi_out, int* metadata_length, char** metadata_json)
+void synth_gfsk_custom(const char* symbols, float f0_given, const float* custom_tones, float symbol_bt, float symbol_period, int signal_rate, int n_start_delay, int n_end_extension, float* signal, float* dphi_out, int* metadata_length, char** metadata_json)
 {
+    int n_sym = strlen(symbols);
     int n_spsym = (int)(0.5f + signal_rate * symbol_period);
     int n_ramp = n_spsym / 8;
-    int n_total = calculate_num_samples(n_sym, symbol_period, signal_rate);
-    int n_wave = n_sym * n_spsym;
-    float hmod = 1.0f;
+    int n_total = n_start_delay + (n_sym * n_spsym) + n_end_extension; // should match calculate_num_samples() + start + end
     float tone_spacing = custom_tones ? (custom_tones[1] - custom_tones[0]) : FT8_TONE_SPACING;
-    float dphi_peak = 2 * M_PI * hmod / n_spsym;
 
-    float* extended_signal = (float*)malloc(n_total * sizeof(float));
-    float* dphi = (float*)malloc((n_total + 2 * n_spsym) * sizeof(float));
-
-    // Calculate absolute frequencies
     float frequencies[FT8_TONE_COUNT];
+    float dphi_per_frequency[FT8_TONE_COUNT];
+    float f0 = f0_given;
     float min_freq = custom_tones ? custom_tones[0] : f0;
-    float max_freq = custom_tones ? custom_tones[0] : f0;
-    for (int i = 0; i < FT8_TONE_COUNT; i++) {
-        if (custom_tones) {
-            frequencies[i] = custom_tones[i];
-        } else {
-            frequencies[i] = f0 + i * FT8_TONE_SPACING;
-        }
-        if (frequencies[i] < min_freq) min_freq = frequencies[i];
-        if (frequencies[i] > max_freq) max_freq = frequencies[i];
-    }
+    float max_freq = custom_tones ? custom_tones[FT8_TONE_COUNT - 1] : f0 + (FT8_TONE_COUNT - 1) * FT8_TONE_SPACING;
 
-    // Initialize dphi with base frequency
-    for (int i = 0; i < n_total + 2 * n_spsym; ++i)
-    {
-        dphi[i] = 2 * M_PI * f0 / signal_rate;
+    for (int i = 0; i < FT8_TONE_COUNT; i++) {
+        frequencies[i] = custom_tones ? custom_tones[i] : (f0 + i * FT8_TONE_SPACING);
+        dphi_per_frequency[i] = 2 * M_PI * (frequencies[i] - f0) / signal_rate;
     }
 
     float* pulse = (float*)malloc(3 * n_spsym * sizeof(float));
     gfsk_pulse(n_spsym, symbol_bt, pulse);
 
-    // Apply frequency changes for each symbol
-    if (custom_tones) {
-        for (int i = 0; i < n_sym; ++i)
-        {
-            int ib = i * n_spsym + n_ramp;
-            float symbol_freq = custom_tones ? custom_tones[symbols[i]] : (f0 + symbols[i] * tone_spacing);
-            float symbol_dphi = 2 * M_PI * (symbol_freq - f0) / signal_rate;
-
-            for (int j = 0; j < 3 * n_spsym; ++j)
-            {
-                dphi[j + ib] += symbol_dphi * pulse[j];
-            }
-        }
-    } else {
-        for (int i = 0; i < n_sym; ++i)
-        {
-            int ib = i * n_spsym + n_ramp;
-            for (int j = 0; j < 3 * n_spsym; ++j)
-            {
-                dphi[j + ib] += dphi_peak * symbols[i] * pulse[j];
-            }
-        }
-    }    
-    // Apply ramps at the beginning and end
-    for (int j = 0; j < 2 * n_spsym; ++j)
-    {
-        dphi[j] += dphi_peak * pulse[j + n_spsym] * symbols[0];
-        dphi[j + n_total - 2 * n_spsym] += dphi_peak * pulse[j] * symbols[n_sym - 1];
-    }
-
-    // Generate the signal
     float phi = 0;
-    for (int k = 0; k < n_total; ++k)
-    {
-        extended_signal[k] = sinf(phi);
-        phi = fmodf(phi + dphi[k], 2 * M_PI);
-    }
+    for (int k = 0; k < n_total; ++k) {
+        int symbol_index = (k - n_start_delay) / n_spsym;
+        int sample_in_symbol = (k - n_start_delay) % n_spsym;
+        
+        float signal_level = 0;
+        float dphi = 2 * M_PI * f0 / signal_rate;
 
-    // Apply envelope shaping
-    for (int i = 0; i < n_ramp; ++i)
-    {
-        float env = (1 - cosf(2 * M_PI * i / (2 * n_ramp))) / 2;
-        extended_signal[i] *= env;
-        extended_signal[n_total - 1 - i] *= env;
-    }
+        if (k >= n_start_delay && k < (n_total - n_end_extension)) {
+            char current_symbol = symbols[symbol_index];
+            char prev_symbol = (symbol_index > 0) ? symbols[symbol_index - 1] : current_symbol;
+            char next_symbol = (symbol_index < n_sym - 1) ? symbols[symbol_index + 1] : current_symbol;
 
-    memcpy(signal, extended_signal, n_total * sizeof(float));
+            if (current_symbol != '-') {
+                int tone_index = current_symbol - '0';
+                dphi += dphi_per_frequency[tone_index];
 
-    if (dphi_out != NULL)
-    {
-        memcpy(dphi_out, dphi + n_ramp, n_total * sizeof(float));
+                for (int j = -1; j <= 1; ++j) {
+                    int pulse_index = sample_in_symbol + (j + 1) * n_spsym;
+                    if (pulse_index >= 0 && pulse_index < 3 * n_spsym) {
+                        char symbol_to_use;
+                        if (j == -1 && sample_in_symbol < n_ramp) {
+                            symbol_to_use = current_symbol;
+                        } else if (j == 1 && sample_in_symbol >= (n_spsym - n_ramp)) {
+                            symbol_to_use = current_symbol;
+                        } else {
+                            symbol_to_use = (j == -1) ? prev_symbol : (j == 1) ? next_symbol : current_symbol;
+                        }
+                        
+                        if (symbol_to_use != '-') {
+                            int adj_tone_index = symbol_to_use - '0';
+                            signal_level += (dphi_per_frequency[adj_tone_index] - dphi_per_frequency[tone_index]) * pulse[pulse_index];
+                        }
+                    }
+                }
+
+                float envelope = 1.0f;
+                if (sample_in_symbol < n_ramp) {
+                    envelope = (1 - cosf(M_PI * sample_in_symbol / n_ramp)) / 2;
+                } else if (sample_in_symbol >= (n_spsym - n_ramp)) {
+                    envelope = (1 - cosf(M_PI * (n_spsym - sample_in_symbol - 1) / n_ramp)) / 2;
+                }
+                signal_level *= envelope;
+            }
+        }
+
+        signal[k] = sinf(phi) * signal_level;
+        phi = fmodf(phi + dphi, 2 * M_PI);
+        if (dphi_out) {
+            dphi_out[k] = dphi;
+        }
     }
 
     // Generate metadata JSON
-    if (metadata_json != NULL && metadata_length != NULL)
-    {
-        // Convert symbols to a string of digits
-        char* symbols_str = (char*)malloc(n_sym + 1);
-        for (int i = 0; i < n_sym; i++) {
-            symbols_str[i] = '0' + symbols[i];
-        }
-        symbols_str[n_sym] = '\0';
-
-        char* json = (char*)malloc(2048 + n_sym);  // Increased size to accommodate symbols string
-        int len = snprintf(json, 2048 + n_sym,
+    if (metadata_json != NULL && metadata_length != NULL) {
+        char* json = (char*)malloc(2048);
+        int len = snprintf(json, 2048,
             "{"
             "\"sample_rate\": %d,"
             "\"symbol_count\": %d,"
@@ -143,30 +125,17 @@ void synth_gfsk_custom(const uint8_t* symbols, int n_sym, float f0, const float*
             "\"first_symbol_start\": %d,"
             "\"last_symbol_end\": %d,"
             "\"ramp_length\": %d,"
-            "\"total_samples\": %d,"
-            "\"symbols\": \"%s\""
+            "\"total_samples\": %d"
             "}",
             signal_rate, n_sym, symbol_period, symbol_bt, f0,
             min_freq, max_freq,
             frequencies[0], frequencies[1], frequencies[2], frequencies[3],
             frequencies[4], frequencies[5], frequencies[6], frequencies[7],
-            n_ramp, n_total - n_ramp, n_ramp, n_total,
-            symbols_str
+            n_start_delay, n_total - n_end_extension, n_ramp, n_total
         );
         *metadata_json = json;
         *metadata_length = len;
-
-        free(symbols_str);
     }
 
-    free(extended_signal);
-    free(dphi);
     free(pulse);
-}
-
-// Function with original signature that calculates default FT8 frequencies
-EMSCRIPTEN_KEEPALIVE
-void synth_gfsk(const uint8_t* symbols, int n_sym, float f0, float symbol_bt, float symbol_period, int signal_rate, float* signal, float* dphi_out, int* metadata_length, char** metadata_json)
-{
-    synth_gfsk_custom(symbols, n_sym, f0, NULL, symbol_bt, symbol_period, signal_rate, signal, dphi_out, metadata_length, metadata_json);
 }

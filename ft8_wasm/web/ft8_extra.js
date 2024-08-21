@@ -840,61 +840,6 @@ function hexToBinary(hex) {
   ).join('').replace(/^0*/g, '');
 }
 
-function messageToPackedData(message) {
-    const resultPtr = Module.ccall('encodeFT8Message', 'number', ['string'], [message]);
-    if (resultPtr === 0) {
-        return {
-            success: false,
-            errorCode: -1,
-            errorMessage: "Failed to allocate memory for result"
-        };
-    }
-
-    const result = {
-        data: Module.getValue(resultPtr, '*'),
-        size: Module.getValue(resultPtr + 4, 'i32'),
-        errorCode: Module.getValue(resultPtr + 8, 'i32'),
-        errorMessage: Module.getValue(resultPtr + 12, '*')
-    };
-
-    let returnObject;
-
-    if (result.errorCode !== 0) {
-        returnObject = {
-            success: false,
-            errorCode: result.errorCode,
-            errorMessage: Module.UTF8ToString(result.errorMessage)
-        };
-    } else {
-        const packedData = new Uint8Array(Module.HEAPU8.buffer, result.data, result.size);
-        returnObject = {
-            success: true,
-            data: new Uint8Array(packedData)
-        };
-    }
-
-    Module.ccall('freeFT8EncodeResult', 'void', ['number'], [resultPtr]);
-    
-    return returnObject;
-}
-
-function packedDataToSymbolsArray(packedData) {
-    const symbolsPtr = Module.ccall('packedToSymbols', 'number', ['array'], [packedData]);
-    const symbols = new Uint8Array(Module.HEAPU8.buffer, symbolsPtr, FT8_NN);
-    const result = new Uint8Array(symbols);
-    Module._free(symbolsPtr);
-    return result;
-}
-
-function packedDataToSymbols(packedData) {
-    const symbolsPtr = Module.ccall('packedToSymbols', 'number', ['array'], [packedData]);
-    const symbols = new Uint8Array(Module.HEAPU8.buffer, symbolsPtr, FT8_NN);
-    const result = new Uint8Array(symbols);
-    Module._free(symbolsPtr);
-    
-    return arrayToSymbols(result);
-}
-
 function arrayToSymbols(toneArray) {
   // Convert the Uint8Array to a regular array of numbers
   const numbers = Array.from(toneArray);
@@ -919,7 +864,7 @@ function symbolsToArray(toneString) {
 
 function symbolsToPackedData(symbolsText) {
   // returns Uint8Array
-  
+
   const messageBits = symbolsToBitsStrNoCosta(symbolsText).slice(0, 77).padEnd(80, '0');
   const packedData = new Uint8Array(10);
   
@@ -954,18 +899,6 @@ function symbolsToAudio(symbols, baseFreq, sampleRate) {
 
 const encodeFT8 = Module.cwrap('encodeFT8', 'number', ['string', 'number', 'number']);
 const freeFT8Result = Module.cwrap('freeFT8Result', null, ['number']);
-//const decodeFT8Symbols = Module.cwrap('decodeFT8Symbols', 'string', ['number', 'number']);
-//const decodeFT8PackedData = Module.cwrap('decodeFT8PackedData', 'string', ['number', 'number']);
-const decodeFT8Symbols = (symbolsPtr, length) => {
-    const resultPtr = Module.ccall('decodeFT8Symbols', 'number', ['number', 'number'], [symbolsPtr, length]);
-    if (resultPtr === 0) {
-        console.error("Decoding failed");
-        return null;
-    }
-    const result = Module.UTF8ToString(resultPtr);
-    Module._free(resultPtr);
-    return result;
-};
 
 const decodeFT8PackedData = (packedData) => {
     const packedDataArray = new Uint8Array(packedData);
@@ -1159,8 +1092,7 @@ function bitsToCallDetails(bits, extraBit = "") {
         result.hashBits = subBits;
         result.hashLen = 22;
         result.value = hashBitsPrettyZ32(subBits); // for bit viz display
-
-        //result.rawAppend = `22-bit hash: ${hashBitsPretty(subBits)} (=${hashBitsTo22styleBase10(subBits)})`;
+        result.rawAppend = `22-bit hash: ${hashBitsPretty(subBits)} (=${hashBitsTo22styleBase10(subBits)})`;
 
         const matchDetails = hashMatchDetails(subBits);
         if (matchDetails) result = {...result, ...matchDetails};

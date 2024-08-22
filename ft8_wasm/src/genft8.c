@@ -67,8 +67,10 @@ void synth_gfsk_custom(const char* symbols, float f0_given, const float* custom_
 
         if (k >= n_start_delay && k < (n_total - n_end_extension)) {
             char current_symbol = symbols[symbol_index];
-            char prev_symbol = (symbol_index > 0) ? symbols[symbol_index - 1] : current_symbol;
-            char next_symbol = (symbol_index < n_sym - 1) ? symbols[symbol_index + 1] : current_symbol;
+            char prev_symbol_tone = (symbol_index > 0) ? symbols[symbol_index - 1] : current_symbol;
+            char next_symbol_tone = (symbol_index < n_sym - 1) ? symbols[symbol_index + 1] : current_symbol;
+            char prev_symbol_env = (symbol_index > 0) ? symbols[symbol_index - 1] : '-';
+            char next_symbol_env = (symbol_index < n_sym - 1) ? symbols[symbol_index + 1] : '-';
 
             if (current_symbol != '-') {
                 int tone_index = current_symbol - '0';
@@ -83,7 +85,7 @@ void synth_gfsk_custom(const char* symbols, float f0_given, const float* custom_
                         } else if (j == 1 && sample_in_symbol >= (n_spsym - n_ramp)) {
                             symbol_to_use = current_symbol;
                         } else {
-                            symbol_to_use = (j == -1) ? prev_symbol : (j == 1) ? next_symbol : current_symbol;
+                            symbol_to_use = (j == -1) ? prev_symbol_tone : (j == 1) ? next_symbol_tone : current_symbol;
                         }
                         
                         if (symbol_to_use != '-') {
@@ -94,9 +96,9 @@ void synth_gfsk_custom(const char* symbols, float f0_given, const float* custom_
                 }
 
                 float envelope = 1.0f;
-                if (sample_in_symbol < n_ramp) {
+                if (prev_symbol_env == '-' && sample_in_symbol < n_ramp) {
                     envelope = (1 - cosf(M_PI * sample_in_symbol / n_ramp)) / 2;
-                } else if (sample_in_symbol >= (n_spsym - n_ramp)) {
+                } else if (next_symbol_env == '-' && sample_in_symbol >= (n_spsym - n_ramp)) {
                     envelope = (1 - cosf(M_PI * (n_spsym - sample_in_symbol - 1) / n_ramp)) / 2;
                 }
                 signal_level *= envelope;

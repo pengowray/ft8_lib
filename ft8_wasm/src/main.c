@@ -33,6 +33,7 @@ typedef struct {
     float* audio;
     int audio_samples;
     float* dphi;
+    float* levels;
     char* decoded_text;
     char* metadata;
     int metadata_length;
@@ -321,9 +322,10 @@ FT8Result* symbolsToAudio(const char* symbols, float base_freq, int sample_rate)
     result->audio_samples = calculate_num_samples(count, FT8_SYMBOL_PERIOD, sample_rate);
     result->audio = (float*)malloc(result->audio_samples * sizeof(float));
     result->dphi = (float*)malloc(result->audio_samples * sizeof(float));
+    result->levels = (float*)malloc(result->audio_samples * sizeof(float));
 
     synth_gfsk_custom(symbols, base_freq, 0, FT8_SYMBOL_BT, FT8_SYMBOL_PERIOD, sample_rate, 0, 0, 
-               result->audio, result->dphi, &result->metadata_length, &result->metadata);
+               result->audio, result->dphi, result->levels, &result->metadata_length, &result->metadata);
 
     return result;
 }

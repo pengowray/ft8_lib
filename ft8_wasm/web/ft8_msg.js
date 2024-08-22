@@ -100,6 +100,10 @@ class FT8Message extends EventTarget {
       this.symbolPeriod = null; // 0.160
       //this.numOfSymbols = null; // 79 (todo)
 
+      this.audioSamples = null;
+      this.dphiSamples = null;
+      this.levelsSamples = null;
+
       // for playing
       this.isPlaying = false; // == (audioSource != null)
       this.playStartTime = null;
@@ -265,7 +269,7 @@ class FT8Message extends EventTarget {
 
         if (this.symbolsText == null && this.packedData != null) {
             this.symbolsText = packedDataToSymbolsArray(this.packedData);
-            
+
         } else if (this.packedData == null && this.symbolsText != null) {
             //console.log("empty packed data, generating from symbols");
             this.packedData = symbolsToPackedData(this.symbolsText);
@@ -301,6 +305,7 @@ class FT8Message extends EventTarget {
     clearAudioData() {
         this.audioSamples = null;
         this.dphiSamples = null;
+        this.levelsSamples = null;
         //this.metadata = null;
         this.audioBuffer = null;
         this.channelData = null;
@@ -472,7 +477,8 @@ class FT8Message extends EventTarget {
         // Allocate memory for audio and dphi
         const audioPtr = Module._malloc(numSamples * 4);
         const dphiPtr = Module._malloc(numSamples * 4);
-    
+        const levelsPtr = Module._malloc(numSamples * 4);
+
         // Allocate memory for metadata
         const metadataLengthPtr = Module._malloc(4);
         const metadataJsonPtrPtr = Module._malloc(4);
@@ -494,7 +500,7 @@ class FT8Message extends EventTarget {
                 symbolsPtr, options.baseFrequency, toneOffsetsPtr,
                 options.symbolBT, options.symbolPeriod, options.sampleRate,
                 n_start_delay, n_end_extension,
-                audioPtr, dphiPtr, metadataLengthPtr, metadataJsonPtrPtr
+                audioPtr, dphiPtr, levelsPtr, metadataLengthPtr, metadataJsonPtrPtr
             );
     
             Module._free(toneOffsetsPtr);
@@ -504,17 +510,21 @@ class FT8Message extends EventTarget {
                 symbolsPtr, options.baseFrequency, 0, // Pass 0 for custom_tones when using default
                 options.symbolBT, options.symbolPeriod, options.sampleRate,
                 n_start_delay, n_end_extension,
-                audioPtr, dphiPtr, metadataLengthPtr, metadataJsonPtrPtr
+                audioPtr, dphiPtr, levelsPtr, metadataLengthPtr, metadataJsonPtrPtr
             );
         }
     
         const audio = new Float32Array(Module.HEAPF32.buffer, audioPtr, numSamples);
         const dphi = new Float32Array(Module.HEAPF32.buffer, dphiPtr, numSamples);
+        const levels = new Float32Array(Module.HEAPF32.buffer, levelsPtr, numSamples);
         this.audioSamples = Array.from(audio);
     
         const dphiArray = Array.from(dphi);
         this.dphiSamples = scaleToRange(dphiArray, 190, 10);
-    
+
+        const levelsArray = Array.from(levels);
+        this.levelsSamples = scaleToRange(levelsArray, 190, 10);
+
         const metadataLength = Module.HEAP32[metadataLengthPtr / 4];
         const metadataJsonPtr = Module.HEAP32[metadataJsonPtrPtr / 4];
         const metadataStr = Module.UTF8ToString(metadataJsonPtr, metadataLength);
@@ -529,6 +539,7 @@ class FT8Message extends EventTarget {
             Module._free(symbolsPtr);
             Module._free(audioPtr);
             Module._free(dphiPtr);
+            Module._free(levelsPtr);
             Module._free(metadataLengthPtr);
             Module._free(metadataJsonPtrPtr);
             Module._free(metadataJsonPtr);
@@ -650,6 +661,7 @@ function doDetectInputType(inputOriginal) {
  */
 function scaleToRange(numbers, newMin, newMax) {
     const { min: originalMin, max: originalMax } = findMinAndMax(numbers);
+    console.log("min/max:", originalMin, originalMax);
     const scale = (newMax - newMin) / (originalMax - originalMin);
     
     return numbers.map(num => (num - originalMin) * scale + newMin);

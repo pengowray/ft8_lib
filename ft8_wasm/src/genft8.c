@@ -8,6 +8,7 @@
 
 #define GFSK_CONST_K 5.336446f
 #define FT8_SYMBOL_BT 2.0f
+
 #define FT8_TONE_SPACING 6.25f
 #define FT8_TONE_COUNT 8
 
@@ -35,7 +36,10 @@ void gfsk_pulse(int n_spsym, float symbol_bt, float* pulse)
 
 
 EMSCRIPTEN_KEEPALIVE
-void synth_gfsk_custom(const char* symbols, float f0_given, const float* custom_tones, float symbol_bt, float symbol_period, int signal_rate, int n_start_delay, int n_end_extension, float* signal, float* dphi_out, int* metadata_length, char** metadata_json)
+void synth_gfsk_custom 
+        (const char* symbols, float f0_given, const float* custom_tones, float symbol_bt, 
+        float symbol_period, int signal_rate, int n_start_delay, int n_end_extension, 
+        float* signal, float* dphi_out, float* levels_out, int* metadata_length, char** metadata_json)
 {
     int n_sym = strlen(symbols);
     int n_spsym = (int)(0.5f + signal_rate * symbol_period);
@@ -43,9 +47,11 @@ void synth_gfsk_custom(const char* symbols, float f0_given, const float* custom_
     int n_total = n_start_delay + (n_sym * n_spsym) + n_end_extension;
     float tone_spacing = custom_tones ? (custom_tones[1] - custom_tones[0]) : FT8_TONE_SPACING;
 
-    float frequencies[FT8_TONE_COUNT]; // = custom_tones or generated
+    float frequencies[FT8_TONE_COUNT];
     for (int i = 0; i < FT8_TONE_COUNT; i++) {
-        //TODO: option to start at f0_given or not
+        //TODO: option to start at f0_given or at 1st tone spacing
+        //note: custom_tones are actually frequencies
+        
         //float freq = custom_tones ? custom_tones[i] : (f0_given + i * FT8_TONE_SPACING);
         float freq = custom_tones ? custom_tones[i] : (f0_given + (i+1) * FT8_TONE_SPACING);
         frequencies[i] = freq;
@@ -87,6 +93,7 @@ void synth_gfsk_custom(const char* symbols, float f0_given, const float* custom_
 
     float phi = 0; // rename: phase (?)
     float freq = firstFreq;
+
     for (int k = 0; k < n_total; ++k) {
         int symbol_index = (k - n_start_delay) / n_spsym;
         int sample_in_symbol = (k - n_start_delay) % n_spsym;
@@ -97,8 +104,9 @@ void synth_gfsk_custom(const char* symbols, float f0_given, const float* custom_
         //float dphi = 0;
         //float dfreq = 0;
         float target_freq = freq; // will be replaced
-        float pulse_drive = 0;
+        float inst_freq = freq; // will be replaced
         float envelope = 1.0f;
+        float pulse_drive = 0;
 
         if (k >= n_start_delay && k < (n_total - n_end_extension)) {
             char curr_symbol = symbols[symbol_index];
@@ -119,12 +127,12 @@ void synth_gfsk_custom(const char* symbols, float f0_given, const float* custom_
                 } else {
                     float prev_tone = frequencies[prev_symbol - '0'];
                     float curr_tone = frequencies[curr_symbol - '0'];
-                    float change = curr_tone - prev_tone;
-                    
-                    pulse_drive = pulse[sample_in_symbol + n_spsym];
-                    //pulse_drive += pulse[sample_in_symbol]; // unsure
-
+                    pulse_drive = pulse[n_spsym - sample_in_symbol];
+                    //pulse_drive = pulse[sample_in_symbol];
                     target_freq = curr_tone;
+                    inst_freq = prev_tone + (curr_tone - prev_tone) * pulse_drive;
+                    
+
                 }
 
             } else {
@@ -141,17 +149,19 @@ void synth_gfsk_custom(const char* symbols, float f0_given, const float* custom_
                     float curr_tone = frequencies[curr_symbol - '0'];
                     float change = next_tone - curr_tone;
                     
-                    pulse_drive = pulse[sample_in_symbol + n_spsym];
-                    //pulse_drive += pulse[sample_in_symbol + n_spsym * 2]; // unsure
-
+                    pulse_drive = pulse[n_spsym + sample_in_symbol];
+                    //pulse_drive = pulse[sample_in_symbol + n_spsym];
+                    //pulse_drive = pulse[sample_in_symbol + n_spsym * 2]; // unsure
                     target_freq = next_tone;
+                    inst_freq = curr_tone + (next_tone - curr_tone) * pulse_drive;
+
                 }
 
             }
 
         }
         
-        float inst_freq = freq + (target_freq - freq) * pulse_drive;
+        //float inst_freq = freq + (target_freq - freq) * pulse_drive;
         float dphi = 2 * M_PI * inst_freq / signal_rate;
         //float dphi = inst_freq * dphi_peak; // == above?
 
@@ -161,6 +171,10 @@ void synth_gfsk_custom(const char* symbols, float f0_given, const float* custom_
         if (dphi_out) {
             dphi_out[k] = dphi;
             //dphi_out[k] = signal_level; // for testing TODO: make separate output
+        }
+
+        if (levels_out) {
+            levels_out[k] = signal_level;
         }
     }
 

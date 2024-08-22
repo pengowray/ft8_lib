@@ -43,72 +43,117 @@ void synth_gfsk_custom(const char* symbols, float f0_given, const float* custom_
     int n_total = n_start_delay + (n_sym * n_spsym) + n_end_extension;
     float tone_spacing = custom_tones ? (custom_tones[1] - custom_tones[0]) : FT8_TONE_SPACING;
 
-    float frequencies[FT8_TONE_COUNT];
+    float frequencies[FT8_TONE_COUNT]; // = custom_tones or generated
+    for (int i = 0; i < FT8_TONE_COUNT; i++) {
+        //TODO: option to start at f0_given or not
+        //float freq = custom_tones ? custom_tones[i] : (f0_given + i * FT8_TONE_SPACING);
+        float freq = custom_tones ? custom_tones[i] : (f0_given + (i+1) * FT8_TONE_SPACING);
+        frequencies[i] = freq;
+    }
+
+    float min_freq = frequencies[0];
+    float max_freq = frequencies[FT8_TONE_COUNT - 1];
+    for (int i = 0; i < FT8_TONE_COUNT; i++) {
+        float freq = frequencies[i];
+        if (freq < min_freq) min_freq = freq;
+        if (freq > max_freq) max_freq = freq;
+    }
+
     float dphi_per_frequency[FT8_TONE_COUNT];
     float f0 = f0_given;
-    float min_freq = custom_tones ? custom_tones[0] : f0;
-    float max_freq = custom_tones ? custom_tones[FT8_TONE_COUNT - 1] : f0 + (FT8_TONE_COUNT - 1) * FT8_TONE_SPACING;
+    //float f0 = min_freq;
+    //float f0 = min_freq - FT8_TONE_SPACING;
+    float f0_dphi = 2 * M_PI * f0 / signal_rate; // base/default phase delta
+    float hmod = 1.0f;
+    float dphi_peak = 2 * M_PI * hmod / n_spsym;
 
     for (int i = 0; i < FT8_TONE_COUNT; i++) {
-        frequencies[i] = custom_tones ? custom_tones[i] : (f0 + i * FT8_TONE_SPACING);
-        dphi_per_frequency[i] = 2 * M_PI * (frequencies[i] - f0) / signal_rate;
+        float freq = frequencies[i];
+        //dphi_per_frequency[i] = 2 * M_PI * (f0_dphi - f0) / signal_rate;
+        dphi_per_frequency[i] = 2 * M_PI * freq / signal_rate;
+    }
+
+    float firstTone = frequencies[0];
+    for (int i; i < n_sym; i++) {
+        char symbol = symbols[i];
+        if (symbol != '-') {
+            firstTone = frequencies[symbol - '0'];
+            break;
+        }
     }
 
     float* pulse = (float*)malloc(3 * n_spsym * sizeof(float));
     gfsk_pulse(n_spsym, symbol_bt, pulse);
 
     float phi = 0;
+    float tone = firstTone;
     for (int k = 0; k < n_total; ++k) {
         int symbol_index = (k - n_start_delay) / n_spsym;
         int sample_in_symbol = (k - n_start_delay) % n_spsym;
         
         float signal_level = 1;
-        float dphi = 2 * M_PI * f0 / signal_rate;
+        //float dphi = 2 * M_PI * f0 / signal_rate;
+        float dphi = 0;
+        float dfreq = 0;
 
         if (k >= n_start_delay && k < (n_total - n_end_extension)) {
-            char current_symbol = symbols[symbol_index];
-            char prev_symbol_tone = (symbol_index > 0) ? symbols[symbol_index - 1] : current_symbol;
-            char next_symbol_tone = (symbol_index < n_sym - 1) ? symbols[symbol_index + 1] : current_symbol;
-            char prev_symbol_env = (symbol_index > 0) ? symbols[symbol_index - 1] : '-';
-            char next_symbol_env = (symbol_index < n_sym - 1) ? symbols[symbol_index + 1] : '-';
+            
+            char curr_symbol = symbols[symbol_index];
+            //char prev_symbol_tone = (symbol_index > 0) ? symbols[symbol_index - 1] : curr_symbol;
+            //char next_symbol_tone = (symbol_index < n_sym - 1) ? symbols[symbol_index + 1] : curr_symbol;
+            char prev_symbol = (symbol_index > 0) ? symbols[symbol_index - 1] : '-';
+            char next_symbol = (symbol_index < n_sym - 1) ? symbols[symbol_index + 1] : '-';
 
-            if (current_symbol != '-') {
-                int tone_index = current_symbol - '0';
-                dphi += dphi_per_frequency[tone_index];
+            if (curr_symbol == '-') {
+                signal_level = 0;
+                dphi = f0_dphi; //TODO: use previous tone / switch to next tone half way
+            } else {
+                //fallback if no tones
+                float base_dphi = curr_symbol == '-' ? f0_dphi : dphi_per_frequency[curr_symbol - '0'];
 
-                for (int j = -1; j <= 1; ++j) {
-                    int pulse_index = sample_in_symbol + (j + 1) * n_spsym;
-                    if (pulse_index >= 0 && pulse_index < 3 * n_spsym) {
-                        char symbol_to_use;
-                        if (j == -1 && sample_in_symbol < n_ramp) {
-                            symbol_to_use = current_symbol;
-                        } else if (j == 1 && sample_in_symbol >= (n_spsym - n_ramp)) {
-                            symbol_to_use = current_symbol;
-                        } else {
-                            symbol_to_use = (j == -1) ? prev_symbol_tone : (j == 1) ? next_symbol_tone : current_symbol;
-                        }
-                        
-                        if (symbol_to_use != '-') {
-                            int adj_tone_index = symbol_to_use - '0';
-                            signal_level += (dphi_per_frequency[adj_tone_index] - dphi_per_frequency[tone_index]) * pulse[pulse_index];
-                        }
-                    }
+                // actually dphi (not tone frequency)
+                float prev_tone = prev_symbol == '-' ? base_dphi : dphi_per_frequency[prev_symbol - '0'];
+                float curr_tone = curr_symbol == '-' ? base_dphi : dphi_per_frequency[curr_symbol - '0'];
+                float next_tone = next_symbol == '-' ? base_dphi : dphi_per_frequency[next_symbol - '0'];
+
+                // impulse responses at current sample
+                float prev_level = (prev_symbol == '-') ? 0 : pulse[sample_in_symbol];
+                float curr_level = (curr_symbol == '-') ? 0 : pulse[sample_in_symbol + n_spsym];
+                float next_level = (next_symbol == '-') ? 0 : pulse[sample_in_symbol + n_spsym * 2];
+
+                float total_level = prev_level + curr_level + next_level;
+                if (total_level == 0) {
+                    // no tone
+                    signal_level = 0;
+                    dphi = base_dphi;
+                } else {
+                    //weighted average?
+                    signal_level = 1;
+                    //signal_level = curr_level; // test
+                    dphi = ((prev_level * prev_tone) + (curr_level * curr_tone) + (next_level * next_tone)) / total_level;
+                    //dphi *= dphi_peak;
                 }
 
                 float envelope = 1.0f;
-                if (prev_symbol_env == '-' && sample_in_symbol < n_ramp) {
+                if (curr_symbol == '-') {
+                    envelope = 0;
+                } else if (prev_symbol == '-' && sample_in_symbol < n_ramp) {
                     envelope = (1 - cosf(M_PI * sample_in_symbol / n_ramp)) / 2;
-                } else if (next_symbol_env == '-' && sample_in_symbol >= (n_spsym - n_ramp)) {
+                } else if (next_symbol == '-' && sample_in_symbol >= (n_spsym - n_ramp)) {
                     envelope = (1 - cosf(M_PI * (n_spsym - sample_in_symbol - 1) / n_ramp)) / 2;
                 }
                 signal_level *= envelope;
             }
         }
 
-        signal[k] = sinf(phi) * signal_level;
+        //float dphi = 2 * M_PI * f0 / signal_rate
+
         phi = fmodf(phi + dphi, 2 * M_PI);
+        signal[k] = sinf(phi) * signal_level;
+
         if (dphi_out) {
             dphi_out[k] = dphi;
+            //dphi_out[k] = signal_level; // for testing TODO: make separate output
         }
     }
 
@@ -139,6 +184,6 @@ void synth_gfsk_custom(const char* symbols, float f0_given, const float* custom_
         *metadata_json = json;
         *metadata_length = len;
     }
-
+    
     free(pulse);
 }

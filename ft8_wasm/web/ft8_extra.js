@@ -1,3 +1,4 @@
+
 // Free text character table
 const FT8_CHAR_TABLE_FULL = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+-./?";
 
@@ -883,58 +884,7 @@ function symbolsToPackedData(symbolsText) {
   return packedData;
 }
 
-function symbolsToAudio(symbols, baseFreq, sampleRate) {
-    const symbolArray = symbolsToArray(symbols);
-    const resultPtr = Module.ccall('symbolsToAudio', 'number', ['array', 'number', 'number'], [symbolArray, baseFreq, sampleRate]);
-    const result = {
-        symbols: new Uint8Array(Module.HEAPU8.buffer, Module.getValue(resultPtr + 8, '*'), FT8_NN),
-        audio: new Float32Array(Module.HEAPF32.buffer, Module.getValue(resultPtr + 16, '*'), Module.getValue(resultPtr + 20, 'i32')),
-        dphi: new Float32Array(Module.HEAPF32.buffer, Module.getValue(resultPtr + 24, '*'), Module.getValue(resultPtr + 20, 'i32')),
-        metadata: Module.UTF8ToString(Module.getValue(resultPtr + 32, '*')),
-        metadata_length: Module.getValue(resultPtr + 36, 'i32')
-    };
-    Module._free(resultPtr);
-    return result;
-}
 
-const encodeFT8 = Module.cwrap('encodeFT8', 'number', ['string', 'number', 'number']);
-const freeFT8Result = Module.cwrap('freeFT8Result', null, ['number']);
-
-const decodeFT8PackedData = (packedData) => {
-    const packedDataArray = new Uint8Array(packedData);
-    const packedDataPtr = Module._malloc(packedDataArray.length);
-    Module.HEAPU8.set(packedDataArray, packedDataPtr);
-    
-    const resultPtr = Module.ccall('decodeFT8PackedData', 'number', ['number', 'number'], [packedDataPtr, packedDataArray.length]);
-    
-    Module._free(packedDataPtr);
-    
-    if (resultPtr === 0) {
-        return {
-            success: false,
-            result: 'error',
-            errorCode: -1,
-            errorMessage: "Failed to allocate memory for result"
-        };
-    }
-
-    const result = {
-        decodedText: Module.UTF8ToString(Module.getValue(resultPtr, '*')),
-        errorCode: Module.getValue(resultPtr + 4, 'i32'),
-        errorMessage: Module.UTF8ToString(Module.getValue(resultPtr + 8, '*'))
-    };
-
-    Module.ccall('freeFT8DecodeResult', 'void', ['number'], [resultPtr]);
-    
-    return {
-        success: result.errorCode === 0,
-        result: result.errorCode === 0 ? 'ok' : 'error',
-        resultText: result.errorCode === 0 ? 'ok' : 'error (' + result.errorCode + ')',
-        decodedText: result.decodedText,
-        errorCode: result.errorCode,
-        errorMessage: result.errorMessage
-    };
-};
 /**
  * Extracts the FT8 message type from packed message data.
  * 

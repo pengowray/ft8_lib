@@ -1,4 +1,4 @@
-//ft8_lib wrappers
+/* ft8_lib wrappers */
 
 function messageToPackedData(message) {
     const resultPtr = Module.ccall('encodeFT8Message', 'number', ['string'], [message]);
@@ -38,22 +38,12 @@ function messageToPackedData(message) {
     return returnObject;
 }
 
-//not used / should be removed
 function packedDataToSymbolsArray(packedData) {
     const symbolsPtr = Module.ccall('packedToSymbols', 'number', ['array'], [packedData]);
     const symbols = new Uint8Array(Module.HEAPU8.buffer, symbolsPtr, FT8_NN);
     const result = new Uint8Array(symbols);
     Module._free(symbolsPtr);
-    return result;
-}
-
-//not used
-function packedDataToSymbols(packedData) {
-    const symbolsPtr = Module.ccall('packedToSymbols', 'number', ['array'], [packedData]);
-    const symbols = new Uint8Array(Module.HEAPU8.buffer, symbolsPtr, FT8_NN);
-    const result = new Uint8Array(symbols);
-    Module._free(symbolsPtr);
-    
+    //return result;
     return arrayToSymbols(result);
 }
 
@@ -72,7 +62,7 @@ function symbolsToAudio(symbols, baseFreq, sampleRate) {
     return result;
 }
 
-const decodeFT8PackedData = (packedData) => {
+function decodeFT8FromPackedData(packedData) {
     const packedDataArray = new Uint8Array(packedData);
     const packedDataPtr = Module._malloc(packedDataArray.length);
     Module.HEAPU8.set(packedDataArray, packedDataPtr);
@@ -108,4 +98,12 @@ const decodeFT8PackedData = (packedData) => {
     };
 };
 
-const freeFT8Result = Module.cwrap('freeFT8Result', null, ['number']);
+function freeFT8Result() {
+    console.log("freeFT8Result");
+    Module.cwrap('freeFT8Result', null, ['number']);
+}
+
+function doFreeFT8Result() {
+    console.log("do freeFT8Result");
+    Module.cwrap('freeFT8Result', null, ['number']);
+}

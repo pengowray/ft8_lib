@@ -33,13 +33,14 @@ void gfsk_pulse(int n_spsym, float symbol_bt, float* pulse)
 //    synth_gfsk_custom(symbols, f0_given, custom_tones, symbol_bt, symbol_period, signal_rate, 0, 0, signal, dphi_out, metadata_length, metadata_json);
 //}
 
+
 EMSCRIPTEN_KEEPALIVE
 void synth_gfsk_custom(const char* symbols, float f0_given, const float* custom_tones, float symbol_bt, float symbol_period, int signal_rate, int n_start_delay, int n_end_extension, float* signal, float* dphi_out, int* metadata_length, char** metadata_json)
 {
     int n_sym = strlen(symbols);
     int n_spsym = (int)(0.5f + signal_rate * symbol_period);
     int n_ramp = n_spsym / 8;
-    int n_total = n_start_delay + (n_sym * n_spsym) + n_end_extension; // should match calculate_num_samples() + start + end
+    int n_total = n_start_delay + (n_sym * n_spsym) + n_end_extension;
     float tone_spacing = custom_tones ? (custom_tones[1] - custom_tones[0]) : FT8_TONE_SPACING;
 
     float frequencies[FT8_TONE_COUNT];
@@ -61,7 +62,7 @@ void synth_gfsk_custom(const char* symbols, float f0_given, const float* custom_
         int symbol_index = (k - n_start_delay) / n_spsym;
         int sample_in_symbol = (k - n_start_delay) % n_spsym;
         
-        float signal_level = 0;
+        float signal_level = 1;
         float dphi = 2 * M_PI * f0 / signal_rate;
 
         if (k >= n_start_delay && k < (n_total - n_end_extension)) {

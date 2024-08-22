@@ -43,6 +43,8 @@ void synth_gfsk_custom
 {
     int n_sym = strlen(symbols);
     int n_spsym = (int)(0.5f + signal_rate * symbol_period);
+    int n_half_left = n_spsym / 2;
+    int n_half_right = n_spsym - n_half_left;
     int n_ramp = n_spsym / 8;
     int n_total = n_start_delay + (n_sym * n_spsym) + n_end_extension;
     float tone_spacing = custom_tones ? (custom_tones[1] - custom_tones[0]) : FT8_TONE_SPACING;
@@ -127,10 +129,11 @@ void synth_gfsk_custom
                 } else {
                     float prev_tone = frequencies[prev_symbol - '0'];
                     float curr_tone = frequencies[curr_symbol - '0'];
-                    pulse_drive = pulse[n_spsym - sample_in_symbol];
+                    pulse_drive = pulse[n_half_left + sample_in_symbol];
                     //pulse_drive = pulse[sample_in_symbol];
                     target_freq = curr_tone;
-                    inst_freq = prev_tone + (curr_tone - prev_tone) * pulse_drive;
+                    inst_freq = prev_tone + (curr_tone - prev_tone) * pulse_drive * dphi_peak;
+                    //inst_freq = prev_tone * (1-pulse_drive) + curr_tone * pulse_drive;
                     
 
                 }
@@ -149,11 +152,12 @@ void synth_gfsk_custom
                     float curr_tone = frequencies[curr_symbol - '0'];
                     float change = next_tone - curr_tone;
                     
-                    pulse_drive = pulse[n_spsym + sample_in_symbol];
+                    pulse_drive = pulse[n_half_left + sample_in_symbol];
                     //pulse_drive = pulse[sample_in_symbol + n_spsym];
                     //pulse_drive = pulse[sample_in_symbol + n_spsym * 2]; // unsure
                     target_freq = next_tone;
-                    inst_freq = curr_tone + (next_tone - curr_tone) * pulse_drive;
+                    inst_freq = curr_tone + (next_tone - curr_tone) * pulse_drive * dphi_peak;
+                    //inst_freq = curr_tone * (1-pulse_drive) + next_tone * pulse_drive;
 
                 }
 
@@ -161,7 +165,9 @@ void synth_gfsk_custom
 
         }
         
-        //float inst_freq = freq + (target_freq - freq) * pulse_drive;
+        inst_freq = freq + (target_freq - freq) * pulse_drive * dphi_peak;
+        freq = inst_freq;
+
         float dphi = 2 * M_PI * inst_freq / signal_rate;
         //float dphi = inst_freq * dphi_peak; // == above?
 
@@ -170,11 +176,19 @@ void synth_gfsk_custom
 
         if (dphi_out) {
             dphi_out[k] = dphi;
-            //dphi_out[k] = signal_level; // for testing TODO: make separate output
         }
 
         if (levels_out) {
-            levels_out[k] = signal_level;
+            //levels_out[k] = signal_level;
+            //levels_out[k] = pulse_drive;
+            levels_out[k] = inst_freq;
+
+            // debug: raw pulse
+            //levels_out[k] = pulse[((k - n_start_delay) % n_spsym * 3)]; // whole
+            //levels_out[k] = pulse[((k - n_start_delay) % n_spsym) + n_spsym]; // middle
+            //levels_out[k] = pulse[((k - n_start_delay) % n_spsym) + n_half_left]; // ramp up
+
+
         }
     }
 

@@ -43,8 +43,11 @@ void synth_gfsk_custom
 {
     int n_sym = strlen(symbols);
     int n_spsym = (int)(0.5f + signal_rate * symbol_period);
-    int n_half_left = n_spsym / 2;
-    int n_half_right = n_spsym - n_half_left;
+
+    //symbol_bt = 2.0f; // force for debug
+
+    //int n_half_left = n_spsym / 2;
+    //int n_half_right = n_spsym - n_half_left;
     int n_ramp = n_spsym / 8;
     int n_total = n_start_delay + (n_sym * n_spsym) + n_end_extension;
     float tone_spacing = custom_tones ? (custom_tones[1] - custom_tones[0]) : FT8_TONE_SPACING;
@@ -68,24 +71,24 @@ void synth_gfsk_custom
     }
 
     //float dphi_per_frequency[FT8_TONE_COUNT];
-    float f0 = f0_given;
+    //float f0 = f0_given;
     //float f0 = min_freq;
-    //float f0 = min_freq - FT8_TONE_SPACING;
-    float f0_dphi = 2 * M_PI * f0 / signal_rate; // base/default phase delta
+    float f0 = min_freq - FT8_TONE_SPACING;
+    //float f0_dphi = 2 * M_PI * f0 / signal_rate; // base/default phase delta
     float hmod = 1.0f;
     float dphi_peak = 2 * M_PI * hmod / n_spsym;
 
+    float freqd[FT8_TONE_COUNT];
     for (int i = 0; i < FT8_TONE_COUNT; i++) {
-        float freq = frequencies[i];
-        ////dphi_per_frequency[i] = 2 * M_PI * (f0_dphi - f0) / signal_rate;
-        //dphi_per_frequency[i] = 2 * M_PI * freq / signal_rate;
+        freqd[i] = frequencies[i] - f0;
     }
 
-    float firstFreq = frequencies[0];
+    // freqd of first non-empty symbol
+    float firstFreqd = freqd[0];
     for (int i; i < n_sym; i++) {
         char symbol = symbols[i];
         if (symbol != '-') {
-            firstFreq = frequencies[symbol - '0'];
+            firstFreqd = freqd[symbol - '0'];
             break;
         }
     }
@@ -94,82 +97,58 @@ void synth_gfsk_custom
     gfsk_pulse(n_spsym, symbol_bt, pulse);
 
     float phi = 0; // rename: phase (?)
-    float freq = firstFreq;
+    float lastFreqd = firstFreqd;
 
     for (int k = 0; k < n_total; ++k) {
         int symbol_index = (k - n_start_delay) / n_spsym;
         int sample_in_symbol = (k - n_start_delay) % n_spsym;
-        int is_halfway = sample_in_symbol >= (n_spsym/2);
-
-        float signal_level = 1;
-        //float dphi = 2 * M_PI * f0 / signal_rate;
-        //float dphi = 0;
-        //float dfreq = 0;
-        float target_freq = freq; // will be replaced
-        float inst_freq = freq; // will be replaced
-        float envelope = 1.0f;
-        float pulse_drive = 0;
-
-        if (k >= n_start_delay && k < (n_total - n_end_extension)) {
-            char curr_symbol = symbols[symbol_index];
-            
-            if (curr_symbol == '-') {
-                envelope = 0;
-                signal_level = 0;
-
-            } else if (!is_halfway) {
-                char prev_symbol = (symbol_index > 0) ? symbols[symbol_index - 1] : '-';
-                if (prev_symbol == '-') {
-                    signal_level = 1;
-                    if (sample_in_symbol < n_ramp) {
-                        envelope = (1 - cosf(M_PI * sample_in_symbol / n_ramp)) / 2;
-                        signal_level = envelope;
-                    }
-                    
-                } else {
-                    float prev_tone = frequencies[prev_symbol - '0'];
-                    float curr_tone = frequencies[curr_symbol - '0'];
-                    pulse_drive = pulse[n_half_left + sample_in_symbol];
-                    //pulse_drive = pulse[sample_in_symbol];
-                    target_freq = curr_tone;
-                    inst_freq = prev_tone + (curr_tone - prev_tone) * pulse_drive * dphi_peak;
-                    //inst_freq = prev_tone * (1-pulse_drive) + curr_tone * pulse_drive;
-                    
-
-                }
-
-            } else {
-                char next_symbol = (symbol_index < n_sym - 1) ? symbols[symbol_index + 1] : '-';
-
-                if (next_symbol == '-') {
-                    signal_level = 1;
-                    if (sample_in_symbol >= (n_spsym - n_ramp)) {
-                        envelope = (1 - cosf(M_PI * (n_spsym - sample_in_symbol - 1) / n_ramp)) / 2;
-                        signal_level = envelope;
-                    }
-                } else {
-                    float next_tone = frequencies[next_symbol - '0'];
-                    float curr_tone = frequencies[curr_symbol - '0'];
-                    float change = next_tone - curr_tone;
-                    
-                    pulse_drive = pulse[n_half_left + sample_in_symbol];
-                    //pulse_drive = pulse[sample_in_symbol + n_spsym];
-                    //pulse_drive = pulse[sample_in_symbol + n_spsym * 2]; // unsure
-                    target_freq = next_tone;
-                    inst_freq = curr_tone + (next_tone - curr_tone) * pulse_drive * dphi_peak;
-                    //inst_freq = curr_tone * (1-pulse_drive) + next_tone * pulse_drive;
-
-                }
-
-            }
-
-        }
         
-        inst_freq = freq + (target_freq - freq) * pulse_drive * dphi_peak;
-        freq = inst_freq;
+        float signal_level = 1;
+        float total_level = 0;
+        float freqd_out;
 
-        float dphi = 2 * M_PI * inst_freq / signal_rate;
-        //float dphi = inst_freq * dphi_peak; // == above?
+        char curr_symbol = (k >= n_start_delay && k < (n_total - n_end_extension)) ? symbols[symbol_index] : '-';
+        char prev_symbol = (symbol_index > 0) ? symbols[symbol_index - 1] : '-';
+        char next_symbol = (symbol_index < n_sym - 1) ? symbols[symbol_index + 1] : '-';
+
+        float curr_freqd = curr_symbol == '-' ? 
+            (next_symbol == '-' ? lastFreqd : freqd[next_symbol - '0'] )
+            : freqd[curr_symbol - '0'];
+
+        float prev_freqd = prev_symbol == '-' ? curr_freqd : freqd[prev_symbol - '0'];
+        float next_freqd = next_symbol == '-' ? curr_freqd : freqd[next_symbol - '0'];
+
+        // impulse responses at current sample (todo: optimize)
+        //float prev_level = (prev_symbol == '-') ? 0 : pulse[sample_in_symbol + n_spsym * 2];
+        //float curr_level = (curr_symbol == '-') ? 0 : pulse[sample_in_symbol + n_spsym];
+        //float next_level = (next_symbol == '-') ? 0 : pulse[sample_in_symbol];
+        float prev_level = pulse[sample_in_symbol + n_spsym * 2]; // is finishing
+        float curr_level = pulse[sample_in_symbol + n_spsym];
+        float next_level = pulse[sample_in_symbol]; // is starting
+
+        //total_level = prev_level + curr_level + next_level; // 0.9999992847442627 to 1.0000007152557373
+
+        //signal_level = total_level; 
+        signal_level = 1;
+
+        freqd_out = (prev_level * prev_freqd) + (curr_level * curr_freqd) + (next_level * next_freqd);
+        //freqd_out = curr_level; // test
+
+        float envelope = 1.0f;
+
+        if (curr_symbol == '-') {
+            envelope = 0;
+        } else if (prev_symbol == '-' && sample_in_symbol < n_ramp) {
+            envelope = (1 - cosf(M_PI * sample_in_symbol / n_ramp)) / 2;
+        } else if (next_symbol == '-' && sample_in_symbol >= (n_spsym - n_ramp)) {
+            envelope = (1 - cosf(M_PI * (n_spsym - sample_in_symbol - 1) / n_ramp)) / 2;
+        }
+        signal_level *= envelope;
+
+        ///////////// apply signal
+
+        float dphi = 2 * M_PI * (f0 + freqd_out) / signal_rate;
+        //float dphi = (2 * M_PI / signal_rate) * (f0 + freqd_out);
 
         phi = fmodf(phi + dphi, 2 * M_PI);
         signal[k] = sinf(phi) * signal_level;
@@ -179,18 +158,22 @@ void synth_gfsk_custom
         }
 
         if (levels_out) {
-            //levels_out[k] = signal_level;
-            //levels_out[k] = pulse_drive;
-            levels_out[k] = inst_freq;
+            levels_out[k] = signal_level;
+            //levels_out[k] = inst_freq;
+            //levels_out[k] = total_level;
 
             // debug: raw pulse
             //levels_out[k] = pulse[((k - n_start_delay) % n_spsym * 3)]; // whole
+            //levels_out[k] = pulse[((k - n_start_delay) % n_spsym)]; // first third
             //levels_out[k] = pulse[((k - n_start_delay) % n_spsym) + n_spsym]; // middle
             //levels_out[k] = pulse[((k - n_start_delay) % n_spsym) + n_half_left]; // ramp up
+            
+            //divide at symbol boundaries (glitchy)
+            //levels_out[k] = symbol_index % 2;
 
 
         }
-    }
+    }        
 
     // Generate metadata JSON
     if (metadata_json != NULL && metadata_length != NULL) {

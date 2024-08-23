@@ -523,7 +523,7 @@ class FT8Message extends EventTarget {
         this.dphiSamples = scaleToRange(dphiArray, 190, 10);
 
         const levelsArray = Array.from(levels);
-        this.levelsSamples = scaleToRange(levelsArray, 190, 10);
+        this.levelsSamples = scaleToRange(levelsArray, 195, 5);
 
         const metadataLength = Module.HEAP32[metadataLengthPtr / 4];
         const metadataJsonPtr = Module.HEAP32[metadataJsonPtrPtr / 4];

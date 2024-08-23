@@ -190,7 +190,7 @@ class VizComponent extends Component {
             ctx.stroke();
         }
         if (showDphi) {
-            doDraw(levelsData, true, 'yellow');
+            doDraw(levelsData, true, 'gray');
             doDraw(data, true, 'green');
         } else {
             doDraw(data, false, 'steelblue');

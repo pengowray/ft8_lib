@@ -962,9 +962,9 @@ body:not(.dark-mode) #piano-roll {
 
 .toggle-switch__input:checked:disabled + .toggle-switch__slider {
     background-color: var(--toggle-bg-on);
-    opacity: 0.5;
+    /* opacity: 0.5; */
 }
 
 .toggle-switch--disabled .toggle-switch__label {
-    opacity: 0.5;
+    /* opacity: 0.5; */
 }

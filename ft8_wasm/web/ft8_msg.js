@@ -1,3 +1,10 @@
+import MSHVFT8 from "./mshv_ft8_wrap.js";
+import * as extra from "./ft8_extra.js";
+import { grayBitsToSymbols, encodeFT8FreeText, packedDataTo80Bits, getFT8MessageType } from "./ft8_extra.js";
+import * as ft8lib from "./ft8_ft8lib.js";
+import { messageToPackedData, packedDataToSymbolsArray, decodeFT8FromPackedData } from "./ft8_ft8lib.js";
+
+const mshvft8 = new MSHVFT8();
 const hashes = {}; // a little global never hurt noone
 
 function addHash(callsign) {
@@ -13,10 +20,10 @@ function addHash(callsign) {
         if (callsign == '') return;
     }
 
-    const hashInt = hashCallsign(callsign);
+    const hashInt = extra.hashCallsign(callsign);
     if (hashInt == null) return;
     const hashBits = hashInt.toString(2).padStart(22, '0');
-    const zhash = hashBitsToZ32Dense(hashBits);
+    const zhash = extra.hashBitsToZ32Dense(hashBits);
     const entry = [hashInt, callsign];
 
     if (zhash) {
@@ -31,7 +38,7 @@ function addHash(callsign) {
 }
 function findHash(bits) {
     //todo: accept int too; use: callsignToHashBits(hashInt)
-    const zhash = hashBitsToZ32Dense(bits);
+    const zhash = extra.hashBitsToZ32Dense(bits);
     if (zhash == null || zhash == '') return null;
     if (zhash in hashes) {
         const entry = hashes[zhash];
@@ -42,7 +49,7 @@ function findHash(bits) {
 }
 
 function addHashesFromInput(inputText) {
-    input = inputText.toUpperCase();
+    const input = inputText.toUpperCase();
     const pieces = input.split(/[\s;\.]+/);
     //const pieces = input.split(' ');
     //console.log("addHashesFromInput", input, pieces);
@@ -57,7 +64,7 @@ function addHashesFromInput(inputText) {
     }
 }
 function addDefaultHashes() {
-    const defaultHashes = ['', 'K1JT', 'K9AN', 'N0CALL', 'QU1RK', 'W1AW', 'CQ', 'VK3PGO', 'AA9GO', 'DEMO', 'D3MO', 'DEM0', 'D3M0', 'A1AAA', 'XX9XXX', 'EXAMPLE', 'CALLSIGN', 'CALLSIGN1', 'TEST', 'TEST1', 'TE1ST', 'TESTCALL', 'TESTCALL1', 'TEST1CALL', 'W3XYZ', 'K5ABC', 'VE3XXX', 'N1ZZZ', 'DL0ABC', 'VK2XYZ', 'ZL1AAA', 'JA1XXX', 'M0ABC', 'IT9XXX', 'ERROR', 'ERR0R','NUL', 'NULL', 'NIL', 'EMPTY'];
+    const defaultHashes = ['', 'K1JT', 'K9AN', 'N0CALL', 'QU1RK', 'W1AW', 'CQ', 'VK3PGO', 'AA9GO', 'DEMO', 'D3MO', 'DEM0', 'D3M0', 'A1AAA', 'XX9XXX', 'EXAMPLE', 'CALLSIGN', 'CALLSIGN1', 'TEST', 'TEST1', 'TE1ST', 'TE0ST', 'TESTCALL', 'TESTCALL1', 'TEST1CALL', 'W3XYZ', 'K5ABC', 'VE3XXX', 'N1ZZZ', 'DL0ABC', 'VK2XYZ', 'ZL1AAA', 'JA1XXX', 'M0ABC', 'IT9XXX', 'ERROR', 'ERR0R', 'NONE', 'N0NE', 'NUL', 'NULL', 'NIL', 'EMPTY', 'F0X', 'FOX', 'SUPERFOX', 'SUP3RFOX', 'SUPERF0X' ];
     for (const callsign of defaultHashes) {
         addHash(callsign);
     }
@@ -83,8 +90,10 @@ class FT8Message extends EventTarget {
       //this.encodedData = null;
       this.symbolsText = null;
       this.packedData = null;
+      this.bits = null; // string of 77 bits
 
       this.reDecodedResult = null;
+      this.mshvDecoded = null;
 
       // cached checks
       this.SyncCheck = null;
@@ -255,8 +264,15 @@ class FT8Message extends EventTarget {
                 addHashesFromInput(this.inputText);
 
                 const packingResult = messageToPackedData(input);
+                const mshvPackingResult = mshvft8.packMessage(input);
 
-                if (packingResult.success) {
+                if (mshvPackingResult.errorCode == 0 && mshvPackingResult.message) {
+                    //todo: try catch
+                    this.bits = mshvPackingResult.message;
+                    this.packedData = bitsToPacked(mshvPackingResult.message);
+                    console.log("mshv bits", this.bits);
+
+                } else if (packingResult.success) {
                     this.packedData = packingResult.data;
                     
                 } else {
@@ -298,6 +314,7 @@ class FT8Message extends EventTarget {
         if (this.packedData) {
             var packedBits = packedDataTo80Bits(this.packedData);
             const zeroPadding = packedBits.slice(77);
+            this.bits = packedBits.slice(0, 77);
             if (zeroPadding != '000') {
                 this.encodeError = `Packed data not zero padded (Expected 77 bits + 3 zeros), Got: ${packedBits}`;
                 throw new Error(this.encodeError);
@@ -306,6 +323,9 @@ class FT8Message extends EventTarget {
 
         this.ft8MessageType = getFT8MessageType(this.packedData);
         this.reDecodedResult = decodeFT8FromPackedData(this.packedData, this.packedData.length);
+
+        this.mshvDecoded = mshvft8.unpackMessage(this.bits);
+        console.log("mshvDecoded", this.mshvDecoded);
 
         if (this.expectedResults) {
             if (this.expectedResults?.decoded) addHashesFromInput(this.expectedResults.decoded);
@@ -577,8 +597,10 @@ function detectTelemetry(str) {
 }
 
 function detectFreeTextBrackets(str) {
+    // brackets or quotes
     const trimmed = str.trim();
-    return (trimmed.startsWith('<') && trimmed.endsWith('>'));
+    return (trimmed.startsWith('<') && trimmed.endsWith('>') && !trimmed.slice(1, trimmed.length-1).includes('<'))  
+        || (trimmed.startsWith('"') && trimmed.endsWith('"'));
 }
 
 function normalizeMessage(message) {
@@ -591,7 +613,13 @@ function normalizeMessageAndHashes(message) {
 }
 
 function normalizeBracketedFreeText(input) {
-    return input.trim().replace(/^<|>$/g, '');
+    // trim and remove brackets or quotes
+    if (input.startsWith('<') && input.endsWith('>')) {
+        return input.trim().replace(/^<|>$/g, '');
+    } else if (input.startsWith('"') && input.endsWith('"')) {
+        return input.trim().replace(/^"|"$|“|”/g, '');
+    }
+    return input.trim();
 }
 
 function normalizeSymbols(input) {
@@ -700,16 +728,9 @@ function findMinAndMax(numbers) {
     return { min, max };
 }
 
-const inputTypeDescriptions = {
-    '77 bits': 'Payload data',
-    '80 bits': 'Payload data, extended with three zero bits',
-    '82 bits': 'Payload data, extended with five zero bits', // input to CRC calculations, according to FT4_FT8_QEX.pdf paper
-    '91 bits': 'Payload + CRC',
-    '174 bits': 'Payload + CRC + LDPC',
-    '237 bits': 'All symbols mapped to regular binary tribbles',
-    '237 grits': 'All symbols as their graycode triplets',
-    '58 symbols': 'FSK tone data without sync tones',
-    '79 symbols': 'Full FSK tone data',
-    'packed': 'Payload as hexadecimal (zero-extended)', // aka right padded with 0's
-    'default': 'FT8 message text',
-};
+// needed
+export { FT8Message, addHash, findHash, addHashesFromInput, addDefaultHashes };
+// sure why not (maybe move some normalize to ft8_extra.js)
+export { hashes, normalizeMessage, normalizeMessageAndHashes, normalizeBracketedFreeText };
+// meh
+//export { normalizeSymbols, normalizeBinary, normalizePackedData, normalizeTelemetry, doDetectInputType, scaleToRange, findMinAndMax };

@@ -1,4 +1,6 @@
-class TribbleComponent extends Component {
+import { Component } from './views.js';
+
+export class TribbleComponent extends Component {
     constructor(index, container) {
         super(index, container);
         this.gridContainer = null;
@@ -273,3 +275,5 @@ class TribbleComponent extends Component {
     initialUpdate() {
     }
 }
+
+//export default TribbleComponent;

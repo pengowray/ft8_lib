@@ -1,4 +1,8 @@
+import {arrayToSymbols, symbolsToArray} from './ft8_extra.js';
+
 /* ft8_lib wrappers */
+
+export const FT8_NN = 79; // Total channel symbols
 
 function messageToPackedData(message) {
     const resultPtr = Module.ccall('encodeFT8Message', 'number', ['string'], [message]);
@@ -103,7 +107,4 @@ function freeFT8Result() {
     Module.cwrap('freeFT8Result', null, ['number']);
 }
 
-function doFreeFT8Result() {
-    console.log("do freeFT8Result");
-    Module.cwrap('freeFT8Result', null, ['number']);
-}
+export { messageToPackedData, packedDataToSymbolsArray, symbolsToAudio, decodeFT8FromPackedData, freeFT8Result };

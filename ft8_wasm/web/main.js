@@ -1,3 +1,13 @@
+import { FT8Message } from './ft8_msg.js';
+import { ViewManager } from './views.js';
+//import { VizComponent, PianoRollComponent, OutputComponent, TribbleComponent, PlayBtnComponent } from './components.js';
+import { VizComponent } from './views_viz.js';
+import { PianoRollComponent } from './views_piano.js';
+import { TribbleComponent } from './views_bits.js';
+import { OutputComponent } from './views_output.js';
+import { PlayBtnComponent } from './views_play.js';
+import { testInputs_ft8code, ft8_examples } from './ft8_tests.js';
+
 const exampleMessages = [
     "CQ K1ABC FN42",
     "K1ABC W9XYZ -15",
@@ -6,8 +16,6 @@ const exampleMessages = [
     "W9XYZ K1ABC 73",
     "<TNX BOB 73 GL>"
 ];
-
-
 
 function initializeUI() {
     //let currentTime = 0;
@@ -257,21 +265,25 @@ function initializeUI() {
         let strings = [];
         let failed = false;
         
-        if (message.encodeError_ft8lib) {
+        if (message && message.encodeError_ft8lib) {
             strings.push(`ft8_lib error: ${message.encodeError_ft8lib}`);
             // not failure yet (may have fallen back to freetext)
         }
         if (exception != null) {
-            console.error("exception", exception);
+            console.error("Exception", exception);
             strings.push(`Exception: ${exception}`);
             failed = true;
+
+            if (!message) {
+                strings.push(`No message object was created.`);
+            }
         }
-        if (message.error) {
+        if (message && message.error) {
             strings.push(`General error: ${message.error}`);
             failed = true;
         }
-        if (message.encodeError) {
-            strings.push(`encoding error: ${message.encodeError}`);
+        if (message && message.encodeError) {
+            strings.push(`Encoding error: ${message.encodeError}`);
             failed = true;
         }
         
@@ -356,10 +368,6 @@ function initializeUI() {
 
     const toggleVisualizationButton = document.getElementById('toggle-visualization');
     const VisualizationCaption = document.getElementById('visualization-caption');
-
-    //TODO XXX
-    //toggleVisualizationButton.addEventListener('click', toggleVisualization);
-
 }
 
 /*
@@ -369,3 +377,5 @@ if (typeof Module !== 'undefined') {
     document.addEventListener('DOMContentLoaded', initializeUI);
 }
 */
+
+export { initializeUI };

@@ -31,12 +31,17 @@ set_target_properties(ft8_wasm PROPERTIES LINK_FLAGS "\
     -s EXPORTED_FUNCTIONS=['_malloc','_free','_freeFT8Result','_decodeFT8PackedData','_synth_gfsk_custom','_encodeFT8Message','_encodeFT8MessageToSymbols','_packedToSymbols','_symbolsToAudio','_calculate_num_samples'] \
     -s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','getValue','UTF8ToString'] \
     -s ALLOW_MEMORY_GROWTH=1 \
+    -s EXPORT_ES6=1 \
+    -s MODULARIZE=1 \
+    -s USE_ES6_IMPORT_META=0 \
+    -O3 \
 ")
 
 # Add a custom command to copy the resulting .js and .wasm files
 add_custom_command(TARGET ft8_wasm POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/web
     COMMAND ${CMAKE_COMMAND} -E copy
         ${CMAKE_CURRENT_BINARY_DIR}/ft8_wasm.js
         ${CMAKE_CURRENT_BINARY_DIR}/ft8_wasm.wasm
-        ${CMAKE_SOURCE_DIR}/..
+        ${CMAKE_SOURCE_DIR}/web
 )

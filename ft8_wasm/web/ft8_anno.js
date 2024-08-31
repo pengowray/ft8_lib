@@ -1,9 +1,11 @@
-const def_i3n3 = { label: "Message Type", shortLabel:'type', tag:'i3.n3', start: 71, length: 6, getValue: bitsToi3n3 };
-const def_i3 = { label: "Message type", shortLabel:'i3', tag:'i3', start: 74, length: 3, getValue: bitsToi3 };
+import { bitsToBigIntString, bitsToText, bitsToCall, bitsToHash, bitsToReport, bitsToGrid4OrReportWithType, bitsToTxDetailsLow, bitsToFieldDayClass, bitsToARRLSection, bitsToTxDetailsHigh, telemetryBitsToText, telemetryByteAnnotations, bitsToRST, bitsToNonstandardCallDetails, bitsToR2 } from './ft8_extra.js';
+
+export const def_i3n3 = { label: "Message Type", shortLabel:'type', tag:'i3.n3', start: 71, length: 6, getValue: bitsToi3n3 };
+export const def_i3 = { label: "Message type", shortLabel:'i3', tag:'i3', start: 74, length: 3, getValue: bitsToi3 };
 
 // note: don't use shortLabel if not needed to display on tribble bit display
 
-const annotationDefinitions = {
+export const annotationDefinitions = {
     "0.0": [ // Free text
         { label: "Free text", tag:'f71', start: 0, length: 71, getValue: bitsToText },
         def_i3n3
@@ -103,7 +105,7 @@ const annotationDefinitions = {
 
 };
 
-function AnnotationDefGetValueText(annotation, payloadBits77) {
+export function AnnotationDefGetValueText(annotation, payloadBits77) {
     const bits = payloadBits77.slice(annotation.start, annotation.start + annotation.length);
     return annotation.getValue(bits);
 }
@@ -223,3 +225,5 @@ function bitsToSerialOrState(bits) {
 function bitsToSerial(bits) {
     return {value: bitsToBigIntString(bits).toString() };
 }
+
+export * from './ft8_anno.js';

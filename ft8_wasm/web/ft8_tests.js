@@ -1,4 +1,4 @@
-  const ft8_examples = [
+export const ft8_examples = [
     { notest: true, name: "input example: <free text>", comment: 'To make sure your message is sent as free text, write it between < and >. Free text will be uppercased and truncated to 13 characters. Valid characters are 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+-./? and space.', value: "<YOUR MSG HERE>" },
     { notest: true, name: "input example: telemetry data", comment: 'To sent a message as the telemetry data type, or enter T: followed by 1 to 18 hex digits. Telemetry data is 71-bits.', value: "Telemetry: A858DE45 F56D9BC9" },
     { notest: true, name: 'input example: telemetry data (exactly 18 digits)', comment: 'Another way to enter telemetry message. Use exactly 18 hexadecimal digits. The first digit must be between 0 and 7.', value: "1005e1eafcafec0ffe" },
@@ -13,7 +13,7 @@
   ]
   
 // ft8code.exe
-const testInputs_ft8code = [
+export const testInputs_ft8code = [
     {
       "message": "<TNX BOB 73 GL>",
       "decoded": "TNX BOB 73 GL",
@@ -265,3 +265,5 @@ const testInputs_ft8code = [
       "symbols": "3140652 12320000026470717462032610755 3140652 73041016005003413426660204571 3140652"
     }
   ];
+
+//export { ft8_examples, testInputs_ft8code }

@@ -293,3 +293,5 @@ class Component {
         }
     }
 }
+
+export { ViewManager, Component, MessageManager };

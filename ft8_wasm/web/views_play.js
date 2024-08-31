@@ -1,4 +1,6 @@
-class PlayBtnComponent extends Component {
+import { Component } from './views.js';
+
+export class PlayBtnComponent extends Component {
     constructor(index, container) {
         super(index, container); // index -2 for all messages
         this.countdownInterval = null;
@@ -251,3 +253,6 @@ function writeString(view, offset, string) {
         view.setUint8(offset + i, string.charCodeAt(i));
     }
 }
+
+//export { PlayBtnComponent, audioBufferToWav };
+//export default PlayBtnComponent;

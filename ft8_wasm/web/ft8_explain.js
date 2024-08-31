@@ -88,3 +88,5 @@ function explainFT8Message(text, msgType) {
 
     return typeExplanation + explanation;
 }
+
+export default explainFT8Message;

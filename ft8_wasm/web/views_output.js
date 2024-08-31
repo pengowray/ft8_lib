@@ -1,7 +1,10 @@
+import { Component } from './views.js';
+import { symbolsToBitsStrNoCosta, bitsToText, inputTypeDescriptions }  from './ft8_extra.js';
+
 const REFERENCE = 'expected';
 const DECODED = 'found';
 
-class OutputComponent extends Component {
+export class OutputComponent extends Component {
     create() {
     }
     
@@ -582,3 +585,5 @@ function escapeHTML(text) {
         return map[match];
     });
 }
+
+//export default OutputComponent;

@@ -43,8 +43,6 @@ function TidyCountry(country) {
     name.replace(pattern, replacement), name);
 }
 
-  
-
 class CTYData {
   constructor() {
     this.countryData = [];
@@ -209,3 +207,5 @@ class CTYData {
 const cty = new CTYData();
 cty.loadData();
 //console.log('countries', cty.countries);
+
+export default cty;

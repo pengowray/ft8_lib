@@ -1,4 +1,7 @@
 import { Component } from './views.js';
+import { annotationDefinitions, AnnotationDefGetValueText, AnnotationDefGetAnnotation } from './ft8_anno.js';
+import { symbolsToBitsStr, symbolsToGrayBitsStr, packedToHexStrSp, getFT8MessageTypeName, encodeFT8FreeText, packedDataTo80Bits, getFT8MessageType, normalizeMessage, normalizeMessageAndHashes, normalizeBracketedFreeText, checkSync, checkCRC, checkParity } from "./ft8_extra.js";
+import * as extra from "./ft8_extra.js";
 
 export class TribbleComponent extends Component {
     constructor(index, container) {

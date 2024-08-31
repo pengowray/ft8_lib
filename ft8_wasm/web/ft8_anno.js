@@ -1,4 +1,4 @@
-import { bitsToBigIntString, bitsToText, bitsToCall, bitsToHash, bitsToReport, bitsToGrid4OrReportWithType, bitsToTxDetailsLow, bitsToFieldDayClass, bitsToARRLSection, bitsToTxDetailsHigh, telemetryBitsToText, telemetryByteAnnotations, bitsToRST, bitsToNonstandardCallDetails, bitsToR2 } from './ft8_extra.js';
+import { getFT8MessageTypeName, bitsToBigIntString, bitsToText, bitsToCall, bitsToHash, bitsToReport, bitsToGrid4OrReportWithType, bitsToTxDetailsLow, bitsToFieldDayClass, bitsToARRLSection, bitsToTxDetailsHigh, telemetryBitsToText, telemetryByteAnnotations, bitsToRST, bitsToNonstandardCallDetails, bitsToR2 } from './ft8_extra.js';
 
 export const def_i3n3 = { label: "Message Type", shortLabel:'type', tag:'i3.n3', start: 71, length: 6, getValue: bitsToi3n3 };
 export const def_i3 = { label: "Message type", shortLabel:'i3', tag:'i3', start: 74, length: 3, getValue: bitsToi3 };
@@ -110,6 +110,17 @@ export function AnnotationDefGetValueText(annotation, payloadBits77) {
     return annotation.getValue(bits);
 }
 
+export function AnnotationDefGetAnnotation(annotation, payloadBits77) {
+    const bits = payloadBits77.slice(annotation.start, annotation.start + annotation.length);
+    var value = annotation.getValue(bits);
+    var rawIntValue = bitsToBigIntString(bits);
+    if (typeof value === 'object') {
+        return { ...annotation, ...value, bits, rawIntValue };
+    } else if (typeof value === 'string') {
+        return { ...annotation, value, bits, rawIntValue };
+    }
+}
+
 function bitToFlag(bit, on, off) {
     //TODO: return details including on and off values for description/diagram
     return bit === '1' ? on : off;
@@ -160,18 +171,6 @@ function callsignModFlagX(bit, flag) {
         return {isFlag: true, value: bit, on: flag, off: nada, onGravity: 'high', desc: `${flag} call sign modifier`  }; // (add: meaning roger or received?
     } else {
         return {isFlag: true, value: bit, on: flag, off: nada }; //  desc: "Nothing at start of report or not a signal report"
-    }
-}
-
-function AnnotationDefGetAnnotation(annotation, payloadBits77) {
-    const bits = payloadBits77.slice(annotation.start, annotation.start + annotation.length);
-    console.log("annotation", annotation);
-    var value = annotation.getValue(bits);
-    var rawIntValue = bitsToBigIntString(bits);
-    if (typeof value === 'object') {
-        return { ...annotation, ...value, bits, rawIntValue };
-    } else if (typeof value === 'string') {
-        return { ...annotation, value, bits, rawIntValue };
     }
 }
 

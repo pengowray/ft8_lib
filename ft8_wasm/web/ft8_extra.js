@@ -1,3 +1,6 @@
+import { HamGridSquare } from './HamGridSquare.js'
+import { findHash } from "./ft8_hashmgr.js";
+
 // Free text character table
 export const FT8_CHAR_TABLE_FULL = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+-./?";
 
@@ -435,7 +438,7 @@ export function hashBitsTo22styleBase10(bits) {
     return parseInt(bits, 2).toString().padStart(7, '0');
 }
 
-function checkSync(symbols) {
+export function checkSync(symbols) {
     if (symbols.length !== 79) {
         throw new Error("Input must be 79 characters (symbols) long");
     }
@@ -846,7 +849,8 @@ export function bitsToPacked(bitString) {
     if (bitString.length != 80 && bitString.length != 77) {
         throw new Error("Invalid length to pack: must be 77 or 80 bits");
     }
-    const bits = normalizeBinary(bitString).padEnd(80, '0');
+
+    const bits = bitString.replace(/[-\s]/g, '').padEnd(80, '0');
 
     return Uint8Array.from(bits.match(/.{8}/g).map(byte => parseInt(byte, 2)));
 }
@@ -965,20 +969,20 @@ export function bitsToCall(bits) {
     //return `${details.callsign} (${details.type})`;
 }
 
-export const FT8_CHAR_TABLE_ALPHANUM_SPACE_SLASH = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/";
-
 export function nchar(char, table) {
     return table.indexOf(char);
 }
 
 export function hashCallsign(callsign) {
+    const FT8_CHAR_TABLE_ALPHANUM_SPACE_SLASH = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ/";
+
     let n58 = BigInt(0);
     const maxLength = Math.min(callsign.length, 11);
 
     for (let i = 0; i < maxLength; i++) {
         const j = nchar(callsign[i], FT8_CHAR_TABLE_ALPHANUM_SPACE_SLASH);
         if (j < 0) {
-            console.error("Invalid character in callsign: " + callsign[i]);
+            //console.error("Invalid character in callsign for hashing: " + callsign[i]);
             return null; // hash error (wrong character set)
         }
         n58 = (BigInt(38) * n58) + BigInt(j);
@@ -1003,7 +1007,7 @@ export function callsignToHashBits(bits) {
 export function bitsToCallDetails(bits, extraBit = "") {
     if (bits.length !== 28 && bits.length !== 29) throw new Error("Callsign must be 28 or 29 bits");
 
-    extraOn = (bits.length === 29 && bits[28] === '1');
+    const extraOn = (bits.length === 29 && bits[28] === '1');
     bits = bits.slice(0, 28);
 
     const n = parseInt(bits, 2);
@@ -1244,7 +1248,7 @@ export function bitsToGrid4OrReportDetails(bits) {
                String.fromCharCode('A'.charCodeAt(0) + j2) +
                j3.toString() +
                j4.toString(), subtype: 'Maidenhead locator' };
-        const latlon = latLonForGrid(ret.value);
+        const latlon = HamGridSquare.latLonForGrid(ret.value);
         let desc = `latitude, longitude: ${latlon.lat}, ${latlon.lon}`;
         if (ret.value == 'RR73') {
             desc += "\n*RR73 is short for 'report received and best regards'. It can also be encoded with a special token, but here has been encoded as a location.";
@@ -1584,3 +1588,22 @@ export const inputTypeDescriptions = {
     'packed': 'Payload as hexadecimal (zero-extended)', // aka right padded with 0's
     'default': 'FT8 message text',
 };
+
+export function normalizeMessage(message) {
+    return message.trim().toUpperCase().replace(/\s+/g, ' ');
+}
+
+export function normalizeMessageAndHashes(message) {
+    // replace contents of <...> with '<...>'
+    return message.trim().toUpperCase().replace(/\s+/g, ' ').replace(/<[^>]*>/g, '<...>');
+}
+
+export function normalizeBracketedFreeText(input) {
+    // trim and remove brackets or quotes
+    if (input.startsWith('<') && input.endsWith('>')) {
+        return input.trim().replace(/^<|>$/g, '');
+    } else if (input.startsWith('"') && input.endsWith('"')) {
+        return input.trim().replace(/^"|"$|“|”/g, '');
+    }
+    return input.trim();
+}

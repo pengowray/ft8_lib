@@ -1,5 +1,8 @@
 import { Component } from './views.js';
-import { symbolsToBitsStrNoCosta, bitsToText, inputTypeDescriptions }  from './ft8_extra.js';
+import { symbolsToBitsStrNoCosta, bitsToText, inputTypeDescriptions, normalizeMessage, normalizeMessageAndHashes, normalizeBracketedFreeText, getFT8MessageTypeName }  from './ft8_extra.js';
+import * as extra from "./ft8_extra.js";
+import { explainFT8Message } from './ft8_explain.js';
+import { annotationDefinitions, AnnotationDefGetValueText, AnnotationDefGetAnnotation } from './ft8_anno.js';
 
 const REFERENCE = 'expected';
 const DECODED = 'found';
@@ -20,6 +23,10 @@ export class OutputComponent extends Component {
 
     prepareOutputData() {
         const message = this.message;
+        if (!message || message.symbolsText == null || message.symbolsText == '') {
+            console.log("nothing to output (OutputComponent)");
+            return;
+        }
         const bitsNoCosta = symbolsToBitsStrNoCosta(message.symbolsText);
         
         //move me
@@ -33,15 +40,15 @@ export class OutputComponent extends Component {
             inputType: message.inputType,
             inputTypeDescription: inputTypeDescriptions[message.inputType],
             ft8MessageType: message.ft8MessageType,
-            messageTypeInfo: getFT8MessageTypeName(message.ft8MessageType),
+            messageTypeInfo: extra.getFT8MessageTypeName(message.ft8MessageType),
             decoded: this.prepareDecodedInfo(),
             comment: message.expectedResults?.comment,
             decodedText: message.reDecodedResult.decodedText,
             symbols: message.symbolsText,
-            packed: packedToHexStrSp(message.packedData),
-            veryPacked: packedToHexStr(message.packedData),
+            packed: extra.packedToHexStrSp(message.packedData),
+            veryPacked: extra.packedToHexStr(message.packedData),
             codeword: bitsNoCosta, // 174 bits
-            messageBits: bitsNoCosta.slice(0, 77),
+            messageBits: message.bits, //bitsNoCosta.slice(0, 77),
             crcBits: bitsNoCosta.slice(77, 91),            
             parityBits: bitsNoCosta.slice(91),
             symbols: message.symbolsText,
@@ -238,7 +245,7 @@ export class OutputComponent extends Component {
                 ${this.renderSubheading('Encoding')}
 
                 ${this.renderChecks('Checks', data.checks)}
-                ${this.renderRowDataHighlights('Symbols', symbolsPretty(data.symbols), this.getSyncHighlights(data.syncCheck), 'Incorrect sync symbols highlighted in red. Expected sync symbols: 3140652.', null, '79 tones')}
+                ${this.renderRowDataHighlights('Symbols', extra.symbolsPretty(data.symbols), this.getSyncHighlights(data.syncCheck), 'Incorrect sync symbols highlighted in red. Expected sync symbols: 3140652.', null, '79 tones')}
                 ${this.renderRowData('Message', data.packed, `Without spaces: ${data.veryPacked}. Zero-extended to 10 bytes.`, 'packed')}
                 ${this.renderRowData('Message', data.messageBits, null, '77 bits')}
                 ${this.renderRowDataHighlights('Checksum', data.crcBits, this.getCRCHighlights(data.crcCheck), null, 'CRC failed', '14 bits', 'CRC (cyclic redundancy check)')}
@@ -342,14 +349,14 @@ export class OutputComponent extends Component {
         //todo:
         //const positionInfo = `bits ${start + 1} to ${start + length} (length: ${length} bits)`;
 
-        const zhash = (hashBits && hashBits.length > 0) ? hashBitsPrettyZ32(hashBits) : null;
-        const hashIntStr = (hashBits && hashBits.length == 22) ? hashBitsTo22styleBase10(hashBits) : null;
+        const zhash = (hashBits && hashBits.length > 0) ? extra.hashBitsPrettyZ32(hashBits) : null;
+        const hashIntStr = (hashBits && hashBits.length == 22) ? extra.hashBitsTo22styleBase10(hashBits) : null;
 
         //todo: less hackish escapeHTML toggle
         let valueText = '';
         if (callsign || zhash) {
             //const boldifyCall = true; // !isHash; // turn off hash highlighting for now
-            valueText = `${ callsign ? `<span class="output-call gravity-high"><span class="${ !isHash ? 'call-highlighter':''}">${escapeHTML(callsign)}</span>${operatingStatusIndicator ?? ''} </span>` : '' }<span class="output-hash ${ isHash ? 'gravity-medium':'gravity-low'}" ${(hashIntStr && hashIntStr != 0) ? `title="${hashIntStr}"` : ''}>${addUnderlineToHash(hashBits, isHash ? hashLen : 0)}</span>`
+            valueText = `${ callsign ? `<span class="output-call gravity-high"><span class="${ !isHash ? 'call-highlighter':''}">${escapeHTML(callsign)}</span>${operatingStatusIndicator ?? ''} </span>` : '' }<span class="output-hash ${ isHash ? 'gravity-medium':'gravity-low'}" ${(hashIntStr && hashIntStr != 0) ? `title="${hashIntStr}"` : ''}>${extra.addUnderlineToHash(hashBits, isHash ? hashLen : 0)}</span>`
             if (country) { valueText += `<div class="output-country gravity-low">${escapeHTML(country)}</div>`; }
         } else {
             if (isFlag) { 
@@ -519,7 +526,7 @@ export class OutputComponent extends Component {
     getSyncHighlights(syncCheck) {
         //3240652 03224752350406114701746102526 3142652 00751360767311242423320017621 3142652
         if (syncCheck.result !== 'error') return [];
-        const costasPositions = [0, 36, 72];
+        //const costasPositions = [0, 36, 72];
         
         return syncCheck.errors.map(index => {
             let prettyIndex = index;

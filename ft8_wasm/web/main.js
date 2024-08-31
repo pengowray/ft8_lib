@@ -99,8 +99,8 @@ function initializeUI() {
 
         testSelect.addEventListener('change', (event) => {
             const selected = event.target.value.split(' ');
-            selectedType = selected[0];
-            selectedIndex = parseInt(selected[1]);
+            let selectedType = selected[0];
+            let selectedIndex = parseInt(selected[1]);
             if (selectedIndex !== "") {
                 if (selectedType === 'ft8codeMsg') {
                     const selectedTest = testInputs_ft8code[selectedIndex];

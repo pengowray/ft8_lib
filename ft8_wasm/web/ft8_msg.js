@@ -1,76 +1,11 @@
-import MSHVFT8 from "./mshv_ft8_wrap.js";
+import { grayBitsToSymbols, encodeFT8FreeText, packedDataTo80Bits, getFT8MessageType, normalizeMessage, normalizeMessageAndHashes, normalizeBracketedFreeText, checkSync, checkCRC, checkParity } from "./ft8_extra.js";
 import * as extra from "./ft8_extra.js";
-import { grayBitsToSymbols, encodeFT8FreeText, packedDataTo80Bits, getFT8MessageType } from "./ft8_extra.js";
-import * as ft8lib from "./ft8_ft8lib.js";
-import { messageToPackedData, packedDataToSymbolsArray, decodeFT8FromPackedData } from "./ft8_ft8lib.js";
+import * as hashmgr from "./ft8_hashmgr.js";
+import FT8LIB from "./ft8_ft8lib.js";
+import MSHVFT8 from "./mshv_ft8_wrap.js";
 
+const ft8lib = new FT8LIB();
 const mshvft8 = new MSHVFT8();
-const hashes = {}; // a little global never hurt noone
-
-function addHash(callsign) {
-    //TODO: watch for conflicts
-    //TODO: priorty levels
-    if (callsign == null) return;
-    
-    callsign = callsign.toUpperCase().trim();
-    if (callsign == '') return;
-
-    if (callsign.startsWith('<') && callsign.endsWith('>')) {
-        callsign = callsign.slice(1, -1).trim();
-        if (callsign == '') return;
-    }
-
-    const hashInt = extra.hashCallsign(callsign);
-    if (hashInt == null) return;
-    const hashBits = hashInt.toString(2).padStart(22, '0');
-    const zhash = extra.hashBitsToZ32Dense(hashBits);
-    const entry = [hashInt, callsign];
-
-    if (zhash) {
-        // 22, 12 and 10 bit hashes.
-        // hashes[aabcc] = [hashInt, callsign]
-        // hashes[aab] = [hashInt, callsign]
-        // hashes[aa] = [hashInt, callsign]
-        hashes[zhash] = entry; // 22 bits
-        hashes[zhash.slice(0, 3)] = entry; // 12 bits
-        hashes[zhash.slice(0, 2)] = entry; // 10 bits
-    }
-}
-function findHash(bits) {
-    //todo: accept int too; use: callsignToHashBits(hashInt)
-    const zhash = extra.hashBitsToZ32Dense(bits);
-    if (zhash == null || zhash == '') return null;
-    if (zhash in hashes) {
-        const entry = hashes[zhash];
-        const entryBits = entry[0].toString(2).padStart(22, '0');
-        return {hashInt: entry[0], callsign: entry[1], hashBits: entryBits};
-    }
-    return null;
-}
-
-function addHashesFromInput(inputText) {
-    const input = inputText.toUpperCase();
-    const pieces = input.split(/[\s;\.]+/);
-    //const pieces = input.split(' ');
-    //console.log("addHashesFromInput", input, pieces);
-
-    for (const piece of pieces) {
-        //ignore if only numbers
-        if (/^\d+$/.test(piece)) continue;
-
-        // add with and without /suffix
-        addHash(piece);
-        if (piece.includes('/')) addHash(piece.split('/')[0]);
-    }
-}
-function addDefaultHashes() {
-    const defaultHashes = ['', 'K1JT', 'K9AN', 'N0CALL', 'QU1RK', 'W1AW', 'CQ', 'VK3PGO', 'AA9GO', 'DEMO', 'D3MO', 'DEM0', 'D3M0', 'A1AAA', 'XX9XXX', 'EXAMPLE', 'CALLSIGN', 'CALLSIGN1', 'TEST', 'TEST1', 'TE1ST', 'TE0ST', 'TESTCALL', 'TESTCALL1', 'TEST1CALL', 'W3XYZ', 'K5ABC', 'VE3XXX', 'N1ZZZ', 'DL0ABC', 'VK2XYZ', 'ZL1AAA', 'JA1XXX', 'M0ABC', 'IT9XXX', 'ERROR', 'ERR0R', 'NONE', 'N0NE', 'NUL', 'NULL', 'NIL', 'EMPTY', 'F0X', 'FOX', 'SUPERFOX', 'SUP3RFOX', 'SUPERF0X' ];
-    for (const callsign of defaultHashes) {
-        addHash(callsign);
-    }
-}
-addDefaultHashes();
-
 
 class FT8Message extends EventTarget {
     /**
@@ -130,7 +65,7 @@ class FT8Message extends EventTarget {
       // ViewManager for reporting audio stop/start/queued/etc
       this.viewManager = null;
 
-      this.hashes = hashes;
+      this.hashes = hashmgr.hashes;
 
       // setup Event Listeners
       //this.dispatchEvent(new Event('queue'));
@@ -234,7 +169,7 @@ class FT8Message extends EventTarget {
                 break;
             case '77 bits':
                 input = normalizePackedData(input);
-                this.packedData = bitsToPacked(input);
+                this.packedData = extra.bitsToPacked(input);
                 break;
             case '80 bits':
             case '82 bits':
@@ -244,7 +179,7 @@ class FT8Message extends EventTarget {
                     this.encodeError = `Invalid ${inputType} message: not zero extended. Expected 77 bits + 3 or 5 zeros; Found: ${bitStr}`;
                     throw new Error(this.encodeError);
                 }
-                this.packedData = bitsToPacked(bitStr.slice(0, 77));
+                this.packedData = extra.bitsToPacked(bitStr.slice(0, 77));
                 break;
             case '91 bits':
                 this.symbolsText = binary91ToSymbols(normalizeBinary(input));
@@ -261,15 +196,15 @@ class FT8Message extends EventTarget {
             case 'default':
             default:
                 input = normalizeMessage(input);
-                addHashesFromInput(this.inputText);
+                hashmgr.addHashesFromInput(this.inputText);
 
-                const packingResult = messageToPackedData(input);
+                const packingResult = ft8lib.messageToPackedData(input);
                 const mshvPackingResult = mshvft8.packMessage(input);
 
                 if (mshvPackingResult.errorCode == 0 && mshvPackingResult.message) {
                     //todo: try catch
                     this.bits = mshvPackingResult.message;
-                    this.packedData = bitsToPacked(mshvPackingResult.message);
+                    this.packedData = extra.bitsToPacked(mshvPackingResult.message);
                     console.log("mshv bits", this.bits);
 
                 } else if (packingResult.success) {
@@ -288,17 +223,16 @@ class FT8Message extends EventTarget {
                         this.encodeError = "Failed to encode as free text";
                         throw new Error(this.encodeError);
                     }
-                    //if failed will try to encode as free text
                 }
                 break;
         }
 
         if (this.symbolsText == null && this.packedData != null) {
-            this.symbolsText = packedDataToSymbolsArray(this.packedData);
+            this.symbolsText = ft8lib.packedDataToSymbolsArray(this.packedData);
 
         } else if (this.packedData == null && this.symbolsText != null) {
             //console.log("empty packed data, generating from symbols");
-            this.packedData = symbolsToPackedData(this.symbolsText);
+            this.packedData = extra.symbolsToPackedData(this.symbolsText);
         }
 
         if (this.symbolsText == null) {
@@ -322,14 +256,18 @@ class FT8Message extends EventTarget {
         }
 
         this.ft8MessageType = getFT8MessageType(this.packedData);
-        this.reDecodedResult = decodeFT8FromPackedData(this.packedData, this.packedData.length);
-
-        this.mshvDecoded = mshvft8.unpackMessage(this.bits);
+        this.reDecodedResult = ft8lib.decodeFT8FromPackedData(this.packedData, this.packedData.length);
+        this.mshvDecodedResult = mshvft8.unpackMessage(this.bits).message;
+        if (this.mshvDecodedResult != null && this.mshvDecodedResult.errorCode == 0) {
+            //TODO XXX fix me
+            this.reDecodedResult = {success: true, resultText: this.mshvDecodedResult.message, result: this.mshvDecodedResult.message, decodedText: this.mshvDecodedResult.message };
+        }
+        
         console.log("mshvDecoded", this.mshvDecoded);
 
         if (this.expectedResults) {
-            if (this.expectedResults?.decoded) addHashesFromInput(this.expectedResults.decoded);
-            if (this.expectedResults?.message) addHashesFromInput(this.expectedResults.message);
+            if (this.expectedResults?.decoded) hashmgr.addHashesFromInput(this.expectedResults.decoded);
+            if (this.expectedResults?.message) hashmgr.addHashesFromInput(this.expectedResults.message);
         }
 
     }
@@ -369,7 +307,7 @@ class FT8Message extends EventTarget {
     readyAudioAndBuffer() {
         this.readyAudio();
 
-        if (this.audioSamples == null) {
+        if (this.audioSamples == null || this.audioSamples.length == 0) {
             // failed to generate audio
             return;
         }
@@ -504,23 +442,23 @@ class FT8Message extends EventTarget {
         
         // Allocate memory for symbols string
         //const symbolsPtr = Module.stringToUTF8(this.symbolsText);
-        const symbolsPtr = Module._malloc(numSymbols + 1); // +1 for null terminator
+        const symbolsPtr = ft8lib.module._malloc(numSymbols + 1); // +1 for null terminator
         for (let i = 0; i < numSymbols; i++) {
-            Module.HEAP8[symbolsPtr + i] = this.symbolsText.charCodeAt(i);
+            ft8lib.module.HEAP8[symbolsPtr + i] = this.symbolsText.charCodeAt(i);
         }
-        Module.HEAP8[symbolsPtr + numSymbols] = 0; // Null terminator
+        ft8lib.module.HEAP8[symbolsPtr + numSymbols] = 0; // Null terminator
 
         // Calculate number of samples
-        let numSamples = Module._calculate_num_samples(numSymbols, options.symbolPeriod, options.sampleRate);
+        let numSamples = ft8lib.module._calculate_num_samples(numSymbols, options.symbolPeriod, options.sampleRate);
     
         // Allocate memory for audio and dphi
-        const audioPtr = Module._malloc(numSamples * 4);
-        const dphiPtr = Module._malloc(numSamples * 4);
-        const levelsPtr = Module._malloc(numSamples * 4);
+        const audioPtr = ft8lib.module._malloc(numSamples * 4);
+        const dphiPtr = ft8lib.module._malloc(numSamples * 4);
+        const levelsPtr = ft8lib.module._malloc(numSamples * 4);
 
         // Allocate memory for metadata
-        const metadataLengthPtr = Module._malloc(4);
-        const metadataJsonPtrPtr = Module._malloc(4);
+        const metadataLengthPtr = ft8lib.module._malloc(4);
+        const metadataJsonPtrPtr = ft8lib.module._malloc(4);
         const FT8_TONE_COUNT = 8;
     
         let result;
@@ -529,23 +467,23 @@ class FT8Message extends EventTarget {
     
         if (options.customToneFrequencies != null) {
             // Use custom tone frequencies
-            const toneOffsetsPtr = Module._malloc(FT8_TONE_COUNT * 4);
-            const toneOffsets = new Float32Array(Module.HEAPF32.buffer, toneOffsetsPtr, FT8_TONE_COUNT);
+            const toneOffsetsPtr = ft8lib.module._malloc(FT8_TONE_COUNT * 4);
+            const toneOffsets = new Float32Array(ft8lib.module.HEAPF32.buffer, toneOffsetsPtr, FT8_TONE_COUNT);
             for (let i = 0; i < FT8_TONE_COUNT; i++) {
                 toneOffsets[i] = options.customToneFrequencies[i];
             }
     
-            result = Module._synth_gfsk_custom(
+            result = ft8lib.module._synth_gfsk_custom(
                 symbolsPtr, options.baseFrequency, toneOffsetsPtr,
                 options.symbolBT, options.symbolPeriod, options.sampleRate,
                 n_start_delay, n_end_extension,
                 audioPtr, dphiPtr, levelsPtr, metadataLengthPtr, metadataJsonPtrPtr
             );
     
-            Module._free(toneOffsetsPtr);
+            ft8lib.module._free(toneOffsetsPtr);
         } else {
             // Use default FT8 frequencies
-            result = Module._synth_gfsk_custom(
+            result = ft8lib.module._synth_gfsk_custom(
                 symbolsPtr, options.baseFrequency, 0, // Pass 0 for custom_tones when using default
                 options.symbolBT, options.symbolPeriod, options.sampleRate,
                 n_start_delay, n_end_extension,
@@ -553,9 +491,9 @@ class FT8Message extends EventTarget {
             );
         }
     
-        const audio = new Float32Array(Module.HEAPF32.buffer, audioPtr, numSamples);
-        const dphi = new Float32Array(Module.HEAPF32.buffer, dphiPtr, numSamples);
-        const levels = new Float32Array(Module.HEAPF32.buffer, levelsPtr, numSamples);
+        const audio = new Float32Array(ft8lib.module.HEAPF32.buffer, audioPtr, numSamples);
+        const dphi = new Float32Array(ft8lib.module.HEAPF32.buffer, dphiPtr, numSamples);
+        const levels = new Float32Array(ft8lib.module.HEAPF32.buffer, levelsPtr, numSamples);
         this.audioSamples = Array.from(audio);
     
         const dphiArray = Array.from(dphi);
@@ -564,9 +502,9 @@ class FT8Message extends EventTarget {
         const levelsArray = Array.from(levels);
         this.levelsSamples = scaleToRange(levelsArray, 195, 5);
 
-        const metadataLength = Module.HEAP32[metadataLengthPtr / 4];
-        const metadataJsonPtr = Module.HEAP32[metadataJsonPtrPtr / 4];
-        const metadataStr = Module.UTF8ToString(metadataJsonPtr, metadataLength);
+        const metadataLength = ft8lib.module.HEAP32[metadataLengthPtr / 4];
+        const metadataJsonPtr = ft8lib.module.HEAP32[metadataJsonPtrPtr / 4];
+        const metadataStr = ft8lib.module.UTF8ToString(metadataJsonPtr, metadataLength);
     
         try {
             this.metadata = JSON.parse(metadataStr);
@@ -575,13 +513,13 @@ class FT8Message extends EventTarget {
             console.error(error);
         } finally {
             // Free allocated memory
-            Module._free(symbolsPtr);
-            Module._free(audioPtr);
-            Module._free(dphiPtr);
-            Module._free(levelsPtr);
-            Module._free(metadataLengthPtr);
-            Module._free(metadataJsonPtrPtr);
-            Module._free(metadataJsonPtr);
+            ft8lib.module._free(symbolsPtr);
+            ft8lib.module._free(audioPtr);
+            ft8lib.module._free(dphiPtr);
+            ft8lib.module._free(levelsPtr);
+            ft8lib.module._free(metadataLengthPtr);
+            ft8lib.module._free(metadataJsonPtrPtr);
+            ft8lib.module._free(metadataJsonPtr);
         }
     }
 }
@@ -601,25 +539,6 @@ function detectFreeTextBrackets(str) {
     const trimmed = str.trim();
     return (trimmed.startsWith('<') && trimmed.endsWith('>') && !trimmed.slice(1, trimmed.length-1).includes('<'))  
         || (trimmed.startsWith('"') && trimmed.endsWith('"'));
-}
-
-function normalizeMessage(message) {
-    return message.trim().toUpperCase().replace(/\s+/g, ' ');
-}
-
-function normalizeMessageAndHashes(message) {
-    // replace contents of <...> with '<...>'
-    return message.trim().toUpperCase().replace(/\s+/g, ' ').replace(/<[^>]*>/g, '<...>');
-}
-
-function normalizeBracketedFreeText(input) {
-    // trim and remove brackets or quotes
-    if (input.startsWith('<') && input.endsWith('>')) {
-        return input.trim().replace(/^<|>$/g, '');
-    } else if (input.startsWith('"') && input.endsWith('"')) {
-        return input.trim().replace(/^"|"$|“|”/g, '');
-    }
-    return input.trim();
 }
 
 function normalizeSymbols(input) {
@@ -728,9 +647,14 @@ function findMinAndMax(numbers) {
     return { min, max };
 }
 
-// needed
-export { FT8Message, addHash, findHash, addHashesFromInput, addDefaultHashes };
-// sure why not (maybe move some normalize to ft8_extra.js)
-export { hashes, normalizeMessage, normalizeMessageAndHashes, normalizeBracketedFreeText };
-// meh
-//export { normalizeSymbols, normalizeBinary, normalizePackedData, normalizeTelemetry, doDetectInputType, scaleToRange, findMinAndMax };
+
+export { 
+    // needed
+    FT8Message,
+
+    // sure why not (maybe move some normalize to ft8_extra.js)
+    normalizeMessage, normalizeMessageAndHashes, normalizeBracketedFreeText,
+
+    // meh (probably internal)
+    normalizeSymbols, normalizeBinary, normalizePackedData, normalizeTelemetry, doDetectInputType, scaleToRange, findMinAndMax
+};

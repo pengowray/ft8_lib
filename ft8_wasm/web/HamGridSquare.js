@@ -258,4 +258,6 @@ const HamGridSquare = {
 };
 
 //testGridSquare();
-export * from './HamGridSquare.js';
+
+export { HamGridSquare } ;
+//export { gridForLatLon, latLonToGridSquare, latLonForGrid, gridSquareToLatLon, testGridSquare }

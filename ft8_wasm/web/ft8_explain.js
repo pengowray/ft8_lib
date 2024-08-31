@@ -1,4 +1,5 @@
-function explainFT8Message(text, msgType) {
+
+export function explainFT8Message(text, msgType) {
     if (text === "Decoding failed") {
         return '';
     }
@@ -88,5 +89,3 @@ function explainFT8Message(text, msgType) {
 
     return typeExplanation + explanation;
 }
-
-export default explainFT8Message;

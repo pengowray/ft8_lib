@@ -1,5 +1,5 @@
 import { Component } from './views.js';
-import { symbolsToBitsStrNoCosta, bitsToText, inputTypeDescriptions, normalizeMessage, normalizeMessageAndHashes, normalizeBracketedFreeText, getFT8MessageTypeName }  from './ft8_extra.js';
+import { symbolsToBitsStrNoCosta, bitsToText, symbolsPretty, inputTypeDescriptions, normalizeMessage, normalizeMessageAndHashes, normalizeBracketedFreeText, getFT8MessageTypeName }  from './ft8_extra.js';
 import * as extra from "./ft8_extra.js";
 import { explainFT8Message } from './ft8_explain.js';
 import { annotationDefinitions, AnnotationDefGetValueText, AnnotationDefGetAnnotation } from './ft8_anno.js';
@@ -250,7 +250,7 @@ export class OutputComponent extends Component {
                 ${this.renderRowData('Message', data.messageBits, null, '77 bits')}
                 ${this.renderRowDataHighlights('Checksum', data.crcBits, this.getCRCHighlights(data.crcCheck), null, 'CRC failed', '14 bits', 'CRC (cyclic redundancy check)')}
                 ${this.renderRowDataHighlights('Parity', data.parityBits, this.getParityHighlights(data.parityCheck), 'Low Density Parity Check (LDPC). The highlighted bits differ from parity data which would match the combined message and CRC bits.', null, '83 bits', 'Low Density Parity Check (LDPC)')}
-                ${(!data.parityCheck.success) ? this.renderRowDataHighlights('Codeword', data.codeword, this.getLDPCErrorHighlights(data.parityCheck), 'Red highlighted bits are the most likely to be incorrect, considering the parity data. Orange highlighted bits are less likely errors. The 174 bits are the message, CRC and LDPC concatenated together.', null, '174-bit', 'The 174 bits are the concatenation of the message, CRC and LDPC.') : ''}
+                ${(!data.parityCheck.success) ? this.renderRowDataHighlights('Codeword', data.codeword, this.getLDPCErrorHighlights(data.parityCheck), 'Red highlighted bits are the most likely to be incorrect, considering the parity data. Orange highlighted bits are less likely errors. The 174 bits are the message, CRC, and LDPC concatenated together.', null, '174-bit', 'The 174 bits are the concatenation of the message, CRC, and LDPC.') : ''}
                 ${(!data.parityCheck.success && data.repaired) ? this.renderRowDataHighlights('One-step Repair', data.repaired, data.parityCheck.messageErrors.mostFrequentNumbers, 'This has changes applied to the codeword, applying a single-step error repair, based on the parity data. Copy this into the input and encode to see the result. If there are only a small number of errors, this may repair the message.', 'corrected', '*') : ''  }
                 
                 ${this.renderSubheading('Decoding')}

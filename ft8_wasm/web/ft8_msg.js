@@ -1,4 +1,4 @@
-import { grayBitsToSymbols, encodeFT8FreeText, packedDataTo80Bits, getFT8MessageType, normalizeMessage, normalizeMessageAndHashes, normalizeBracketedFreeText, checkSync, checkCRC, checkParity } from "./ft8_extra.js";
+import { grayBitsToSymbols, encodeFT8FreeText, packedDataTo80Bits, getFT8MessageType, normalizeMessage, normalizeMessageAndHashes, normalizeBracketedFreeText, checkSync, checkCRC, checkParity, repairErrorsOnce, symbolsToBitsStrNoCosta  } from "./ft8_extra.js";
 import * as extra from "./ft8_extra.js";
 import * as hashmgr from "./ft8_hashmgr.js";
 import FT8LIB from "./ft8_ft8lib.js";
@@ -65,7 +65,11 @@ class FT8Message extends EventTarget {
       // ViewManager for reporting audio stop/start/queued/etc
       this.viewManager = null;
 
-      this.hashes = hashmgr.hashes;
+      if (hashmgr && hashmgr.mshvft8 == null) {
+          hashmgr.setMshvft8(mshvft8);
+      }
+      
+      //this.hashes = hashmgr.hashes;
 
       // setup Event Listeners
       //this.dispatchEvent(new Event('queue'));
@@ -93,7 +97,7 @@ class FT8Message extends EventTarget {
         // returns null if nothing to repair
         const parityCheck = this.getParityCheck();
         if (parityCheck == null || parityCheck.success) return null;
-        const repaired = repairErrorsOnce(symbolsToBitsStrNoCosta(this.symbolsText), parityCheck);
+        const repaired = extra.repairErrorsOnce(symbolsToBitsStrNoCosta(this.symbolsText), parityCheck);
         return repaired;
     }
 
@@ -144,7 +148,7 @@ class FT8Message extends EventTarget {
         switch (inputType) {
             case 'free text':
                 input = normalizeBracketedFreeText(input);
-                this.packedData = encodeFT8FreeText(input);
+                this.packedData = extra.encodeFT8FreeText(input);
                 break;
             case '79 symbols':
                 input = normalizeSymbols(input);
@@ -152,7 +156,7 @@ class FT8Message extends EventTarget {
                 break;
             case '58 symbols':
                 input = normalizeSymbols(input);
-                this.symbolsText = symbols58ToSymbols79(input);
+                this.symbolsText = extra.symbols58ToSymbols79(input);
                 break;
             case 'packed':
                 input = normalizePackedData(input);
@@ -160,7 +164,7 @@ class FT8Message extends EventTarget {
                 break;
             case 'telemetry':
                 input = normalizeTelemetry(input);
-                let result = encodeFT8Telemetry(input);
+                let result = extra.encodeFT8Telemetry(input);
                 if (result.error) {
                     this.encodeError = result.error;
                     throw new Error(result.error);
@@ -182,20 +186,20 @@ class FT8Message extends EventTarget {
                 this.packedData = extra.bitsToPacked(bitStr.slice(0, 77));
                 break;
             case '91 bits':
-                this.symbolsText = binary91ToSymbols(normalizeBinary(input));
+                this.symbolsText = extra.binary91ToSymbols(normalizeBinary(input));
                 break;
             case '174 bits':
-                this.symbolsText = binary174ToSymbols(normalizeBinary(input));
+                this.symbolsText = extra.binary174ToSymbols(normalizeBinary(input));
                 break;
             case '237 bits': // symbols (as normal binary, including sync)
-                this.symbolsText = binary237ToSymbols(normalizeBinary(input));
+                this.symbolsText = extra.binary237ToSymbols(normalizeBinary(input));
                 break;
             case '237 grits': // symbols (as graycode bits, including sync)
-                this.symbolsText = grayBitsToSymbols(normalizeBinary(input));
+                this.symbolsText = extra.grayBitsToSymbols(normalizeBinary(input));
                 break;
             case 'default':
             default:
-                input = normalizeMessage(input);
+                input = extra.normalizeMessage(input);
                 hashmgr.addHashesFromInput(this.inputText);
 
                 const packingResult = ft8lib.messageToPackedData(input);
@@ -246,7 +250,7 @@ class FT8Message extends EventTarget {
         }
     
         if (this.packedData) {
-            var packedBits = packedDataTo80Bits(this.packedData);
+            var packedBits = extra.packedDataTo80Bits(this.packedData);
             const zeroPadding = packedBits.slice(77);
             this.bits = packedBits.slice(0, 77);
             if (zeroPadding != '000') {
@@ -255,7 +259,7 @@ class FT8Message extends EventTarget {
             }
         }
 
-        this.ft8MessageType = getFT8MessageType(this.packedData);
+        this.ft8MessageType = extra.getFT8MessageType(this.packedData);
         this.reDecodedResult = ft8lib.decodeFT8FromPackedData(this.packedData, this.packedData.length);
         this.mshvDecodedResult = mshvft8.unpackMessage(this.bits).message;
         if (this.mshvDecodedResult != null && this.mshvDecodedResult.errorCode == 0) {
@@ -528,7 +532,7 @@ function detectTelemetry(str) {
     //exactly 18 hex digits, or start with T:
     //note: first digit must be 0-8 if 18 digits. (not checked here)
     const trimmed = str.trim().toUpperCase();
-    return (/^([0-9A-Fa-f][\s\-\:]?){18}$/.test(trimmed)) 
+    return (/^([0-9A-Fa-f][\s\-\:\,]?){18}$/.test(trimmed)) 
 //                || (/^[Tt](ELEMETRY)?:\s0*([0-9A-Fa-f][\s\-\:]?){1,18}$/.test(trimmed))
           || (/^[Tt](ELEMETRY)?\s*:/.test(trimmed))
           || (/\#T(ELEMETRY)?$/.test(trimmed))
@@ -553,7 +557,7 @@ function normalizeBinary(input) {
 
 function normalizePackedData(input) {
     //return input.replace(/[-\s]/g, '').toUpperCase();
-    return input.replace(/[-\s]/g, '').toLowerCase();
+    return input.replace(/[\s\-\:\,]/g, '').toLowerCase();
 }
 
 function normalizeTelemetry(str) {
@@ -564,7 +568,7 @@ function normalizeTelemetry(str) {
     trimmed = trimmed.toUpperCase()
         .replace(/^[Tt](ELEMETRY)?:\s*/g, '') // remove initial "T:" or telemetry:
         .replace(/\#T(ELEMETRY)?\s*$/g, '') // remove "#TELEMETRY "
-        .replace(/[ \-\:]/g, '') // remove any space - :
+        .replace(/[\s\-\:\,]/g, '') // remove any space - : ,
         .replace(/^[0]*/g, ''); // initial 0's
     return trimmed;
 }
@@ -585,7 +589,7 @@ function doDetectInputType(inputOriginal) {
     }
 
     // Check if input is hex string (packed data); pairs of hex must be together.
-    if (/^\s*([0-9A-Fa-f]{2}[-\s]?){10}\s*$/.test(input)) {
+    if (/^\s*([0-9A-Fa-f]{2}[-\s\,\:]?){10}\s*$/.test(input)) {
         return 'packed';
     }
 
@@ -629,7 +633,7 @@ function doDetectInputType(inputOriginal) {
  */
 function scaleToRange(numbers, newMin, newMax) {
     const { min: originalMin, max: originalMax } = findMinAndMax(numbers);
-    console.log("min/max:", originalMin, originalMax);
+    //console.log("min/max:", originalMin, originalMax);
     const scale = (newMax - newMin) / (originalMax - originalMin);
     
     return numbers.map(num => (num - originalMin) * scale + newMin);

@@ -1,3 +1,6 @@
+// ctydata.js copyright Pengo Wray 2024; made available under an MIT license.
+// cty.csv ("The Contest Country Files") Copyright © 1994-, also available under an MIT license from AD1C's website: http://www.country-files.com/cty/
+
 const deofficializationTable = {
   'Fed. Rep. of Germany': 'Germany',
   'Republic of Korea': 'South Korea',
@@ -204,8 +207,16 @@ class CTYData {
   }
 }
 
-const cty = new CTYData();
-cty.loadData();
+let cty = null;
+
+function getCty() {
+    if (cty == null) {
+        cty = new CTYData();
+        cty.loadData();
+    }
+    return cty;
+}
+
 //console.log('countries', cty.countries);
 
-export default cty;
+export { getCty };

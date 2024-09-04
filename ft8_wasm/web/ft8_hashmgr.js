@@ -3,6 +3,11 @@ import { hashCallsign, hashBitsToZ32Dense } from "./ft8_extra.js";
 
 export const hashes = {};
 
+export let mshvft8 = null;
+export function setMshvft8(mshvft8_) {
+    mshvft8 = mshvft8_;
+}
+
 export function addHash(callsign) {
     //TODO: watch for conflicts
     //TODO: priorty levels
@@ -31,6 +36,10 @@ export function addHash(callsign) {
         hashes[zhash] = entry; // 22 bits
         hashes[zhash.slice(0, 3)] = entry; // 12 bits
         hashes[zhash.slice(0, 2)] = entry; // 10 bits
+
+        if (mshvft8 !== null) {
+            mshvft8.saveHash(callsign);
+        }
     }
 }
 

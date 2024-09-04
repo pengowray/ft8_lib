@@ -1,5 +1,6 @@
 import { HamGridSquare } from './HamGridSquare.js'
 import { findHash } from "./ft8_hashmgr.js";
+import { getCty } from "./ctydata.js";
 
 // Free text character table
 export const FT8_CHAR_TABLE_FULL = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ+-./?";
@@ -1132,23 +1133,18 @@ export function bitsToCallDetails(bits, extraBit = "") {
 }
 
 export function callsignToCountry(call) {
-    if (typeof cty !== 'undefined' && cty) {
-        const countryDetails = cty.getCountryDetails(call);
-        if (countryDetails) {
-            return countryDetails.country;
-        }
-    }
-    return null;
+    return callsignToCountryDetails(call)?.country;
 }
 
-function callsignToCountryDetails(call) {
-    if (typeof cty !== 'undefined' && cty) {
-        const countryDetails = cty.getCountryDetails(call);
-        return countryDetails;
-    }
-    return null;
-}
+export function callsignToCountryDetails(call) {
+    if (typeof getCty === 'undefined') return null;
 
+    const cty = getCty();
+    const countryDetails = cty.getCountryDetails(call);
+    //console.log('countryDetails:', countryDetails);
+
+    return countryDetails;
+}
 
 function hashMatchDetails(bits) {
     const match = findHash(bits);

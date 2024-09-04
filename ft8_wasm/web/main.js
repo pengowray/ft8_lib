@@ -129,17 +129,13 @@ function initializeUI() {
 
     const parseNote = (note) => {
       const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-      //const flatToSharp = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
       const flatToSharp = { 'DB': 'C#', 'EB': 'D#', 'GB': 'F#', 'AB': 'G#', 'BB': 'A#' };          
-      // Validate input
 
       if (typeof note !== 'string') return NaN;
-      note = note.toUpperCase();
-      
-      // Convert flat notation to sharp notation if necessary
-      //let normalizedNote = note.replace(/([A-G])b(\d?)$/, (_, noteLetter, octave) => 
-      //  (flatToSharp[noteLetter + 'b'] || noteLetter + 'b') + octave
-      //);
+      note = note.toUpperCase().replace('♭', 'B').replace('♯', '#');
+      // TODO: ♭ should only be second letter; use detectNoteNotation instead?
+
+      // Convert flat notation to sharp notation
       let normalizedNote = note.replace(/([A-G])B(\d?)$/, (_, noteLetter, octave) => 
         (flatToSharp[noteLetter + 'B'] || noteLetter + 'B') + octave
       );
@@ -155,19 +151,34 @@ function initializeUI() {
     };
 
     function detectNoteNotation(input) {
+      const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+      const flatToSharp = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
+
       // Regular expression to match note notation
-      //const notePattern = /^([A-G](#|b)?)(\d)?$/;
-      const notePattern = /^([A-G](#|B)?)(\d)?$/;
+      
+      const notePattern = /^([A-G])(#|B|♭|♯)?([+-]?\d+)?$/;
       const match = input.toUpperCase().match(notePattern);
       
       if (match) {
         const [, note, accidental, octave] = match;
-        return {
+        if (accidental === 'B' || accidental === '♭') accidental = 'b';
+        if (accidental === '♯') accidental = '#';
+
+        let returnNote = {
           isValid: true,
-          note: note,
-          accidental: accidental || null,
-          octave: octave ? parseInt(octave) : null
+          noteInput: note + accidental + (parseInt(octave) || ''),
+          note: flatToSharp[noteInput] || noteInput,
+          //octaveInput: octave ? parseInt(octave) : null,
+          octave: octave ? parseInt(octave) : 4,
+          //accidentalInput: accidental || null,
         };
+        if (!returnNote.note) return { isValid: false };
+
+        const a4 = 440;
+        returnNote.keyNumber = notes.indexOf(returnNote.note);
+        returnNote.frequency = a4 * Math.pow(2, (notes.octave - 4) + (returnNote.keyNumber - 9) / 12);
+
+        return returnNote;
       } else {
         return { isValid: false };
       }

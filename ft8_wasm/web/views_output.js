@@ -52,7 +52,8 @@ export class OutputComponent extends Component {
             packed: extra.packedToHexStrSp(message.packedData),
             veryPacked: extra.packedToHexStr(message.packedData),
             codeword: bitsNoCosta, // 174 bits
-            messageBits: message.bits, //bitsNoCosta.slice(0, 77),
+            messageBits: message.bits,
+            allBits: message.allBits,
             crcBits: bitsNoCosta.slice(77, 91),            
             parityBits: bitsNoCosta.slice(91),
             symbols: message.symbolsText,
@@ -71,6 +72,7 @@ export class OutputComponent extends Component {
     }
 
     prepareChecks() {
+        if (!this.message || this.packetType != 'ft8') return null;
         return [
             { name: "Sync check", ...this.message.getSyncCheck() },
             { name: "CRC check", ...this.message.getCRCCheck() },
@@ -257,29 +259,29 @@ export class OutputComponent extends Component {
                 ${data.isATest ? this.renderRowDataField( { label: 'Test case?', value: data.isATest, subtype: data.testType, isField: false }) : ''}
 
                 ${this.renderSubheading('Message Fields')}
-                ${this.renderRows(data.messageBits, data.ft8MessageType)}
+                ${this.renderRows(this.message.allBits ?? this.message.bits, data.ft8MessageType)}
 
-                ${this.renderSubheading('Encoding')}
+                ${this.renderSubheading('FT8 Packing')}
 
                 ${this.renderChecks('Checks', data.checks)}
                 ${this.renderRowDataHighlights('Symbols', extra.symbolsPretty(data.symbols), this.getSyncHighlights(data.syncCheck), 'Incorrect sync symbols highlighted in red. Expected sync symbols: 3140652.', null, '79 tones')}
                 ${this.renderRowData('Message', data.packed, `Without spaces: ${data.veryPacked}. Zero-extended to 10 bytes.`, 'packed')}
-                ${this.renderRowData('Message', data.messageBits, null, '77 bits')}
+                ${this.renderRowData('Message', data.messageBits, null, `${data.messageBits.length} bits`)}
                 ${this.renderRowDataHighlights('Checksum', data.crcBits, this.getCRCHighlights(data.crcCheck), null, 'CRC failed', '14 bits', 'CRC (cyclic redundancy check)')}
                 ${this.renderRowDataHighlights('Parity', data.parityBits, this.getParityHighlights(data.parityCheck), 'Low Density Parity Check (LDPC). The highlighted bits differ from parity data which would match the combined message and CRC bits.', null, '83 bits', 'Low Density Parity Check (LDPC)')}
                 ${(!data.parityCheck.success) ? this.renderRowDataHighlights('Codeword', data.codeword, this.getLDPCErrorHighlights(data.parityCheck), 'Red highlighted bits are the most likely to be incorrect, considering the parity data. Orange highlighted bits are less likely errors. The 174 bits are the message, CRC, and LDPC concatenated together.', null, '174-bit', 'The 174 bits are the concatenation of the message, CRC, and LDPC.') : ''}
                 ${(!data.parityCheck.success && data.repaired) ? this.renderRowDataHighlights('One-step Repair', data.repaired, data.parityCheck.messageErrors.mostFrequentNumbers, 'This has changes applied to the codeword, applying a single-step error repair, based on the parity data. Copy this into the input and encode to see the result. If there are only a small number of errors, this may repair the message.', 'corrected', '*') : ''  }
                 
-                ${this.renderSubheading('Decoding')}
+                ${this.renderSubheading('FT8 Unpacking')}
                 ${this.renderChecks('Decode check', data.decoded )}
                 ${this.renderRowData('Input text', data.inputText )}
                 
                 ${data.mshvDecodedResult.success ? 
                     this.renderRowDataField({label: 'Decoded text', secondaryLabel: 'mshv', value: data.decodedText_mshv}) :
-                    this.renderRowData('Decode error', data.mshvDecodedResult.errorMessage)}
+                    this.renderRowDataField({label: 'Decode error', secondaryLabel: 'mshv', value: data.mshvDecodedResult.errorMessage, isField: false})}
                 ${data.ft8libDecodedResult.success ? 
                     this.renderRowDataField({label: 'Decoded text', secondaryLabel: 'ft8_lib', value: data.decodedText_ft8lib, desc: data.decodedText_mshv.includes('<...>') || data.decodedText_ft8lib.includes('<...>') ? '<...> represents a hashed callsign.' : null }) :
-                    this.renderRowData('Decode error', data.ft8libDecodedResult.errorMessage)}
+                    this.renderRowDataField({label: 'Decode error', secondaryLabel: 'ft8_lib', value: data.ft8libDecodedResult.errorMessage, isField: false})}
 
                 ${data.explanation ? this.renderSubheading('More info') : ''}
                 ${data.explanation ? this.renderRowText('Explanation', data.explanation) : ''}
@@ -471,7 +473,8 @@ export class OutputComponent extends Component {
                 default: return '';
             }
         };
-    
+        if (checks == null) return '';
+
         const checksHtml = checks.map(check => `
             <span class="check-result check-${check.result.toLowerCase()}">
                 <span class="check-icon">${getIcon(check.result)}</span>

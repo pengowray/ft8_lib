@@ -12,7 +12,7 @@ class FT8Message extends EventTarget {
     initSymbolsText(symbolsText) {
         this.symbolsText = symbolsText;
         this.packedData = extra.symbolsToPackedData(symbolsText);
-        this.bits = extra.symbolsToBitsStrNoCosta(this.symbolsText).slice(0, 77);
+        this.bits = extra.symbolsToBitsStrNoCosta(this.symbolsText).slice(0, 77); // == symbolsToBitsStr(this.symbolsText).slice(21, 108);
         this.postInit();
     }
 
@@ -57,6 +57,8 @@ class FT8Message extends EventTarget {
     postInit() {
         // todo: separate checks and additions
 
+        this.packetType ??= (this.ft8MessageType !== null && ft8MessageType === 'spp') ? 'spp' : 'ft8';
+
         if (this.symbolsText == null && this.packedData != null) {
             console.log("empty symbols, generating from packed data (should not happen).")
             this.symbolsText = ft8lib.packedDataToSymbols(this.packedData);
@@ -79,7 +81,7 @@ class FT8Message extends EventTarget {
         var packedBits = extra.packedDataTo80Bits(this.packedData);
         const zeroPadding = packedBits.slice(77);
         //this.bits = packedBits.slice(0, 77);
-        if (zeroPadding != '000') {
+        if ((this.packetType == null || this.packetType === 'ft8') && zeroPadding != '000') {
             this.encodeError = `Packed data not zero padded (Expected 77 bits + 3 zeros), Got: ${packedBits}`;
             throw new Error(this.encodeError);
         }
@@ -88,8 +90,8 @@ class FT8Message extends EventTarget {
             throw new Error("Packed data does not match bits");
         }
 
-        this.ft8MessageType = extra.getFT8MessageType(this.packedData);
-        
+        this.ft8MessageType ??= extra.getFT8MessageType(this.packedData);
+
         // re-encoding messages
         
         //TODO: use both / use consistant format
@@ -121,6 +123,10 @@ class FT8Message extends EventTarget {
       this.symbolsText = null;
       this.packedData = null;
       this.bits = null; // string of 77 bits
+
+      this.allBits = null; // all bits needed for annotations: 80 bits for SPP; will be 237 bits for FT8 but keeping it null for now
+      this.packetType = null; // 'ft8' or 'spp
+      this.ft8MessageType = null;
 
       // results of encoding
       this.encodeError = null;

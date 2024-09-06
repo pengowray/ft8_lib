@@ -71,10 +71,16 @@ function initMessage(message, normalizedInput, inputType) { // was: encode()
             message.initSymbolsText(symbolsText);
             return;
         case 'packed':
-            //const normalInput = normalizePackedData(input);
-            //const packed = new Uint8Array(input.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
             const packed = extra.hexToPacked(input);
             message.initPackedData(packed);
+            return;
+        case 'packed spp':
+            const packedSpp = extra.hexToPacked(input);
+            message.packetType = 'spp';
+            message.ft8MessageType = 'spp';
+            message.initPackedData(packedSpp);
+            message.allBits = packedDataTo80Bits(packedSpp);
+            //message.ft8MessageType = 'spp'; 
             return;
         case 'telemetry':
             let result = extra.encodeFT8Telemetry(input);
@@ -202,7 +208,7 @@ export function inputToTabs(inputOriginal, expectedResults = null) {
 
     if (input != inputOriginal) info.normalized = true;
 
-    const inputTypes = detectInputTypes(input);
+    const inputTypes = detectInputTypes(input, inputOriginal);
 
     // grits check
     // TODO: put this somewhere else
@@ -265,6 +271,7 @@ export function normalizeType(input, type) {
         case '58 symbols':
             return normalizeSymbols(input);
         case 'packed':
+        case 'packed spp':
             return normalizePackedData(input);
         case 'telemetry':
             return normalizeTelemetry(input);
@@ -287,7 +294,7 @@ export function normalizeType(input, type) {
 }
 
 // was: detectInput / doDetectInputType
-export function detectInputTypes(normalizedInput) {
+export function detectInputTypes(normalizedInput, inputOriginal) {
     const input = normalizedInput;
 
     //TODO: return normalized forms per type?
@@ -318,6 +325,10 @@ export function detectInputTypes(normalizedInput) {
     // Check if input is hex string (packed data); pairs of hex must be together.
     if (/^\s*([0-9A-Fa-f]{2}[-\s\,\:]?){10}\s*$/.test(input)) {
         inputTypes['packed'] = 25;
+
+        if (inputOriginal.includes(',')) {
+            inputTypes['packed spp'] = 50;
+        }
     }
 
     if (detectTelemetry(input)) {

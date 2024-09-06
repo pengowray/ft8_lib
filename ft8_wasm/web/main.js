@@ -83,9 +83,7 @@ function initializeUI() {
             testSelect.appendChild(option2);
         });
 
-        testSelect.addEventListener('change', (event) => {
-            testSelect.addEventListener('change', handleTestInputChange);
-        });
+        testSelect.addEventListener('change', handleTestInputChange);
     }
 
     function handleTestInputChange(event) {
@@ -117,6 +115,10 @@ function initializeUI() {
     document.addEventListener('keydown', handleKeyboardShortcuts);
 
     function handleKeyboardShortcuts(event) {
+        if (isEditableElement(document.activeElement)) {
+            return;
+        }
+
         if (event.ctrlKey || event.metaKey) {
             if (event.key === 'ArrowRight') {
                 event.preventDefault();
@@ -134,6 +136,12 @@ function initializeUI() {
                 changeTestInput(-1);
             }
         }
+    }
+    
+    function isEditableElement(element) {
+        return element.tagName === 'INPUT' || 
+               element.tagName === 'TEXTAREA' || 
+               element.isContentEditable;
     }
     
     function changeTab(direction) {
@@ -419,11 +427,20 @@ function initializeUI() {
                     typeInfo = typeInfo.slice(8);
                 }
 
-                if (msg.ft8MessageType && msg.inputType && !['free text', 'telemetry'].includes(msg.inputType)) {
-                    typeInfo += ' → ' + (extra.getFT8MessageTypeName(msg.ft8MessageType) || msg.ft8MessageType);
+                if (msg.packetType == 'spp') {
+                    tabButton.innerHTML = `Space Packet Protocol 🛰<br>${typeInfo}`;
+                } else {
+
+                    if (msg.ft8MessageType && msg.inputType && !['free text', 'telemetry'].includes(msg.inputType)) {
+                        typeInfo += ' → ' + (extra.getFT8MessageTypeName(msg.ft8MessageType) || msg.ft8MessageType);
+                    }
+
+                    if (msg.bestDecodedResult?.success) { 
+                        tabButton.innerHTML = `<b>${msg.bestDecodedResult.decodedText}</b><br>${typeInfo}`;
+                    } else {
+                        tabButton.innerHTML = typeInfo;
+                    }
                 }
-                //tabButton.textContent = msg.bestDecodedResult?.success ? `${inputType}: ${msg.bestDecodedResult.decodedText}` : `${inputType}`;
-                tabButton.innerHTML = msg.bestDecodedResult?.success ? `<b>${msg.bestDecodedResult.decodedText}</b><br>${typeInfo}` : `${typeInfo}`;
 
             } else {
                 tabButton.textContent = `Tab ${index + 1}`;
@@ -432,7 +449,7 @@ function initializeUI() {
             //if (index === activeIndex) {
             if (msg === message) {
                 tabButton.classList.add('active');
-            } else if (!msg.encodeError && !message.encodeError && msg.bits === message.bits) {
+            } else if (!msg.encodeError && !message.encodeError && msg.bits === message.packetType && msg.packetType) {
                 tabButton.classList.add('equal');
             }
 

@@ -974,6 +974,7 @@ export function getFT8MessageTypeName(type) {
         case "5": return "EU VHF with 6-digit grid locator";
         case "6": return "Unknown / Reserved";
         case "7": return "Unknown / Reserved";
+        case "spp": return "Space Packet Protocol";
         default: return "Unknown";
     }
 }

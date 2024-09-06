@@ -61,25 +61,7 @@ function initializeUI() {
     viewManager.registerComponent(new PlayBtnComponent(-2, audioControls));
 
     const initializeTestInputs = () => {;
-        testInputs.forEach((test, index) => {
-            const option = document.createElement('option');
-            option.value = index;
-            option.textContent = test.name || test.value;
-            testSelect.appendChild(option);
-        });
-
-        testSelect.addEventListener('change', (event) => {
-            const selectedIndex = event.target.value;
-            if (selectedIndex !== "") {
-                const selectedTest = testInputs[selectedIndex];
-                messageInput.value = selectedTest.value;
-                doEncode();
-            }
-        });
-    }
-    //initializeTestInputs();
-
-    const initializeTestInputs_ft8code = () => {;
+       
         ft8_examples.forEach((test, index) => {
             const option = document.createElement('option');
             option.value = `example ${index}`;
@@ -102,30 +84,73 @@ function initializeUI() {
         });
 
         testSelect.addEventListener('change', (event) => {
-            const selected = event.target.value.split(' ');
-            let selectedType = selected[0];
-            let selectedIndex = parseInt(selected[1]);
-            if (selectedIndex !== "") {
-                if (selectedType === 'ft8codeMsg') {
-                    const selectedTest = testInputs_ft8code[selectedIndex];
-                    messageInput.value = selectedTest.message;
-                    const expectedResults = { ...selectedTest, testType: selectedType};
-                    doEncode(expectedResults);
-                } else if (selectedType === 'ft8codeSymbols') {
-                    const selectedTest = testInputs_ft8code[selectedIndex];
-                    messageInput.value = selectedTest.symbols;
-                    const expectedResults = {...selectedTest, ...{symbols:null}, testType: selectedType}; // don't bother testing symbols when they're in the input
-                    doEncode(expectedResults);
-                } else if (selectedType === 'example') {
-                    const selectedTest = ft8_examples[selectedIndex];
-                    messageInput.value = selectedTest.value;
-                    const nonTest = { ...selectedTest, testType: selectedType};
-                    doEncode(nonTest); // to add a comment
-                }
-            }
+            testSelect.addEventListener('change', handleTestInputChange);
         });
     }
-    initializeTestInputs_ft8code();
+
+    function handleTestInputChange(event) {
+        const selected = event.target.value.split(' ');
+        let selectedType = selected[0];
+        let selectedIndex = parseInt(selected[1]);
+        if (selectedIndex !== "") {
+            if (selectedType === 'ft8codeMsg') {
+                const selectedTest = testInputs_ft8code[selectedIndex];
+                messageInput.value = selectedTest.message;
+                const expectedResults = { ...selectedTest, testType: selectedType};
+                doEncode(expectedResults);
+            } else if (selectedType === 'ft8codeSymbols') {
+                const selectedTest = testInputs_ft8code[selectedIndex];
+                messageInput.value = selectedTest.symbols;
+                const expectedResults = {...selectedTest, ...{symbols:null}, testType: selectedType}; // don't bother testing symbols when they're in the input
+                doEncode(expectedResults);
+            } else if (selectedType === 'example') {
+                const selectedTest = ft8_examples[selectedIndex];
+                messageInput.value = selectedTest.value;
+                const nonTest = { ...selectedTest, testType: selectedType};
+                doEncode(nonTest);
+            }
+        }
+    }
+
+    initializeTestInputs();
+
+    document.addEventListener('keydown', handleKeyboardShortcuts);
+
+    function handleKeyboardShortcuts(event) {
+        if (event.ctrlKey || event.metaKey) {
+            if (event.key === 'ArrowRight') {
+                event.preventDefault();
+                changeTab(1);
+            } else if (event.key === 'ArrowLeft') {
+                event.preventDefault();
+                changeTab(-1);
+            }
+        } else if (event.shiftKey) {
+            if (event.key === '.' || event.key === '>') {
+                event.preventDefault();
+                changeTestInput(1);
+            } else if (event.key === ',' || event.key === '<') {
+                event.preventDefault();
+                changeTestInput(-1);
+            }
+        }
+    }
+    
+    function changeTab(direction) {
+        const tabs = Array.from(tabContainer.children);
+        const activeTabIndex = tabs.findIndex(tab => tab.classList.contains('active'));
+        if (activeTabIndex !== -1) {
+            const newIndex = (activeTabIndex + direction + tabs.length) % tabs.length;
+            tabs[newIndex].click();
+        }
+    }
+
+    function changeTestInput(direction) {
+        const currentIndex = testSelect.selectedIndex;
+        const newIndex = (currentIndex + direction + testSelect.options.length) % testSelect.options.length;
+        testSelect.selectedIndex = newIndex;
+        testSelect.dispatchEvent(new Event('change'));
+    }
 
     const parseFreq = (note) => {
         return parseNote(note) || parseFloat(note) || 500;
@@ -341,7 +366,6 @@ function initializeUI() {
     function changeToMessage(msg) {
         //TODO: separate: views stuff and audio stuff and updateTabUI stuff (already in its own function)
 
-        console.log("changeToMessage", msg);
         message = msg;
 
         updateTabUI();
@@ -366,7 +390,6 @@ function initializeUI() {
 
         const index = viewManager.addMessage(message);
         viewManager.switchToMessageIndex(index);
-        console.log("switched to message", index);
 
         if (message.audioSamples.length > 0) {
             //setupAudioPlayback(message);
@@ -412,7 +435,7 @@ function initializeUI() {
             } else if (!msg.encodeError && !message.encodeError && msg.bits === message.bits) {
                 tabButton.classList.add('equal');
             }
-            
+
             //todo: warning too
             if (msg.encodeError) {
                 tabButton.classList.add('error');

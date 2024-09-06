@@ -65,7 +65,9 @@ export function addHashesFromInput(inputText) {
     //console.log("addHashesFromInput", input, pieces);
 
     for (const piece of pieces) {
-        //ignore if only numbers
+        
+         //ignore if only numbers (e.g. for symbols or bits)
+         //todo: add but low priority
         if (/^\d+$/.test(piece)) continue;
 
         //remove surrounding < > or quotes

@@ -630,7 +630,6 @@ export function repairErrorsOnce(codewordBits, parityCheck) {
         if (flip.has(index)) return element === '0' ? '1' : '0';
         return element;
     }).join('');
-        console.log('flip:', flip, 'flipped:', flipped);
     return flipped;
 }
 

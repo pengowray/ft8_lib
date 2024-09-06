@@ -1,4 +1,5 @@
 import { FT8Message } from './ft8_msg.js';
+import { inputToTabs } from './ft8_tabs.js';
 import { ViewManager } from './views.js';
 //import { VizComponent, PianoRollComponent, OutputComponent, TribbleComponent, PlayBtnComponent } from './components.js';
 import { VizComponent } from './views_viz.js';
@@ -49,6 +50,7 @@ function initializeUI() {
     const audioVisualization = document.getElementById('audio-visualization');
     const tribbleViz = document.getElementById('tribble-visualization');
     const testSelect = document.getElementById('test-select');
+    const tabContainer = document.getElementById('tab-container');
 
     viewManager.registerComponent(new VizComponent(-1, audioVisualization));
     viewManager.registerComponent(new PianoRollComponent(-1, pianoRollDiv));
@@ -314,11 +316,37 @@ function initializeUI() {
     
     function handleEncode(testData = null) {
         let inputText = messageInput.value;
-        message = new FT8Message(inputText); //messageManager.createMessage(inputText);
-        message.expectedResults = testData;
 
-        message.encode();
-        if (message.error != null) {
+        //message = new FT8Message(inputText, testData);
+        //message.encode();
+
+        const tabs = inputToTabs(inputText, testData);
+        console.log('tabs', tabs);
+        const msg = tabs[0] ?? null;
+
+        changeToMessage(msg);
+    }
+    
+    function handleTabSwitch(msg) {
+        changeToMessage(msg);
+    }
+   
+    /*
+    function handleViewManagerTabSwitch(index) {
+        if (viewManager.messages.length > index) {
+            viewManager.switchToMessageIndex(index);
+            updateTabUI(index);
+        }
+    }
+    */
+
+    function changeToMessage(msg) {
+        //TODO: separate: views stuff and audio stuff and updateTabUI stuff (already in its own function)
+
+        message = msg;
+
+        if (!message || message.error != null) {
+            //TODO: blank out everything
             return;
         }
 
@@ -343,7 +371,30 @@ function initializeUI() {
         } else {
             throw new Error("Error generating audio data generated");
         }
+        updateTabUI();
+
     }
+
+    function updateTabUI() {
+        tabContainer.innerHTML = '';
+        
+        //const tabList = viewManager.messages;
+        const tabList = message?.tabs;
+        if (tabList == null) return;
+
+        tabList.forEach((msg, index) => {
+            const tabButton = document.createElement('button');
+            tabButton.textContent = `Tab ${index + 1}`;
+            tabButton.classList.add('tab-button');
+            //if (index === activeIndex) {
+            if (msg === message) {
+                tabButton.classList.add('active');
+            }
+            tabButton.onclick = () => handleTabSwitch(msg); // handleTabSwitch(index)
+            tabContainer.appendChild(tabButton);
+        });
+    }
+
 
     exampleMessages.forEach(message => {
         const button = document.createElement('button');
@@ -379,7 +430,9 @@ function initializeUI() {
 
     const toggleVisualizationButton = document.getElementById('toggle-visualization');
     const VisualizationCaption = document.getElementById('visualization-caption');
+
 }
+
 
 /*
 if (typeof Module !== 'undefined') {

@@ -1,4 +1,4 @@
-import { grayBitsToSymbols, encodeFT8FreeText, packedDataTo80Bits, getFT8MessageType, normalizeMessage, normalizeMessageAndHashes, normalizeBracketedFreeText, checkSync, checkCRC, checkParity, repairErrorsOnce, symbolsToBitsStrNoCosta  } from "./ft8_extra.js";
+import { grayBitsToSymbols, encodeFT8FreeText, packedDataTo80Bits, getFT8MessageType, normalizeMessage, normalizeMessageAndHashes, normalizeBracketedFreeText, checkSync, checkCRC, checkParity, repairErrorsOnce, symbolsToBitsStrNoCosta, symbolsToPackedData  } from "./ft8_extra.js";
 import * as extra from "./ft8_extra.js";
 import * as hashmgr from "./ft8_hashmgr.js";
 import FT8LIB from "./ft8_ft8lib.js";
@@ -8,27 +8,131 @@ const ft8lib = new FT8LIB();
 const mshvft8 = new MSHVFT8();
 
 class FT8Message extends EventTarget {
-    /**
-     * 
-     * @param {string} inputText 
-     */
-    constructor(inputText) {
+
+    initSymbolsText(symbolsText) {
+        this.symbolsText = symbolsText;
+        this.packedData = extra.symbolsToPackedData(symbolsText);
+        this.bits = extra.symbolsToBitsStrNoCosta(this.symbolsText).slice(0, 77);
+        this.postInit();
+    }
+
+    initPackedData(packedData) {
+        this.packedData = packedData;
+        this.symbolsText = ft8lib.packedDataToSymbols(this.packedData);
+        this.bits = extra.symbolsToBitsStrNoCosta(this.symbolsText).slice(0, 77);
+        this.postInit();
+    }
+
+    initBits(bits77) {
+        this.bits = bits77;
+        this.packedData = extra.bitsToPacked(bits77);
+        this.symbolsText = ft8lib.packedDataToSymbols(this.packedData);
+        this.postInit();
+    }
+
+    initMessage(text, encoder) {
+        // note: text assumed to be normalized and uppercase
+        if (encoder === 'ft8lib') {
+            //var result = ft8lib.encodeFT8Message(text);            
+            const packingResult = ft8lib.messageToPackedData(text);
+            if (packingResult.success) {
+                this.initPackedData(packingResult.data);
+
+            } else {
+                //this.encodeError_ft8lib // scrap this
+                throw new Error(`Encoding failed (code ${packingResult.errorCode}): ${packingResult.errorMessage}`);
+            }
+
+        } else if (encoder === 'mshv') {
+            const mshvPackingResult = mshvft8.packMessage(text);
+            if (mshvPackingResult.errorCode == 0 && mshvPackingResult.message) {
+                this.initBits(mshvPackingResult.message);
+            } else {
+                this.encodeError = mshvPackingResult.errorCode;
+            }
+        } else {
+            throw new Error("Unknown encoder or No encoder specified: '" + encoder + "'");
+        }
+    }
+
+    postInit() {
+        // todo: separate checks and additions
+
+        if (this.symbolsText == null && this.packedData != null) {
+            console.log("empty symbols, generating from packed data (should not happen).")
+            this.symbolsText = ft8lib.packedDataToSymbols(this.packedData);
+
+        } else if (this.packedData == null && this.symbolsText != null) {
+            console.log("empty packed data, generating from symbols (should not happen)");
+            this.packedData = extra.symbolsToPackedData(this.symbolsText);
+        }
+
+        if (this.symbolsText == null) {
+            this.encodeError = "Failed to generate symbols";
+            throw new Error(this.encodeError);
+        }
+
+        if (this.packedData == null) {
+            this.encodeError = "Failed to generate packed data";
+            throw new Error(this.encodeError);
+        }
+
+        var packedBits = extra.packedDataTo80Bits(this.packedData);
+        const zeroPadding = packedBits.slice(77);
+        //this.bits = packedBits.slice(0, 77);
+        if (zeroPadding != '000') {
+            this.encodeError = `Packed data not zero padded (Expected 77 bits + 3 zeros), Got: ${packedBits}`;
+            throw new Error(this.encodeError);
+        }
+
+        if (this.bits != packedBits.slice(0, 77)) {
+            throw new Error("Packed data does not match bits");
+        }
+
+        this.ft8MessageType = extra.getFT8MessageType(this.packedData);
+        
+        // re-encoding messages
+        
+        //TODO: use both / use consistant format
+        //TODO: add ft8play decode
+        //TODO: should it use hashmgr?
+        this.ft8libDecodedResult = ft8lib.decodeFT8FromPackedData(this.packedData, this.packedData.length);
+        
+        // translate into ft8libDecodedResult format; TODO: should be other way around
+        const resultMshv = mshvft8.unpackMessage(this.bits);
+        if (resultMshv != null && resultMshv.errorCode == 0) {
+            this.mshvDecodedResult = {success: true, resultText: resultMshv.message, result: resultMshv.message, decodedText: resultMshv.message };
+        } else {
+            this.mshvDecodedResult = {success: false, resultText: resultMshv?.message, result: null, decodedText: null };
+        }
+
+        this.bestDecodedResult = this.mshvDecodedResult?.success ? this.mshvDecodedResult : (this.ft8libDecodedResult?.success ? this.ft8libDecodedResult : this.mshvDecodedResult);
+    }
+
+    constructor(inputText, expectedResults = null) {
       super();
 
       this.inputText = inputText;
+
+      this.normalizedInput = null;
       this.inputType = null; // can be manual set, otherwise auto-detected
-      this.expectedResults = null; // if running test against known input. 
+      this.expectedResults = expectedResults; // if running test against known input
 
       // results of encoding
       this.encodeError = null;
-      this.encodeError_ft8lib = null;
+      this.encodeError_ft8lib = null; //TODO: remove
       //this.encodedData = null;
+
+      // Always set all three by calling one of the init methods (unless there's an error)
       this.symbolsText = null;
       this.packedData = null;
       this.bits = null; // string of 77 bits
 
-      this.reDecodedResult = null;
-      this.mshvDecoded = null;
+      this.ft8libDecodedResult = null;
+      this.mshvDecodedResult = null;
+      this.bestDecodedResult = null;
+
+      this.tabs = null;
 
       // cached checks
       this.SyncCheck = null;
@@ -124,156 +228,6 @@ class FT8Message extends EventTarget {
         //const currentSymbolIndex = Math.floor(audioCurrentTime / symbolDuration);
         
         return { isPlaying, audioCurrentTime, startTime,  currentTime, duration, remainingTime, progress, currentSymbolIndex };
-    }
-
-    detectInputType() {
-        this.inputType = doDetectInputType(this.inputText);
-        return this.inputType;
-    }
-
-    globalInputNormalization(input) {
-        // any input types we shouldn't normalize in all the ways?
-        // TODO: normalize unicode numbers / strip diacritics / etc
-        return input.trim().toUpperCase().replace(/\s+/g, ' ').replace('Ø', '0');
-    }
-
-    encode() {
-
-        let input = this.inputText;
-        input = this.globalInputNormalization(input);
-        const inputType = this.inputType ?? this.detectInputType();
-
-        //let packedData, symbolsText;
-
-        switch (inputType) {
-            case 'free text':
-                input = normalizeBracketedFreeText(input);
-                this.packedData = extra.encodeFT8FreeText(input);
-                break;
-            case '79 symbols':
-                input = normalizeSymbols(input);
-                this.symbolsText = input;
-                break;
-            case '58 symbols':
-                input = normalizeSymbols(input);
-                this.symbolsText = extra.symbols58ToSymbols79(input);
-                break;
-            case 'packed':
-                input = normalizePackedData(input);
-                this.packedData = new Uint8Array(input.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
-                break;
-            case 'telemetry':
-                input = normalizeTelemetry(input);
-                let result = extra.encodeFT8Telemetry(input);
-                if (result.error) {
-                    this.encodeError = result.error;
-                    throw new Error(result.error);
-                }
-                this.packedData = new Uint8Array(result.result.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
-                break;
-            case '77 bits':
-                input = normalizePackedData(input);
-                this.packedData = extra.bitsToPacked(input);
-                break;
-            case '80 bits':
-            case '82 bits':
-                const bitStr = normalizeBinary(input);
-                const zeroPadding = bitStr.slice(77);
-                if (zeroPadding != '000' && zeroPadding != '00000') {
-                    this.encodeError = `Invalid ${inputType} message: not zero extended. Expected 77 bits + 3 or 5 zeros; Found: ${bitStr}`;
-                    throw new Error(this.encodeError);
-                }
-                this.packedData = extra.bitsToPacked(bitStr.slice(0, 77));
-                break;
-            case '91 bits':
-                this.symbolsText = extra.binary91ToSymbols(normalizeBinary(input));
-                break;
-            case '174 bits':
-                this.symbolsText = extra.binary174ToSymbols(normalizeBinary(input));
-                break;
-            case '237 bits': // symbols (as normal binary, including sync)
-                this.symbolsText = extra.binary237ToSymbols(normalizeBinary(input));
-                break;
-            case '237 grits': // symbols (as graycode bits, including sync)
-                this.symbolsText = extra.grayBitsToSymbols(normalizeBinary(input));
-                break;
-            case 'default':
-            default:
-                input = extra.normalizeMessage(input);
-                hashmgr.addHashesFromInput(this.inputText);
-
-                const packingResult = ft8lib.messageToPackedData(input);
-                const mshvPackingResult = mshvft8.packMessage(input);
-
-                if (mshvPackingResult.errorCode == 0 && mshvPackingResult.message) {
-                    //todo: try catch
-                    this.bits = mshvPackingResult.message;
-                    this.packedData = extra.bitsToPacked(mshvPackingResult.message);
-                    console.log("mshv bits", this.bits);
-
-                } else if (packingResult.success) {
-                    this.packedData = packingResult.data;
-                    
-                } else {
-                    this.encodeError_ft8lib = `Encoding failed (code ${packingResult.errorCode}): ${packingResult.errorMessage}`;
-                    console.log("falling back to free text because error: ", this.encodeError_ft8lib);
-                    //this.encodeError = this.encodeError_ft8lib;
-
-                    // attempt free text fallback
-                    input = normalizeBracketedFreeText(input); // in case there's brackets
-                    this.packedData = encodeFT8FreeText(input);
-
-                    if (this.packedData == null) {
-                        this.encodeError = "Failed to encode as free text";
-                        throw new Error(this.encodeError);
-                    }
-                }
-                break;
-        }
-
-        if (this.symbolsText == null && this.packedData != null) {
-            this.symbolsText = ft8lib.packedDataToSymbolsArray(this.packedData);
-
-        } else if (this.packedData == null && this.symbolsText != null) {
-            //console.log("empty packed data, generating from symbols");
-            this.packedData = extra.symbolsToPackedData(this.symbolsText);
-        }
-
-        if (this.symbolsText == null) {
-            this.encodeError = "Failed to generate symbols";
-            throw new Error(this.encodeError);
-        }
-
-        if (this.packedData == null) {
-            this.encodeError = "Failed to generate packed data";
-            throw new Error(this.encodeError);
-        }
-    
-        if (this.packedData) {
-            var packedBits = extra.packedDataTo80Bits(this.packedData);
-            const zeroPadding = packedBits.slice(77);
-            this.bits = packedBits.slice(0, 77);
-            if (zeroPadding != '000') {
-                this.encodeError = `Packed data not zero padded (Expected 77 bits + 3 zeros), Got: ${packedBits}`;
-                throw new Error(this.encodeError);
-            }
-        }
-
-        this.ft8MessageType = extra.getFT8MessageType(this.packedData);
-        this.reDecodedResult = ft8lib.decodeFT8FromPackedData(this.packedData, this.packedData.length);
-        this.mshvDecodedResult = mshvft8.unpackMessage(this.bits).message;
-        if (this.mshvDecodedResult != null && this.mshvDecodedResult.errorCode == 0) {
-            //TODO XXX fix me
-            this.reDecodedResult = {success: true, resultText: this.mshvDecodedResult.message, result: this.mshvDecodedResult.message, decodedText: this.mshvDecodedResult.message };
-        }
-        
-        console.log("mshvDecoded", this.mshvDecoded);
-
-        if (this.expectedResults) {
-            if (this.expectedResults?.decoded) hashmgr.addHashesFromInput(this.expectedResults.decoded);
-            if (this.expectedResults?.message) hashmgr.addHashesFromInput(this.expectedResults.message);
-        }
-
     }
 
     setAudioOptions(sampleRate, baseFrequency, customToneFrequencies = null) {
@@ -528,102 +482,6 @@ class FT8Message extends EventTarget {
     }
 }
 
-function detectTelemetry(str) {
-    //exactly 18 hex digits, or start with T:
-    //note: first digit must be 0-8 if 18 digits. (not checked here)
-    const trimmed = str.trim().toUpperCase();
-    return (/^([0-9A-Fa-f][\s\-\:\,]?){18}$/.test(trimmed)) 
-//                || (/^[Tt](ELEMETRY)?:\s0*([0-9A-Fa-f][\s\-\:]?){1,18}$/.test(trimmed))
-          || (/^[Tt](ELEMETRY)?\s*:/.test(trimmed))
-          || (/\#T(ELEMETRY)?$/.test(trimmed))
-}
-
-function detectFreeTextBrackets(str) {
-    // brackets or quotes
-    const trimmed = str.trim();
-    return (trimmed.startsWith('<') && trimmed.endsWith('>') && !trimmed.slice(1, trimmed.length-1).includes('<'))  
-        || (trimmed.startsWith('"') && trimmed.endsWith('"'));
-}
-
-function normalizeSymbols(input) {
-    // numbers only
-    return input.replace(/[-\s]/g, '');
-}
-
-function normalizeBinary(input) {
-    // 0 and 1 only
-    return input.replace(/[-\s]/g, '');
-}
-
-function normalizePackedData(input) {
-    //return input.replace(/[-\s]/g, '').toUpperCase();
-    return input.replace(/[\s\-\:\,]/g, '').toLowerCase();
-}
-
-function normalizeTelemetry(str) {
-    //exactly 18 hex digits, or start with T:
-    //note: first digit must be 0-8 if 18 digits. (not checked here)
-    
-    let trimmed = str.trim();
-    trimmed = trimmed.toUpperCase()
-        .replace(/^[Tt](ELEMETRY)?:\s*/g, '') // remove initial "T:" or telemetry:
-        .replace(/\#T(ELEMETRY)?\s*$/g, '') // remove "#TELEMETRY "
-        .replace(/[\s\-\:\,]/g, '') // remove any space - : ,
-        .replace(/^[0]*/g, ''); // initial 0's
-    return trimmed;
-}
-
-function doDetectInputType(inputOriginal) {
-    const input = inputOriginal.trim();
-
-    if (detectFreeTextBrackets(input)) {
-        return 'free text'; // TODO: explicit free text vs assumed free text
-    }
-
-    if (/^[0-7]{79}$/.test(normalizeSymbols(input))) {
-        return '79 symbols';
-    }
-
-    if (/^[0-7]{58}$/.test(normalizeSymbols(input))) {
-        return '58 symbols';
-    }
-
-    // Check if input is hex string (packed data); pairs of hex must be together.
-    if (/^\s*([0-9A-Fa-f]{2}[-\s\,\:]?){10}\s*$/.test(input)) {
-        return 'packed';
-    }
-
-    if (detectTelemetry(input)) {
-        return 'telemetry';
-    }
-
-    const normBinary = normalizeBinary(input);
-    if (/^[0-1]+$/.test(normBinary)) {
-        if (normBinary.length === 77) {
-            return '77 bits'; // Source-encoded message, 77 bits
-        } else if (normBinary.length === 80) { // 77 bits + 3 bits zero padding
-            return '80 bits'; 
-        } else if (normBinary.length === 82) { // 77 bits + 5 bits zero padding (as used as input to CRC)
-            return '82 bits'; 
-        } else if (normBinary.length === 91) { // 77 + 14 bits
-            return '91 bits';
-        } else if (normBinary.length === 174) { // 77 + 14 + 83 bits
-            return '174 bits'
-        } else if (normBinary.length === 237) { // 77 + 14 + 83 + 21*3
-            //const normBinary = '010001110000101100011';
-            const grayCosta = "011001100000110101010";
-            if (normBinary.startsWith(grayCosta) || normBinary.endsWith(grayCosta) || normBinary.slice(108, 129) == grayCosta) {
-                return '237 grits';
-            }
-            return '237 bits'
-        } else {
-            //TODO: warning
-        }
-    } 
-
-    // Otherwise, assume it's a message (or 'free text' if ft8_lib fails to encode it)
-    return 'default';
-}
 
 /**
  * @param {Array} numbers - array of numbers to scale
@@ -656,9 +514,6 @@ export {
     // needed
     FT8Message,
 
-    // sure why not (maybe move some normalize to ft8_extra.js)
-    normalizeMessage, normalizeMessageAndHashes, normalizeBracketedFreeText,
-
     // meh (probably internal)
-    normalizeSymbols, normalizeBinary, normalizePackedData, normalizeTelemetry, doDetectInputType, scaleToRange, findMinAndMax
+    scaleToRange, findMinAndMax
 };

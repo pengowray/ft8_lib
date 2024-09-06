@@ -219,6 +219,7 @@ export function symbolsToGrayBitsStr(symbols) {
 }
 
 export function symbolsToBitsStrNoCosta(symbols) {
+   if (symbols.length !== 79) throw new Error("Invalid symbols count");
    var symbolsWithoutCostas = symbols.slice(7, 36) + symbols.slice(43, 72);
    //return symbolsToBitsStr(symbolsWithoutCostas);
    return symbolsWithoutCostas.split('').map(s => GRAY_INV[parseInt(s)].toString(2).padStart(3, '0')).join('');
@@ -703,7 +704,14 @@ export function encodeFT8FreeText(message) {
   // Convert to 71-bit binary string
   let binaryString = result.toString(2).padStart(71, '0');
 
-  // message type 0.0 (6 bits) + 3 bits padding to get to 80
+
+  // message type 0.0 (6 bits)
+  binaryString += '000000';
+
+  return binaryString;
+
+  /*
+  message type 0.0 (6 bits) + 3 bits padding to get to 80
   binaryString = binaryString + '000000000';
 
   // Convert binary string to Uint8Array
@@ -711,8 +719,9 @@ export function encodeFT8FreeText(message) {
   for (let i = 0; i < 10; i++) {
     output[i] = parseInt(binaryString.slice(i * 8, (i + 1) * 8), 2);
   }
-  
   return output;
+  */
+
 }
 
 // Encode hex to 71-bits of telemetry data in a 77-bit payload
@@ -852,9 +861,18 @@ export function bitsToPacked(bitString) {
     }
 
     const bits = bitString.replace(/[-\s]/g, '').padEnd(80, '0');
-
     return Uint8Array.from(bits.match(/.{8}/g).map(byte => parseInt(byte, 2)));
 }
+
+export function hexToPacked(hexString) { 
+    if (hexString.length != 20) {
+        throw new Error("Invalid length to pack: must be 10 bytes (20 hex characters)");
+    }
+
+    return Uint8Array.from(hexString.match(/.{2}/g).map(byte => parseInt(byte, 16)));
+    //return new Uint8Array(hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+}
+
 
 // Helper function to convert hex string to binary string
 function hexToBinary(hex) {

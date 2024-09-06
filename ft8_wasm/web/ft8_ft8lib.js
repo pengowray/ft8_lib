@@ -60,13 +60,16 @@ class FT8Lib {
     return returnObject;
   }
 
-  packedDataToSymbolsArray(packedData) {
+  packedDataToSymbols(packedData) {
     if (!this.module) throw new Error("Module not initialized");
     const symbolsPtr = this.packedToSymbols(packedData);
     const symbols = new Uint8Array(this.module.HEAPU8.buffer, symbolsPtr, FT8_NN);
     const result = new Uint8Array(symbols);
     this.module._free(symbolsPtr);
-    return arrayToSymbols(result);
+    
+    const symbolstext =  arrayToSymbols(result);
+    console.log("packedDataToSymbolsArray", packedData, result, symbolstext);
+    return symbolstext;
   }
 
   symbolsToAudio(symbols, baseFreq, sampleRate) {

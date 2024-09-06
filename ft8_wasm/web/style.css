@@ -916,7 +916,7 @@ body:not(.dark-mode) #piano-roll {
 
 .toggle-switch__slider {
     position: absolute;
-    cursor: pointer;
+    /* cursor: pointer; */
     top: 0;
     left: 0;
     right: 0;
@@ -950,7 +950,6 @@ body:not(.dark-mode) #piano-roll {
     font-size: 14px;
 }
 
-/* Disabled state styles */
 .toggle-switch__input:disabled + .toggle-switch__slider {
     background-color: var(--toggle-disabled-bg);
     /* cursor: not-allowed; */
@@ -967,4 +966,59 @@ body:not(.dark-mode) #piano-roll {
 
 .toggle-switch--disabled .toggle-switch__label {
     /* opacity: 0.5; */
+}
+
+/* tabs */
+
+#tab-container {
+    display: flex;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+    gap: 5px;
+}
+
+.tab-button {
+    padding: 8px 15px;
+    border: 1px solid var(--text-color);
+    background-color: var(--input-bg);
+    color: var(--text-color);
+    cursor: pointer;
+    transition: background-color 0.3s, color 0.3s;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.tab-button:hover {
+    background-color: var(--button-bg);
+    color: var(--button-text);
+}
+
+.tab-button.active {
+    background-color: var(--button-bg);
+    color: var(--button-text);
+    border-color: var(--button-bg);
+}
+
+.dark-mode .tab-button {
+    border-color: var(--text-color);
+    background-color: var(--input-bg);
+    color: var(--text-color);
+}
+
+.dark-mode .tab-button:hover {
+    background-color: var(--button-bg);
+    color: var(--button-text);
+}
+
+.dark-mode .tab-button.active {
+    background-color: var(--button-bg);
+    color: var(--button-text);
+    border-color: var(--button-bg);
+}
+
+@media (max-width: 600px) {
+    .tab-button {
+        flex: 1 0 auto;
+        text-align: center;
+    }
 }

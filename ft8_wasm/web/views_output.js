@@ -43,7 +43,11 @@ export class OutputComponent extends Component {
             messageTypeInfo: extra.getFT8MessageTypeName(message.ft8MessageType),
             decoded: this.prepareDecodedInfo(),
             comment: message.expectedResults?.comment,
-            decodedText: message.reDecodedResult.decodedText,
+            decodedText: message.bestDecodeResult?.success ? message.bestDecodeResult?.decodedText : '',
+            decodedText_ft8lib: message.ft8libDecodedResult?.decodedText,
+            decodedText_mshv: message.mshvDecodedResult?.success ? message.mshvDecodedResult?.decodedText : '',
+            ft8libDecodedResult: message.ft8libDecodedResult,
+            mshvDecodedResult: message.mshvDecodedResult,
             symbols: message.symbolsText,
             packed: extra.packedToHexStrSp(message.packedData),
             veryPacked: extra.packedToHexStr(message.packedData),
@@ -56,8 +60,8 @@ export class OutputComponent extends Component {
             crcCheck: message.getCRCCheck(),
             parityCheck: message.getParityCheck(),
             checks: this.prepareChecks(),
-            explanation: this.message.reDecodedResult.success ? 
-                explainFT8Message(this.message.reDecodedResult.decodedText, this.message.ft8MessageType) : 
+            explanation: this.message.bestDecodedResult?.success ? 
+                explainFT8Message(this.message.bestDecodedResult.decodedText, this.message.ft8MessageType) : 
                 null,
             encodeError: message.encodeError_ft8lib,
             tests: this.prepareTests(),
@@ -77,14 +81,21 @@ export class OutputComponent extends Component {
     }
 
     prepareDecodedInfo() {
-        const decodeResult = this.message.reDecodedResult;
+        //TODO: try both decoders
+
+        const decodeResult = this.message.bestDecodedResult;
+        if (decodeResult == null) {
+            return { error: true, result: 'error', message: 'No decode result' };
+        }
+
         const decodeTest1 = { name: "decode", ...decodeResult };
         if (!decodeResult.success) {
             //return { error: true, result: 'error', message: `${decodeResult.errorCode}: ${decodeResult.errorMessage}` };
             return [ decodeTest1 ];
-        } else {
-            decodeTest1.resultText = 'success';
         }
+
+        decodeTest1.resultText = 'success';
+        decodeTest1.result = 'ok';
 
         const decoded = decodeResult.decodedText;
         const originalInput = this.message.inputText;
@@ -96,7 +107,7 @@ export class OutputComponent extends Component {
             resultText: 'unchecked',
         };
         
-        if (inputType === 'default') {
+        if (inputType.startsWith('default')) {
             decodeTest2.result = 'ok';
 
             if (normalizeMessage(decoded) !== normalizeMessage(originalInput)) {
@@ -111,7 +122,8 @@ export class OutputComponent extends Component {
 
                 } else if (normalizeBracketedFreeText(originalInput).toUpperCase().startsWith(decoded.toUpperCase())) {
                     decodeTest2.resultInfo = "Original message appears to be truncated.";
-                    decodeTest2.resultText = 'input truncated';
+                    decodeTest2.resultText = 'truncated'; // 'input truncated';
+                    decodeTest2.hideName = true; // no need for "input match: "
                     decodeTest2.result = 'error';  // warn for plain text, but error for other messages
                     //decodeTest2.result = 'warning';
                 } 
@@ -120,7 +132,7 @@ export class OutputComponent extends Component {
             }
             return [ decodeTest1, decodeTest2 ];
 
-        } else if (inputType === 'free text') {
+        } else if (inputType.startsWith('free text')) {
             decodeTest2.result = 'ok';
 
             if (decoded.toUpperCase() !== normalizeBracketedFreeText(originalInput).toUpperCase()) {
@@ -129,7 +141,8 @@ export class OutputComponent extends Component {
                 decodeTest2.result = 'error';
                 if (normalizeBracketedFreeText(originalInput).toUpperCase().startsWith(decoded.toUpperCase())) {
                     decodeTest2.resultInfo = "Original message has been truncated to fit 13 character limit of free text.";
-                    decodeTest2.resultText = 'input truncated';
+                    decodeTest2.resultText = 'truncated'; //'input truncated';
+                    decodeTest2.hideName = true; // no need for "input match: "
                     decodeTest2.result = 'warning';
                 }
             } else {
@@ -173,16 +186,16 @@ export class OutputComponent extends Component {
 
         const expectedMessage = expected.decoded ?? expected.message;
         if (expectedMessage) {
-            const match = (expectedMessage.trim() === this.message.reDecodedResult.decodedText.trim());
+            const match = (expectedMessage.trim() === this.message.decodedResult?.decodedText?.trim() ?? '');
             const test = {
                 name: "Message text",
                 result: (expected.error ? (match ? 'warning' : 'warning') : (match ? 'ok' : 'error')),
                 resultText: (expected.error ? (match ? 'Matched test*' : 'Did not match test*') : (match ? 'Matched test' : 'Did not match test')),
                 expected: expectedMessage,
-                actual: this.message.reDecodedResult.decodedText,
+                actual: this.message.ft8libDecodedResult?.decodedText,
                 note: expected.error ? "Error or truncated result expected" : null
             };
-            const hashMatch = (normalizeMessageAndHashes(expectedMessage) === normalizeMessageAndHashes(this.message.reDecodedResult.decodedText));
+            const hashMatch = (normalizeMessageAndHashes(expectedMessage) === normalizeMessageAndHashes(this.message.ft8libDecodedResult?.decodedText ?? ''));
             if (!match && hashMatch) {
                 test.result = 'ok';
                 test.resultText = 'Matched test*';
@@ -256,9 +269,13 @@ export class OutputComponent extends Component {
                 ${this.renderSubheading('Decoding')}
                 ${this.renderChecks('Decode check', data.decoded )}
                 ${this.renderRowData('Input text', data.inputText )}
-                ${this.renderRowDataField({label: 'Decoded text', value: data.decodedText, desc: data.decodedText.includes('<...>') ? '<...> represents a hashed callsign.' : null })}
-
-                ${!data.decoded[0].success ? this.renderRowData('Decode error', data.decoded[0].errorMessage, "Please check if individual message fields were were decoded.") : ''}
+                
+                ${data.mshvDecodedResult.success ? 
+                    this.renderRowDataField({label: 'Decoded text', secondaryLabel: 'mshv', value: data.decodedText_mshv}) :
+                    this.renderRowData('Decode error', data.mshvDecodedResult.errorMessage)}
+                ${data.ft8libDecodedResult.success ? 
+                    this.renderRowDataField({label: 'Decoded text', secondaryLabel: 'ft8_lib', value: data.decodedText_ft8lib, desc: data.decodedText_mshv.includes('<...>') || data.decodedText_ft8lib.includes('<...>') ? '<...> represents a hashed callsign.' : null }) :
+                    this.renderRowData('Decode error', data.ft8libDecodedResult.errorMessage)}
 
                 ${(data.explanation || data.encodeError) ? this.renderSubheading('More info') : ''}
                 ${data.explanation ? this.renderRowText('Explanation', data.explanation) : ''}
@@ -455,7 +472,7 @@ export class OutputComponent extends Component {
         const checksHtml = checks.map(check => `
             <span class="check-result check-${check.result.toLowerCase()}">
                 <span class="check-icon">${getIcon(check.result)}</span>
-                ${check.name}: ${check.resultText ?? check.result}
+                ${check.hideName ? '' : `${check.name}: `}${check.resultText ?? check.result}
             </span>
         `).join('');
     

@@ -56,7 +56,6 @@ class FT8Lib {
     }
 
     this.freeFT8EncodeResult(resultPtr);
-    
     return returnObject;
   }
 
@@ -68,7 +67,6 @@ class FT8Lib {
     this.module._free(symbolsPtr);
     
     const symbolstext =  arrayToSymbols(result);
-    console.log("packedDataToSymbolsArray", packedData, result, symbolstext);
     return symbolstext;
   }
 

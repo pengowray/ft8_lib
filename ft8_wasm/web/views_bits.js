@@ -200,7 +200,6 @@ export class TribbleComponent extends Component {
                         const subanno = AnnotationDefGetAnnotation(subdef, payloadBits);
                         const subanno_text = subanno.short ?? subanno.value ?? subanno.long;
                         const subanno_tooltip = `${subanno.label ?? subanno.shortLabel ?? subanno.tag}\n${subanno.long ?? subanno.value ?? subanno.short}\nRaw bits (=integer): ${subanno.bits} (=${subanno.rawIntValue})`;
-                        console.log(subanno);
                         this.addAnnotation(annotationsRow5, subanno_text, subanno_tooltip, 21 + subanno.start, subanno.length);
                     });
                 }

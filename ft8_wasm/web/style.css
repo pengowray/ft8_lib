@@ -12,6 +12,7 @@
 
     --error-text: #aa0000;
     --warning-text: rgb(181, 112, 0);
+    --success-text: #00aa00;
 
     --position-line-color: red;
     --costas-bg: rgb(8, 78, 255);
@@ -41,6 +42,7 @@
 
     --error-text: #ff4400;
     --warning-text: orange;
+    --success-text: #00aa00;
 
     --position-line-color: white;
     --costas-bg: rgb(26, 90, 253);
@@ -970,6 +972,7 @@ body:not(.dark-mode) #piano-roll {
 
 /* tabs */
 
+/* tabs */
 #tab-container {
     display: flex;
     flex-wrap: wrap;
@@ -983,9 +986,10 @@ body:not(.dark-mode) #piano-roll {
     background-color: var(--input-bg);
     color: var(--text-color);
     cursor: pointer;
-    transition: background-color 0.3s, color 0.3s;
+    transition: background-color 0.3s, color 0.3s, border-color 0.3s;
     border-radius: 4px;
     font-size: 14px;
+    position: relative;
 }
 
 .tab-button:hover {
@@ -997,6 +1001,78 @@ body:not(.dark-mode) #piano-roll {
     background-color: var(--button-bg);
     color: var(--button-text);
     border-color: var(--button-bg);
+}
+
+/* Error tab styles */
+.tab-button.error {
+    border-color: var(--error-text);
+}
+
+.tab-button.error::after {
+    content: '!';
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background-color: var(--error-text);
+    color: var(--button-text);
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.tab-button.error:hover,
+.tab-button.error.active {
+    background-color: var(--error-text);
+    color: var(--button-text);
+}
+
+.tab-button.warning {
+    border-color: var(--warning-text);
+}
+
+.tab-button.warning::after {
+    content: '!';
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background-color: var(--warning-text);
+    color: var(--button-text);
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.tab-button.warning:hover,
+.tab-button.warning.active {
+    background-color: var(--warning-text);
+    color: var(--button-text);
+}
+
+.tab-button.equal::after {
+    content: '=';
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background-color: var(--success-text);
+    color: var(--button-text);
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
 }
 
 .dark-mode .tab-button {
@@ -1014,6 +1090,11 @@ body:not(.dark-mode) #piano-roll {
     background-color: var(--button-bg);
     color: var(--button-text);
     border-color: var(--button-bg);
+}
+
+.dark-mode .tab-button.error,
+.dark-mode .tab-button.warning {
+    border-color: inherit;
 }
 
 @media (max-width: 600px) {

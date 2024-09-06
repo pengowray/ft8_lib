@@ -25,12 +25,7 @@ export class PlayBtnComponent extends Component {
      * @returns {FT8Message}
      */
     getCurrentMessage() {
-        return this.messageManager.getCurrentMessage() ?? this.message;
-    }
-
-    loadMessage() {
-        this.message = this.getCurrentMessage(); // this.messageManager.getMessage(this.index);
-        this.messageUpdate();
+        return this.message ?? this.messageManager?.getCurrentMessage();
     }
 
     stopped() {
@@ -103,7 +98,7 @@ export class PlayBtnComponent extends Component {
     
 
     updateButtonState() {
-        const msg = this.getCurrentMessage();
+        const msg = this.getCurrentMessage(); // may be null
         const nowPlaying = this.viewManager.playingMessages;
         const anyPlaying = nowPlaying.size > 0;
         const isPlaying =  msg?.isPlaying ?? false;

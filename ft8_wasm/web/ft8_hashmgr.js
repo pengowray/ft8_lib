@@ -68,6 +68,17 @@ export function addHashesFromInput(inputText) {
         //ignore if only numbers
         if (/^\d+$/.test(piece)) continue;
 
+        //remove surrounding < > or quotes
+        if (piece.startsWith('<') && piece.endsWith('>')) {
+            addHash(piece.slice(1, -1));
+        } else if (piece.startsWith('"') && piece.endsWith('"')) {
+            addHash(piece.slice(1, -1));
+        } else if (piece.startsWith("'") && piece.endsWith("'")) {
+            addHash(piece.slice(1, -1));
+        } else {
+            addHash(piece);
+        }
+        
         // add with and without /suffix
         addHash(piece);
         if (piece.includes('/')) addHash(piece.split('/')[0]);

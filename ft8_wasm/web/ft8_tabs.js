@@ -71,7 +71,7 @@ function initMessage(message, normalizedInput, inputType) { // was: encode()
             message.initSymbolsText(symbolsText);
             return;
         case 'packed':
-            input = normalizePackedData(input);
+            //const normalInput = normalizePackedData(input);
             //const packed = new Uint8Array(input.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
             const packed = extra.hexToPacked(input);
             message.initPackedData(packed);
@@ -149,7 +149,7 @@ export function detectTelemetry(str) {
 
 export function detectPossibleTelemetry(str) {
     //hex digits (ignoring length)
-    return (/^([0-9A-Fa-f][\s\-\:\,]?)+$/.test(str));
+    return (/^([0-9A-Fa-f][-\s\:\,]?)+$/.test(str));
 }
 
 function detectFreeTextBrackets(str) {
@@ -182,7 +182,7 @@ function normalizeTelemetry(str) {
     trimmed = trimmed.toUpperCase()
         .replace(/^[T](ELEMETRY)?:\s*/g, '') // remove initial "T:" or telemetry:
         .replace(/\#T(ELEMETRY)?\s*$/g, '') // remove "#TELEMETRY "
-        .replace(/[\s\-\:\,]/g, '') // remove any space - : ,
+        .replace(/[-\s\:\,]/g, '') // remove any space - : ,
         .replace(/^[0]*/g, ''); // initial 0's
     return trimmed;
 }
@@ -241,8 +241,8 @@ export function inputToTabs(inputOriginal, expectedResults = null) {
                     message.encodeError = error.message;
                     console.log(`Error encoding message: ${error.message}`);
                     console.trace(error);
-                    //TODO: show error somewhere even if failed
-                    //tabs.push(message);
+                    //show error somewhere even if failed
+                    tabs.push(message);
                 }
             }
         }
@@ -296,7 +296,7 @@ export function detectInputTypes(normalizedInput) {
     const inputTypes = {}; // { 'type': weight, 'type2': weight, ... }
     
     if (detectFreeTextBrackets(input)) {
-        inputTypes['free text'] = 50; // 'free text'
+        inputTypes['free text'] = 30; // 'free text'
     } else {
         inputTypes['free text'] = 5; // fallback free text
     }
@@ -308,31 +308,31 @@ export function detectInputTypes(normalizedInput) {
 
     if (/^[0-7]{79}$/.test(normalizeSymbols(input))) {
         //TODO: warn if all 0 or 1
-        inputTypes['79 symbols'] = 10;
+        inputTypes['79 symbols'] = 25;
     }
 
     if (/^[0-7]{58}$/.test(normalizeSymbols(input))) {
-        inputTypes['58 symbols'] = 10;
+        inputTypes['58 symbols'] = 25;
     }
 
     // Check if input is hex string (packed data); pairs of hex must be together.
     if (/^\s*([0-9A-Fa-f]{2}[-\s\,\:]?){10}\s*$/.test(input)) {
-        inputTypes['packed'] = 10;
+        inputTypes['packed'] = 25;
     }
 
     if (detectTelemetry(input)) {
-        inputTypes['telemetry'] = 50;
+        inputTypes['telemetry'] = 30;
     } else if (detectPossibleTelemetry(input)) {
         // only hex digits of any length
         // will also match many other types (bits, symbols, packed hex)
-        inputTypes['telemetry'] = 4;
+        inputTypes['telemetry'] = 15;
     }
 
     const normBinary = normalizeBinary(input);
     if (/^[0-1]+$/.test(normBinary)) {
         const len = normBinary.length;
         if ([77, 80, 82, 91, 174, 237].includes(len)) {
-            inputTypes[`${len} bits`] = 10; // '77 bits' to '237 bits'
+            inputTypes[`${len} bits`] = 20; // '77 bits' to '237 bits'
         }  else {
             //todo: add 'Unrecognized binary length' type or show the warning somewhere
             info.warn = `Unrecognized binary string length: ${len} bits`;

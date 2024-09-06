@@ -24,8 +24,8 @@ export class OutputComponent extends Component {
     prepareOutputData() {
         const message = this.message;
         if (!message || message.symbolsText == null || message.symbolsText == '') {
-            console.log("nothing to output (OutputComponent)");
-            return;
+            //console.log("nothing to output (OutputComponent)");
+            return null;
         }
         const bitsNoCosta = symbolsToBitsStrNoCosta(message.symbolsText);
         
@@ -63,7 +63,6 @@ export class OutputComponent extends Component {
             explanation: this.message.bestDecodedResult?.success ? 
                 explainFT8Message(this.message.bestDecodedResult.decodedText, this.message.ft8MessageType) : 
                 null,
-            encodeError: message.encodeError_ft8lib,
             tests: this.prepareTests(),
             repaired: message.getParityRepairedCodeword(),
             testType,
@@ -243,6 +242,11 @@ export class OutputComponent extends Component {
     }
 
     renderOutput(data) {
+        if (data == null) {
+            this.container.innerHTML = '';
+            return;
+        }
+
         const outputBox = document.createElement('div');
         outputBox.className = 'output-box';
         outputBox.innerHTML = `
@@ -277,9 +281,8 @@ export class OutputComponent extends Component {
                     this.renderRowDataField({label: 'Decoded text', secondaryLabel: 'ft8_lib', value: data.decodedText_ft8lib, desc: data.decodedText_mshv.includes('<...>') || data.decodedText_ft8lib.includes('<...>') ? '<...> represents a hashed callsign.' : null }) :
                     this.renderRowData('Decode error', data.ft8libDecodedResult.errorMessage)}
 
-                ${(data.explanation || data.encodeError) ? this.renderSubheading('More info') : ''}
+                ${data.explanation ? this.renderSubheading('More info') : ''}
                 ${data.explanation ? this.renderRowText('Explanation', data.explanation) : ''}
-                ${data.encodeError ? this.renderRowData('Initial error', data.encodeError, 'As a fallback the input was encoded as free text after this initial error.') : ''}
 
                 ${data.tests && data.tests.tests ? this.renderSubheading('Comparison to known reference') : ''}
                 ${data.tests && data.tests.tests ? this.renderChecks('Tests', data.tests.tests) : ''}

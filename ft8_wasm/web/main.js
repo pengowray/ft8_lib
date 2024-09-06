@@ -8,6 +8,8 @@ import { TribbleComponent } from './views_bits.js';
 import { OutputComponent } from './views_output.js';
 import { PlayBtnComponent } from './views_play.js';
 import { testInputs_ft8code, ft8_examples } from './ft8_tests.js';
+import { getFT8MessageTypeName } from './ft8_extra.js';
+import * as extra from './ft8_extra.js';
 
 const exampleMessages = [
     "CQ K1ABC FN42",
@@ -52,10 +54,10 @@ function initializeUI() {
     const testSelect = document.getElementById('test-select');
     const tabContainer = document.getElementById('tab-container');
 
-    viewManager.registerComponent(new VizComponent(-1, audioVisualization));
-    viewManager.registerComponent(new PianoRollComponent(-1, pianoRollDiv));
-    viewManager.registerComponent(new OutputComponent(-1, output));
-    viewManager.registerComponent(new TribbleComponent(-1, tribbleViz));
+    viewManager.registerComponent(new VizComponent(-99, audioVisualization));
+    viewManager.registerComponent(new PianoRollComponent(-99, pianoRollDiv));
+    viewManager.registerComponent(new OutputComponent(-99, output));
+    viewManager.registerComponent(new TribbleComponent(-99, tribbleViz));
     viewManager.registerComponent(new PlayBtnComponent(-2, audioControls));
 
     const initializeTestInputs = () => {;
@@ -278,25 +280,19 @@ function initializeUI() {
         let strings = [];
         let failed = false;
         
-        if (message && message.encodeError_ft8lib) {
-            strings.push(`ft8_lib error: ${message.encodeError_ft8lib}`);
-            // not failure yet (may have fallen back to freetext)
-        }
         if (exception != null) {
             console.error("Exception", exception);
             strings.push(`Exception: ${exception}`);
             failed = true;
+        }
 
-            if (!message) {
-                strings.push(`No message object was created.`);
-            }
-        }
-        if (message && message.error) {
-            strings.push(`General error: ${message.error}`);
-            failed = true;
-        }
         if (message && message.encodeError) {
             strings.push(`Encoding error: ${message.encodeError}`);
+            failed = true;
+        }
+
+        if (!message) {
+            strings.push(`No message object was created.`);
             failed = true;
         }
         
@@ -305,13 +301,13 @@ function initializeUI() {
             messageContent.style.display = 'none';
             errorOutput.innerHTML = strings.join("<br>");
             return true;
+
         } else {
             errorOutput.innerHTML = '';
             errorOutput.style.display = 'none';
             messageContent.style.display = 'block';
             return false;
         }
-        
     }
     
     function handleEncode(testData = null) {
@@ -321,8 +317,10 @@ function initializeUI() {
         //message.encode();
 
         const tabs = inputToTabs(inputText, testData);
-        console.log('tabs', tabs);
-        const msg = tabs[0] ?? null;
+        //console.log('tabs', tabs);
+
+        //const msg = tabs[0] ?? null;
+        const msg = tabs.find(tab => tab.encodeError === null) || tabs[0] || null;
 
         changeToMessage(msg);
     }
@@ -343,13 +341,16 @@ function initializeUI() {
     function changeToMessage(msg) {
         //TODO: separate: views stuff and audio stuff and updateTabUI stuff (already in its own function)
 
+        console.log("changeToMessage", msg);
         message = msg;
 
-        if (!message || message.error != null) {
-            //TODO: blank out everything
+        updateTabUI();
+        const hasErrors = handleError(msg); // will unhide messageContent if no errors
+        
+        if (msg == null || hasErrors) {
+            viewManager.switchToMessageIndex(-1);
             return;
         }
-
         // gather audio options
         const freqData = parseFrequencyInput(baseFreqInput.value);
         if (!freqData) {
@@ -365,13 +366,13 @@ function initializeUI() {
 
         const index = viewManager.addMessage(message);
         viewManager.switchToMessageIndex(index);
+        console.log("switched to message", index);
 
         if (message.audioSamples.length > 0) {
             //setupAudioPlayback(message);
         } else {
             throw new Error("Error generating audio data generated");
         }
-        updateTabUI();
 
     }
 
@@ -384,11 +385,37 @@ function initializeUI() {
 
         tabList.forEach((msg, index) => {
             const tabButton = document.createElement('button');
-            tabButton.textContent = `Tab ${index + 1}`;
+            if (msg == null) {
+                console.log("null message in tab list at index", index);
+            }
+            if (msg.inputType != null && msg.inputType.length > 0) {
+                // todo: inputTypeDescriptions[msg.type] + inputType
+                //const typeName = msg.type;
+                let typeInfo = msg.inputType;
+                if (typeInfo != null && typeInfo.startsWith('default/')) {
+                    typeInfo = typeInfo.slice(8);
+                }
+
+                if (msg.ft8MessageType && msg.inputType && !['free text', 'telemetry'].includes(msg.inputType)) {
+                    typeInfo += ' → ' + (extra.getFT8MessageTypeName(msg.ft8MessageType) || msg.ft8MessageType);
+                }
+                //tabButton.textContent = msg.bestDecodedResult?.success ? `${inputType}: ${msg.bestDecodedResult.decodedText}` : `${inputType}`;
+                tabButton.innerHTML = msg.bestDecodedResult?.success ? `<b>${msg.bestDecodedResult.decodedText}</b><br>${typeInfo}` : `${typeInfo}`;
+
+            } else {
+                tabButton.textContent = `Tab ${index + 1}`;
+            }
             tabButton.classList.add('tab-button');
             //if (index === activeIndex) {
             if (msg === message) {
                 tabButton.classList.add('active');
+            } else if (!msg.encodeError && !message.encodeError && msg.bits === message.bits) {
+                tabButton.classList.add('equal');
+            }
+            
+            //todo: warning too
+            if (msg.encodeError) {
+                tabButton.classList.add('error');
             }
             tabButton.onclick = () => handleTabSwitch(msg); // handleTabSwitch(index)
             tabContainer.appendChild(tabButton);

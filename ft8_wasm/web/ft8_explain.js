@@ -10,7 +10,7 @@ export function explainFT8Message(text, msgType) {
 
     const parts = text.trim().split(/\s+/);
     let explanation = '';
-    console.log(parts);
+    //console.log(parts); // [ "K1ABC", "W9XYZ", "RRR" ]
 
     function isSimpleCallsign(call) {
         return /^[A-Z0-9]{1,6}$/.test(call);

@@ -39,7 +39,6 @@ class FT8Message extends EventTarget {
                 this.initPackedData(packingResult.data);
 
             } else {
-                //this.encodeError_ft8lib // scrap this
                 throw new Error(`Encoding failed (code ${packingResult.errorCode}): ${packingResult.errorMessage}`);
             }
 
@@ -118,16 +117,15 @@ class FT8Message extends EventTarget {
       this.inputType = null; // can be manual set, otherwise auto-detected
       this.expectedResults = expectedResults; // if running test against known input
 
-      // results of encoding
-      this.encodeError = null;
-      this.encodeError_ft8lib = null; //TODO: remove
-      //this.encodedData = null;
-
       // Always set all three by calling one of the init methods (unless there's an error)
       this.symbolsText = null;
       this.packedData = null;
       this.bits = null; // string of 77 bits
 
+      // results of encoding
+      this.encodeError = null;
+
+      // results of decoding final packed message
       this.ft8libDecodedResult = null;
       this.mshvDecodedResult = null;
       this.bestDecodedResult = null;

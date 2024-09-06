@@ -727,8 +727,11 @@ export function encodeFT8FreeText(message) {
 // Encode hex to 71-bits of telemetry data in a 77-bit payload
 export function encodeFT8Telemetry(telemetryHex) {
   
-  if (!/^[0-9A-Fa-f]{1,18}$/.test(telemetryHex)) {
-    return { "error": "Telemetry data must be a 1 to 18 character hex string" };
+  //if (!/^[0-9A-Fa-f]{1,18}$/.test(telemetryHex)) {
+  if (!/^[0-9A-Fa-f]*$/.test(telemetryHex)) {
+    return { "error": `Invalid character(s) found in telemetry data. Must contain only hex values (0 to F).` };
+  } else if (telemetryHex.length > 18 || telemetryHex.length < 1) {
+    return { "error": `Telemetry data must be a 1 to 18 hex character string. Found ${telemetryHex.length} hex characters.` };
   }
 
   let binaryString = hexToBinary(telemetryHex); // leading 0's are trimmed
@@ -957,7 +960,7 @@ export function getFT8MessageType(packedData) {
 
 export function getFT8MessageTypeName(type) {
     switch (type) {
-        case "0.0": return "Free text message";
+        case "0.0": return "Free text";
         case "0.1": return "DXpedition mode";
         case "0.2": return "Unknown / Reserved";
         case "0.3": return "Field Day";

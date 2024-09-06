@@ -90,7 +90,7 @@ class FT8Message extends EventTarget {
             throw new Error("Packed data does not match bits");
         }
 
-        this.ft8MessageType ??= extra.getFT8MessageType(this.packedData);
+        this.ft8MessageType ??= extra.getFT8MessageType(this.bits);
 
         // re-encoding messages
         
@@ -104,7 +104,7 @@ class FT8Message extends EventTarget {
         if (resultMshv != null && resultMshv.errorCode == 0) {
             this.mshvDecodedResult = {success: true, resultText: resultMshv.message, result: resultMshv.message, decodedText: resultMshv.message };
         } else {
-            this.mshvDecodedResult = {success: false, resultText: resultMshv?.message, result: null, decodedText: null };
+            this.mshvDecodedResult = {success: false, error: true, result: 'error', errorMessage: resultMshv?.message, errorCode: resultMshv.errorCode, decodedText: null };
         }
 
         this.bestDecodedResult = this.mshvDecodedResult?.success ? this.mshvDecodedResult : (this.ft8libDecodedResult?.success ? this.ft8libDecodedResult : this.mshvDecodedResult);

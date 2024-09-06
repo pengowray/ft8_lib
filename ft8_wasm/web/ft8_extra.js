@@ -941,7 +941,7 @@ export function symbolsToPackedData(symbolsText) {
  * @param {Uint8Array} packedData - The packed 77-bit message payload (10 bytes)
  * @returns {string} The extracted message type
  */
-export function getFT8MessageType(packedData) {
+export function getFT8MessageTypeFromPacked(packedData) {
     if (!packedData || packedData.length < 10) {
         return "-";
     }
@@ -956,6 +956,26 @@ export function getFT8MessageType(packedData) {
     
     return i3.toString();
 }
+
+export function getFT8MessageType(bits) {
+    const i3 = parseInt(bits.slice(74, 77), 2);
+    if (i3 === 0) {
+        const n3 = parseInt(bits.slice(71, 74), 2);
+        const type = `0.${n3}`;
+        if (type === "0.6") {
+            if (bits[49] == '1') { // j50 
+                return "wspr2"; // '--1'
+            } else if (bits[48] == '0') { // j49 'x00'
+                return "wspr1"; // '-00'
+            } else if (bits[47] == '0') { // j48
+                return "wspr3"; // '010'
+            }
+        }
+        return type;
+    }
+    return i3.toString();
+}
+
 
 export function getFT8MessageTypeName(type) {
     switch (type) {
@@ -975,6 +995,9 @@ export function getFT8MessageTypeName(type) {
         case "6": return "Unknown / Reserved";
         case "7": return "Unknown / Reserved";
         case "spp": return "Space Packet Protocol";
+        case "wspr1": return "WSPR 1";
+        case "wspr2": return "WSPR 2";
+        case "wspr3": return "WSPR 3";
         default: return "Unknown";
     }
 }

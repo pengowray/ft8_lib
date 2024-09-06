@@ -449,7 +449,7 @@ function initializeUI() {
             //if (index === activeIndex) {
             if (msg === message) {
                 tabButton.classList.add('active');
-            } else if (!msg.encodeError && !message.encodeError && msg.bits === message.packetType && msg.packetType) {
+            } else if (!msg.encodeError && !message.encodeError && msg.bits === message.bits && msg.packetType == message.packetType) {
                 tabButton.classList.add('equal');
             }
 

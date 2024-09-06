@@ -183,10 +183,13 @@ export class TribbleComponent extends Component {
             this.addAnnotation(annotationsRow1, 'data', null, 129, 87);
             this.addAnnotation(annotationsRow1, 'sync', null, 216, 21);
 
-            this.addAnnotation(annotationsRow2, 'payload', null, 21, 77);
+            this.addAnnotation(annotationsRow2, 'ft8 payload', null, 21, 77);
             this.addAnnotation(annotationsRow2, 'crc', null, 98, 10);
             this.addAnnotation(annotationsRow2, 'crc', null, 129, 4);
             this.addAnnotation(annotationsRow2, 'parity', null, 133, 83);
+        }
+        if (message.ft8MessageType.startsWith('wspr')) {
+            this.addAnnotation(annotationsRow2, 'wspr payload', null, 21, 50);
         }
         const defs = annotationDefinitions[ft8MessageType];
         if (defs) {

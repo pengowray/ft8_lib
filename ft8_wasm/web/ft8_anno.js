@@ -6,6 +6,7 @@ export const def_i3 = { label: "Message type", shortLabel:'i3', tag:'i3', start:
 // note: don't use shortLabel if not needed to display on tribble bit display
 
 export const annotationDefinitions = {
+    "this is text": [],
     "0.0": [ // Free text
         { label: "Free text", tag:'f71', start: 0, length: 71, getValue: bitsToText },
         def_i3n3
@@ -44,17 +45,32 @@ export const annotationDefinitions = {
         { label: "Telemetry", tag: 't71', start: 0, length: 71, getValue: telemetryBitsToText, subdefs: telemetryByteAnnotations() },
         def_i3n3
     ],
-    "0.6": [ // WSPR type 1, 2, and 3
-        { label: "Call", tag:'c28', start: 0, length: 28, getValue: bitsToCall },
-        { label: "Grid/Report", tag:'g15', start: 28, length: 15, getValue: bitsToGrid4OrReportWithType },
-        { label: 'Power', tag: 'dBm', start: 43, length: 3, getValue: placeholder },
-        { label: 'WSRP', tag: 'j3', start: 46, length: 3, getValue: placeholder }, // subtype
+    "wspr1": [ // WSPR type 1
+        { label: "Call", tag:'n28', start: 0, length: 28, getValue: bitsToCall },
+        { label: "Grid", tag:'b15', start: 28, length: 15, getValue: bitsToGrid4OrReportWithType },
+        { label: 'Power', tag: 'b5', start: 43, length: 5, getValue: wsprPower }, // 7 bits for power level? (wikipedia)
+        { label: 'WSRP type', tag: 'j2', start: 48, length: 2, getValue: wsprType },
+        def_i3n3
+    ],
+    "wspr2": [ // WSPR type 2
+        { label: "Call", tag:'n28', start: 0, length: 28, getValue: bitsToCall },
+        { label: "npfx", tag:'b16', start: 28, length: 16, getValue: placeholder }, // crpt?
+        { label: 'Power', tag: 'b5', start: 44, length: 5, getValue: wsprPower },
+        { label: 'WSRP type', tag: 'j2', start: 49, length: 1, getValue: wsprType },
+        def_i3n3
+    ],
+    "wspr3": [ // WSPR type 3
+        { label: "Call", tag:'b22', start: 0, length: 22, getValue: placeholder },
+        { label: "Grid6", tag:'b25', start: 22, length: 25, getValue: bitsToGrid6 },
+        { label: 'WSRP type', tag: 'j3', start: 47, length: 3, getValue: wsprType },
+        def_i3n3
+    ],
+    "0.6": [
         def_i3n3
     ],
     "0.7": [ // undefined
         def_i3n3
     ],
-
     "1": [ // Standard message
         { label: "Call A", tag:'c28', start: 0, length: 28, getValue: bitsToCall },
         { label: "/R", shortLabel:'r', tag:'r1a', start: 28, length: 1, getValue: callsignModFlagR },
@@ -176,6 +192,25 @@ function tuFlag(bit) {
     } else {
         return {isFlag: true, value: bit, on: 'TU', off: nada }
     }
+}
+
+function wsprPower(bits) {
+    const val = parseInt(bits, 2);
+    const dBm = Math.round(val*10.0/3.0);
+    const isValid = dBm >= 0 && dBm <= 60;
+    const subtype = isValid ? null : 'out of range';
+    return { value: dBm, units: 'dBm', subtype, desc: 'Transmitter power level' };
+}
+
+function wsprType(bits) {
+    if (bits === '1') {
+        return { value: '2', units: 'WSPR type' };
+    } else if (bits === '00') {
+        return { value: '1', units: 'WSPR type' };
+    } else if (bits === '010') {
+        return { value: '3', units: 'WSPR type' };
+    }
+    return { value: bits, units: 'binary', subtype: 'Error', desc: 'Not a WSPR type' };
 }
 
 function sppVersionNumber(bits) {

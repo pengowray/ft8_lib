@@ -43,7 +43,7 @@ export class OutputComponent extends Component {
             messageTypeInfo: extra.getFT8MessageTypeName(message.ft8MessageType),
             decoded: this.prepareDecodedInfo(),
             comment: message.expectedResults?.comment,
-            decodedText: message.bestDecodeResult?.success ? message.bestDecodeResult?.decodedText : '',
+            decodedText: message.bestDecodedResult?.success ? message.bestDecodedResult?.decodedText : '',
             decodedText_ft8lib: message.ft8libDecodedResult?.decodedText,
             decodedText_mshv: message.mshvDecodedResult?.success ? message.mshvDecodedResult?.decodedText : '',
             ft8libDecodedResult: message.ft8libDecodedResult,
@@ -86,7 +86,7 @@ export class OutputComponent extends Component {
 
         const decodeResult = this.message.bestDecodedResult;
         if (decodeResult == null) {
-            return { error: true, result: 'error', message: 'No decode result' };
+            return [ { error: true, result: 'error', message: 'No decode result' } ];
         }
 
         const decodeTest1 = { name: "decode", ...decodeResult };
@@ -98,7 +98,7 @@ export class OutputComponent extends Component {
         decodeTest1.resultText = 'success';
         decodeTest1.result = 'ok';
 
-        const decoded = decodeResult.decodedText;
+        const decoded = decodeResult?.decodedText;
         const originalInput = this.message.inputText;
         const inputType = this.message.inputType;
 
@@ -193,7 +193,7 @@ export class OutputComponent extends Component {
                 result: (expected.error ? (match ? 'warning' : 'warning') : (match ? 'ok' : 'error')),
                 resultText: (expected.error ? (match ? 'Matched test*' : 'Did not match test*') : (match ? 'Matched test' : 'Did not match test')),
                 expected: expectedMessage,
-                actual: this.message.ft8libDecodedResult?.decodedText,
+                actual: this.message.bestDecodedResult?.decodedText,
                 note: expected.error ? "Error or truncated result expected" : null
             };
             const hashMatch = (normalizeMessageAndHashes(expectedMessage) === normalizeMessageAndHashes(this.message.ft8libDecodedResult?.decodedText ?? ''));
@@ -473,7 +473,10 @@ export class OutputComponent extends Component {
                 default: return '';
             }
         };
-        if (checks == null) return '';
+        if (checks == null) {
+            console.log('no checks', checks);
+            return '';
+        }
 
         const checksHtml = checks.map(check => `
             <span class="check-result check-${check.result.toLowerCase()}">

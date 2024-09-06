@@ -63,6 +63,14 @@ export const testInputs_ft8code = [
       "type": "0.5",
       "symbols": "3140652 11045365753236716724005630431 3140652 62063315364670325657643764734 3140652"
     },
+    { 
+      'name': 'Test WSPR-1 FT8',
+      'type': '0.6',
+      'message': "AA9GO EM66 33", 
+      'decoded': "AA9GO EM66 33", 
+      'symbols': "3140652 35566157660311130000000151573 3140652 11560105214477105573475466602 3140652", 
+      'comment': 'WSPR Type 1 message (50-bit) inside an FT8 message, as created by wsjt-x' 
+    },
     {
       "message": "CQ K1ABC FN42",
       "type": "1.",
@@ -267,7 +275,7 @@ export const testInputs_ft8code = [
       "message": "<KA1ABC> YW18FIFA RR73",
       "type": "4.",
       "symbols": "3140652 12320000026470717462032610755 3140652 73041016005003413426660204571 3140652"
-    }
-  ];
+    },
+];
 
 //export { ft8_examples, testInputs_ft8code }

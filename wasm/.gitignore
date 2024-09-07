@@ -37,10 +37,6 @@ CMakeFiles/
 cmake_install.cmake
 Makefile
 
-# WebAssembly output
-*.wasm
-*.js
-
 # Editor-specific files
 .vscode/
 .idea/

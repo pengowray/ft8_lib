@@ -56,7 +56,7 @@ export const annotationDefinitions = {
         { label: "Call", tag:'n28', start: 0, length: 28, getValue: bitsToCall },
         { label: "npfx", tag:'b16', start: 28, length: 16, getValue: placeholder }, // crpt?
         { label: 'Power', tag: 'b5', start: 44, length: 5, getValue: wsprPower },
-        { label: 'WSRP type', tag: 'j2', start: 49, length: 1, getValue: wsprType },
+        { label: 'WSRP type', tag: 'j1', start: 49, length: 1, getValue: wsprType },
         def_i3n3
     ],
     "wspr3": [ // WSPR type 3
@@ -204,7 +204,7 @@ function wsprPower(bits) {
 
 function wsprType(bits) {
     if (bits === '1') {
-        return { value: '2', units: 'WSPR type' };
+        return { value: '2', units: 'WSPR type', rawAppend: '' };
     } else if (bits === '00') {
         return { value: '1', units: 'WSPR type' };
     } else if (bits === '010') {

@@ -2,37 +2,23 @@ import { FT8Message } from './ft8_msg.js';
 import { grayBitsToSymbols, encodeFT8FreeText, packedDataTo80Bits, getFT8MessageType, normalizeMessage, normalizeMessageAndHashes, normalizeBracketedFreeText, checkSync, checkCRC, checkParity, repairErrorsOnce, symbolsToBitsStrNoCosta  } from "./ft8_extra.js";
 import * as extra from "./ft8_extra.js";
 import * as hashmgr from "./ft8_hashmgr.js";
-import FT8LIB from "./ft8_ft8lib.js";
-import MSHVFT8 from "./mshv_ft8_wrap.js";
 
-//example:
 /*
-
-// format: 'ft8/77b', ''ft8/text', 'ft8/text'
+// format: 'ft8/77b', 'ft8/text',  ...
 // generic formats: 'bits', 'text', 'symbols', 'ft8/bits', 'ft8/text', 'ft8/symbols'
 // engine: 'ft8_lib', 'mshv', 'ft8play'
-// engineVersion: 'MSHV 245'
+// engineVersion: example: 'MSHV 245'
 // error: means error creating ft8_msg; NOT error validating msg, but that should also be indicated on the tab
 // todo: processing (flags): 'rpad', 'ucase', 'normalize' (e.g. removed spaces), 'flip bits', 'grits', 'truncate text', 'remove zero padding' ...
 //      'hash(es) not expanded'
 // todo: assumptions (interpretation): 'hash1 match' (assumed not a collision), 'is ft8',
-// todo: merge identical tabs (when engines give same output)
-// todo: { meh: true } less interesting tabs, e.g. grits or flip bits when more basic results are available or when not valid result
-// todo: future formats: 'wspr', 'js8', 'hash', 'spp'
-
-let tabs = {
-    '0.0': null, 
-    '0.5': null, // { message: 'A00FA', format: 'ft8/77b', title: 'Telemetry', isValid: true, error: null, bits: '10111...' }
-    'ft8lib': null,
-    'msvh': null,
-    'ft8play': null,
-    '_selected': '0.0'
-};
+// todo: { meh: true } less interesting tabs, e.g. grits or flip bits when more basic results are available or when not valid result; hide behind a "more..." button
+// todo: future formats: [X] wspr in ft8, [ ] wspr, [ ] js8, [ ] hash, [X] spp
 */
 
-
 export function globalInputNormalization(input) {
-    // any input types we shouldn't normalize in all the ways?
+    //TODO: any input types we shouldn't normalize in all the ways?
+
     // 'Größe Straße' -> 'GROSSE STRASSE'
     // '“Café ① ² × ³ Olé”' -> '"CAFE 1 2 X 3 OLE"'
 
@@ -100,7 +86,7 @@ function initMessage(message, normalizedInput, inputType) { // was: encode()
         case '82 bits':
             const zeroPadding = bitStr.slice(77);
             if (zeroPadding != '000' && zeroPadding != '00000') {
-                throw new Error(`Invalid ${inputType} message: not zero extended. Expected 77 bits + 3 or 5 zeros; Found: ${bitStr}`);
+                throw new Error(`Invalid ${inputType} message: not zero extended. Expected 77 bits + 3 or 5 zeros; Found: ${bitStr.slice(0,77)} ${zeroPadding}`);
             }
             message.initBits(bitStr.slice(0, 77));
             return;
@@ -140,13 +126,11 @@ function initMessage(message, normalizedInput, inputType) { // was: encode()
 }
 
 /////////////////////////////////
-/*
-    
-*/
 
 export function detectTelemetry(str) {
     //exactly 18 hex digits, or start with T:
     //note: first digit must be 0-8 if 18 digits. (not checked here)
+    //todo: also consider 0x prefix, h suffix, (for this and packed hex)
     const trimmed = str.trim().toUpperCase();
     return (/^([0-9A-Fa-f][\s\-\:\,]?){18}$/.test(trimmed)) 
           || (/^[T](ELEMETRY)?\s*:/.test(trimmed))
@@ -154,8 +138,9 @@ export function detectTelemetry(str) {
 }
 
 export function detectPossibleTelemetry(str) {
-    //hex digits (ignoring length)
-    return (/^([0-9A-Fa-f][-\s\:\,]?)+$/.test(str));
+    //hex digits, near proper length but less than packed data length
+    //note: bits (0,1) and symbols (0-7) are valid hex too
+    return (/^([0-9A-Fa-f][-\s\:\,]?)+$/.test(str) && str.length >= 1 && str.length < 20);
 }
 
 function detectFreeTextBrackets(str) {
@@ -254,6 +239,17 @@ export function inputToTabs(inputOriginal, expectedResults = null) {
         }
     }
 
+    if (expectedResults && expectedResults.symbols && expectedResults.symbols.length >= 79) {
+        const expectedSymbols = expectedResults.symbols;
+        const normalizedSymbols = normalizeType(expectedSymbols, '79 symbols');
+        let expectedMsg = new FT8Message(expectedSymbols, expectedResults);
+        expectedMsg.normalizedInput = normalizedSymbols;
+        expectedMsg.initSymbolsText(normalizedSymbols);
+        expectedMsg.inputType = 'expected';
+        expectedMsg.bestDecodedResultFromExpected(expectedResults);
+        tabs.push(expectedMsg);
+    }
+
     tabs.forEach(message => {
         message.tabs = tabs;
     });
@@ -334,9 +330,8 @@ export function detectInputTypes(normalizedInput, inputOriginal) {
     if (detectTelemetry(input)) {
         inputTypes['telemetry'] = 30;
     } else if (detectPossibleTelemetry(input)) {
-        // only hex digits of any length
-        // will also match many other types (bits, symbols, packed hex)
-        inputTypes['telemetry'] = 15;
+        // only hex digits, length < 20
+        inputTypes['telemetry'] = 6; // before only fallback free text
     }
 
     const normBinary = normalizeBinary(input);
@@ -346,7 +341,7 @@ export function detectInputTypes(normalizedInput, inputOriginal) {
             inputTypes[`${len} bits`] = 20; // '77 bits' to '237 bits'
         }  else {
             //todo: add 'Unrecognized binary length' type or show the warning somewhere
-            info.warn = `Unrecognized binary string length: ${len} bits`;
+            console.log(`Unrecognized binary string length: ${len} bits`);
         }
     }
 

@@ -187,7 +187,7 @@ export class OutputComponent extends Component {
 
         const expectedMessage = expected.decoded ?? expected.message;
         if (expectedMessage) {
-            const match = (expectedMessage.trim() === this.message.decodedResult?.decodedText?.trim() ?? '');
+            const match = (expectedMessage.trim() === this.message.bestDecodedResult?.decodedText?.trim() ?? '[fail]');
             const test = {
                 name: "Message text",
                 result: (expected.error ? (match ? 'warning' : 'warning') : (match ? 'ok' : 'error')),
@@ -196,7 +196,7 @@ export class OutputComponent extends Component {
                 actual: this.message.bestDecodedResult?.decodedText,
                 note: expected.error ? "Error or truncated result expected" : null
             };
-            const hashMatch = (normalizeMessageAndHashes(expectedMessage) === normalizeMessageAndHashes(this.message.ft8libDecodedResult?.decodedText ?? ''));
+            const hashMatch = (normalizeMessageAndHashes(expectedMessage) === normalizeMessageAndHashes(this.message.bestDecodedResult?.decodedText ?? '[fail]'));
             if (!match && hashMatch) {
                 test.result = 'ok';
                 test.resultText = 'Matched test*';
@@ -384,7 +384,7 @@ export class OutputComponent extends Component {
             if (isFlag) { 
                 valueText = `${this.makeSwitch(bits === '1', off, on)}`;
 
-            } else if (bits == '0' || bits == '1') {
+            } else if ((bits == '0' || bits == '1') && units == null) { // not a switch if you set units; bit of a hack
                 //valueText = `<span class="output-data>${this.makeSwitch(bits === '1', '0', '1')}</span>`;
                 valueText = `${this.makeSwitch(bits === '1', '0', '1')}`;
             } else {
@@ -397,7 +397,7 @@ export class OutputComponent extends Component {
                 <div class="output-label">${label}${secondaryLabel ? ` <span class="output-sublabel">${secondaryLabel}` : ''}</span></div>` 
                 + `<div class="output-value">${valueText}${ units ? `<span class="output-comment-info"> ${units}</span>` : '' }`
                 + `${ subtype ? `<div class="output-metadata">${subtype}</div>` : ''}` 
-                + `${(bits && bits.length >= 2) ? `<div class="output-raw-values">Raw value: ${bits} (=${rawIntValue})${rawAppend ? ` ${rawAppend}` : ''}</div>` : '' }`  +
+                + `${(bits && (bits.length >= 2 || rawAppend != null)) ? `<div class="output-raw-values">Raw value: ${bits} (=${rawIntValue})${rawAppend ? ` ${rawAppend}` : ''}</div>` : '' }`  +
                `</div>`
                 + `${desc ? `<div class="output-comment">${escapeHTML(desc).replace('\n','<br>')}</div>` : ''}` 
                 + `${descNoEsc ? `<div class="output-comment">${descNoEsc}</div>` : ''}
@@ -474,7 +474,7 @@ export class OutputComponent extends Component {
             }
         };
         if (checks == null) {
-            console.log('no checks', checks);
+            //console.log('no checks', checks);
             return '';
         }
 

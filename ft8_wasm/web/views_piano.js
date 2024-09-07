@@ -71,8 +71,6 @@ export class PianoRollComponent extends Component {
     }
 
     onPlay() {
-        console.log('piano playing');
-
         if (this.message == null) return;
 
         this.message.readyAudioAndBuffer();

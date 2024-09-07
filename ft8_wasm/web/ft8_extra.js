@@ -730,7 +730,7 @@ export function encodeFT8Telemetry(telemetryHex) {
   if (!/^[0-9A-Fa-f]*$/.test(telemetryHex)) {
     return { "error": `Invalid character(s) found in telemetry data. Must contain only hex values (0 to F).` };
   } else if (telemetryHex.length > 18 || telemetryHex.length < 1) {
-    return { "error": `Telemetry data must be a 1 to 18 hex character string. Found ${telemetryHex.length} hex characters.` };
+    return { "error": `Telemetry data must be a 1 to 18 hex character string. Found ${telemetryHex.length} hex characters. (May exclude leading zeros)` };
   }
 
   let binaryString = hexToBinary(telemetryHex); // leading 0's are trimmed

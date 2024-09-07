@@ -165,7 +165,7 @@ class CTYData {
   }
 
   getCountryDetails(callsign) {
-    callsign = callsign.toUpperCase();
+    callsign = callsign.toUpperCase().trim();;
     let node = this.prefixTrie;
     let lastMatchingNode = null;
     let exactMatch = null;

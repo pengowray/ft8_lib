@@ -110,6 +110,24 @@ class FT8Message extends EventTarget {
         this.bestDecodedResult = this.mshvDecodedResult?.success ? this.mshvDecodedResult : (this.ft8libDecodedResult?.success ? this.ft8libDecodedResult : this.mshvDecodedResult);
     }
 
+    bestDecodedResultFromExpected(expectedResults) {
+        if (expectedResults == null) {
+            this.bestDecodedResult = null;
+            return;
+        }
+        
+        if (!expectedResults.error) {
+            this.bestDecodedResult = {success: true, resultText: expectedResults.message, result: expectedResults.message, decodedText: expectedResults.message };
+        } else {
+            this.bestDecodedResult = {success: false, error: true, result: 'error', result: expectedResults.message, errorMessage: 'Could not unpack in reference', decodedText: expectedResults.decoded };
+            this.decodingError = expectedResults.decoded;
+
+        }
+
+
+        return null;
+    }
+
     constructor(inputText, expectedResults = null) {
       super();
 

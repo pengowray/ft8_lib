@@ -76,12 +76,15 @@ function initializeUI() {
             testSelect.appendChild(option);
         });
 
+        //TODO: check if there's anything lost by not having these and only having the "expected" tab instead
+        /*
         testInputs_ft8code.forEach((test, index) => {
             const option2 = document.createElement('option');
             option2.value = `ft8codeSymbols ${index}`;
             option2.textContent = `(${test.type}) ${test.message} (unpack)`;
             testSelect.appendChild(option2);
         });
+        */
 
         testSelect.addEventListener('change', handleTestInputChange);
     }

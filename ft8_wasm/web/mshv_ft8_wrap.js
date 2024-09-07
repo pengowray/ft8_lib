@@ -1,8 +1,13 @@
-import createMshvFT8Module from './mshv_ft8.js';
+import createMshvFT8Module from './mshv/mshv_ft8.js';
 
 class MSHVFT8 {
   constructor(readyCallback) {
-    createMshvFT8Module().then(module => {
+    createMshvFT8Module({
+      locateFile: function(path, prefix) {
+        if (path.endsWith('.wasm')) return './mshv/' + path;
+        return prefix + path;
+      }
+    }).then(module => {
       this.module = module;
       this.initFT8 = this.module.cwrap('init_ft8', null, []);
       this.createInstance = this.module.cwrap('create_packunpack77_instance', 'number', ['boolean']);

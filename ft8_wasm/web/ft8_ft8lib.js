@@ -1,11 +1,16 @@
 import {arrayToSymbols, symbolsToArray} from './ft8_extra.js';
-import create_ft8lib_module from './ft8_wasm.js';
+import create_ft8lib_module from './ft8lib/ft8_wasm.js';
 
 export const FT8_NN = 79; // Total channel symbols
 
 class FT8Lib {
   constructor(readyCallback) {
-    create_ft8lib_module().then(module => {
+    create_ft8lib_module({
+      locateFile: function(path, prefix) {
+        if (path.endsWith('.wasm')) return './ft8lib/' + path;
+        return prefix + path;
+      }
+    }).then(module => {
         this.module = module;
         this.initializeFunctions();
         if (readyCallback) readyCallback();

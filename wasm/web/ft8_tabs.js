@@ -140,7 +140,8 @@ export function detectTelemetry(str) {
 export function detectPossibleTelemetry(str) {
     //hex digits, near proper length but less than packed data length
     //note: bits (0,1) and symbols (0-7) are valid hex too
-    return (/^([0-9A-Fa-f][-\s\:\,]?)+$/.test(str) && str.length >= 1 && str.length < 20);
+    const trimmed = str.trim().toUpperCase();
+    return (/^([0-9A-Fa-f][\s\-\:\,]?){1,19}$/.test(trimmed));
 }
 
 function detectFreeTextBrackets(str) {

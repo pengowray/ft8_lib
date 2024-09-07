@@ -39,9 +39,9 @@ set_target_properties(ft8_wasm PROPERTIES LINK_FLAGS "\
 
 # Add a custom command to copy the resulting .js and .wasm files
 add_custom_command(TARGET ft8_wasm POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/web
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/web/ft8lib
     COMMAND ${CMAKE_COMMAND} -E copy
         ${CMAKE_CURRENT_BINARY_DIR}/ft8_wasm.js
         ${CMAKE_CURRENT_BINARY_DIR}/ft8_wasm.wasm
-        ${CMAKE_SOURCE_DIR}/web
+        ${CMAKE_SOURCE_DIR}/web/ft8lib
 )

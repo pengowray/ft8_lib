@@ -69,7 +69,8 @@ bool decft8_decode_symbols(const uint8_t* symbols, int symbol_count, char* decod
     memcpy(message.payload, payload, FTX_PAYLOAD_LENGTH_BYTES);
 
     // Decode the message
-    ftx_message_rc_t rc = ftx_message_decode(&message, NULL, decoded_text);
+    ftx_message_offsets_t offsets;
+    ftx_message_rc_t rc = ftx_message_decode(&message, NULL, decoded_text, &offsets);
 
     if (rc != FTX_MESSAGE_RC_OK) {
         printf("Error: Message decoding failed with code %d\n", rc);
@@ -90,8 +91,9 @@ bool decft8_decode_packed(const uint8_t* packed_data, int packed_size, char* dec
     memcpy(message.payload, packed_data, packed_size);
 
     // Decode the message
-    //ftx_message_rc_t rc = ftx_message_decode(&message, &hash_if, decoded_text);
-    ftx_message_rc_t rc = ftx_message_decode(&message, NULL, decoded_text);
+    //ftx_message_rc_t rc = ftx_message_decode(&message, &hash_if, decoded_text, &offsets);
+    ftx_message_offsets_t offsets;
+    ftx_message_rc_t rc = ftx_message_decode(&message, NULL, decoded_text, &offsets);
     
     if (rc != FTX_MESSAGE_RC_OK) {
         snprintf(decoded_text, max_text_length, "Decoding failed (error code: %d)", rc);

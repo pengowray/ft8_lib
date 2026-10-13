@@ -76,60 +76,99 @@ typedef struct {
     char* error_message;
 } FT8DecodeResult;
 
+// Result of decodeFT8PackedDataFields(). Starts with an FT8DecodeResult, so the
+// first three fields are at the same offsets, and freeFT8DecodeResult() frees it.
+typedef struct {
+    FT8DecodeResult base;                      // +0 decoded_text, +4 error_code, +8 error_message
+    int field_types[FTX_MAX_MESSAGE_FIELDS];   // +12 ftx_field_t value for each field (see ft8/message.h)
+    int field_offsets[FTX_MAX_MESSAGE_FIELDS]; // +24 character offset of each field in decoded_text, or -1 if unused
+} FT8DecodeFieldsResult;
+
+static const char* message_rc_text(ftx_message_rc_t rc, const char* unknown_text) {
+    switch (rc) {
+        case FTX_MESSAGE_RC_ERROR_CALLSIGN1:
+            return "Invalid first callsign";
+        case FTX_MESSAGE_RC_ERROR_CALLSIGN2:
+            return "Invalid second callsign";
+        case FTX_MESSAGE_RC_ERROR_SUFFIX:
+            return "Invalid callsign suffix";
+        case FTX_MESSAGE_RC_ERROR_GRID:
+            return "Invalid grid locator";
+        case FTX_MESSAGE_RC_ERROR_TYPE:
+            return "Unsupported message type";
+        default:
+            return unknown_text;
+    }
+}
+
+// Decodes packed_data into result and offsets. Returns false if memory allocation failed.
+static bool decode_packed(const uint8_t* packed_data, int packed_size, FT8DecodeResult* result, ftx_message_offsets_t* offsets) {
+    result->error_message = NULL;
+    for (int i = 0; i < FTX_MAX_MESSAGE_FIELDS; ++i) {
+        offsets->types[i] = FTX_FIELD_UNKNOWN;
+        offsets->offsets[i] = -1;
+    }
+
+    result->decoded_text = (char*)malloc(FTX_MAX_MESSAGE_LENGTH);
+    if (!result->decoded_text) {
+        return false;
+    }
+
+    if (packed_size != FTX_PAYLOAD_LENGTH_BYTES) {
+        result->error_code = -2; // Custom error code for invalid size
+        result->error_message = strdup("Invalid packed data size");
+        result->decoded_text[0] = '\0';
+        return true;
+    }
+
+    ftx_message_t message;
+    memcpy(message.payload, packed_data, packed_size);
+
+    //ftx_message_rc_t rc = ftx_message_decode(&message, &hash_if, result->decoded_text, offsets);
+    ftx_message_rc_t rc = ftx_message_decode(&message, NULL, result->decoded_text, offsets);
+
+    result->error_code = rc;
+    if (rc != FTX_MESSAGE_RC_OK) {
+        result->error_message = strdup(message_rc_text(rc, "Unknown decoding error"));
+        result->decoded_text[0] = '\0';
+    }
+    return true;
+}
+
 EMSCRIPTEN_KEEPALIVE
 FT8DecodeResult* decodeFT8PackedData(const uint8_t* packed_data, int packed_size) {
     FT8DecodeResult* result = (FT8DecodeResult*)malloc(sizeof(FT8DecodeResult));
     if (!result) {
         return NULL; // Memory allocation failed
     }
-    
-    result->decoded_text = (char*)malloc(FTX_MAX_MESSAGE_LENGTH);
-    if (!result->decoded_text) {
+
+    ftx_message_offsets_t offsets;
+    if (!decode_packed(packed_data, packed_size, result, &offsets)) {
         free(result);
         return NULL; // Memory allocation failed
     }
-    
-    if (packed_size != FTX_PAYLOAD_LENGTH_BYTES) {
-        result->error_code = -2; // Custom error code for invalid size
-        result->error_message = strdup("Invalid packed data size");
-        result->decoded_text[0] = '\0';
-        return result;
+    return result;
+}
+
+// Like decodeFT8PackedData(), but also returns the type and position of each field
+// in the decoded text (callsign, grid, report, token such as CQ or RR73).
+// Free the result with freeFT8DecodeResult().
+EMSCRIPTEN_KEEPALIVE
+FT8DecodeFieldsResult* decodeFT8PackedDataFields(const uint8_t* packed_data, int packed_size) {
+    FT8DecodeFieldsResult* result = (FT8DecodeFieldsResult*)malloc(sizeof(FT8DecodeFieldsResult));
+    if (!result) {
+        return NULL; // Memory allocation failed
     }
-    
-    ftx_message_t message;
-    memcpy(message.payload, packed_data, packed_size);
-    
-    //ftx_message_rc_t rc = ftx_message_decode(&message, &hash_if, result->decoded_text);
-    ftx_message_rc_t rc = ftx_message_decode(&message, NULL, result->decoded_text);
-    
-    result->error_code = rc;
-    if (rc != FTX_MESSAGE_RC_OK) {
-        const char* error_text;
-        switch (rc) {
-            case FTX_MESSAGE_RC_ERROR_CALLSIGN1:
-                error_text = "Invalid first callsign";
-                break;
-            case FTX_MESSAGE_RC_ERROR_CALLSIGN2:
-                error_text = "Invalid second callsign";
-                break;
-            case FTX_MESSAGE_RC_ERROR_SUFFIX:
-                error_text = "Invalid callsign suffix";
-                break;
-            case FTX_MESSAGE_RC_ERROR_GRID:
-                error_text = "Invalid grid locator";
-                break;
-            case FTX_MESSAGE_RC_ERROR_TYPE:
-                error_text = "Unsupported message type";
-                break;
-            default:
-                error_text = "Unknown decoding error";
-        }
-        result->error_message = strdup(error_text);
-        result->decoded_text[0] = '\0';
-    } else {
-        result->error_message = NULL;
+
+    ftx_message_offsets_t offsets;
+    if (!decode_packed(packed_data, packed_size, &result->base, &offsets)) {
+        free(result);
+        return NULL; // Memory allocation failed
     }
-    
+    for (int i = 0; i < FTX_MAX_MESSAGE_FIELDS; ++i) {
+        result->field_types[i] = offsets.types[i];
+        result->field_offsets[i] = offsets.offsets[i];
+    }
     return result;
 }
 
@@ -237,28 +276,7 @@ FT8EncodeResult* encodeFT8Message(const char* message) {
     if (rc != FTX_MESSAGE_RC_OK) {
         result->data = NULL;
         result->size = 0;
-        
-        const char* error_text;
-        switch (rc) {
-            case FTX_MESSAGE_RC_ERROR_CALLSIGN1:
-                error_text = "Invalid first callsign";
-                break;
-            case FTX_MESSAGE_RC_ERROR_CALLSIGN2:
-                error_text = "Invalid second callsign";
-                break;
-            case FTX_MESSAGE_RC_ERROR_SUFFIX:
-                error_text = "Invalid callsign suffix";
-                break;
-            case FTX_MESSAGE_RC_ERROR_GRID:
-                error_text = "Invalid grid locator";
-                break;
-            case FTX_MESSAGE_RC_ERROR_TYPE:
-                error_text = "Unsupported message type";
-                break;
-            default:
-                error_text = "Unknown error";
-        }
-        result->error_message = strdup(error_text);
+        result->error_message = strdup(message_rc_text(rc, "Unknown error"));
     } else {
         result->data = (uint8_t*)malloc(FTX_PAYLOAD_LENGTH_BYTES);
         if (!result->data) {
